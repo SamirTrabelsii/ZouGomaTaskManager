@@ -1,0 +1,35 @@
+# Local PostgreSQL for LifeOS.
+#   docker compose up -d db        -> database only (use with `npm run dev:all`)
+#   docker compose up -d --build   -> database + the full app on http://localhost:3001
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: lifeos
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lifeos-dev-password}
+      POSTGRES_DB: lifeos
+    ports:
+      - "127.0.0.1:5433:5432"   # bound to localhost only
+    volumes:
+      - lifeos-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lifeos"]
+      interval: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://lifeos:${POSTGRES_PASSWORD:-lifeos-dev-password}@db:5432/lifeos
+      PORT: 3001
+      COOKIE_SECURE: ${COOKIE_SECURE:-0}   # set to 1 when served over HTTPS
+    ports:
+      - "3001:3001"
+
+volumes:
+  lifeos-db:

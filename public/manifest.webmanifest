@@ -1,0 +1,10 @@
+{
+  "name": "LifeOS",
+  "short_name": "LifeOS",
+  "description": "Your personal studio: tasks, projects, habits, calendar and notes in one 3D room.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#080b1a",
+  "theme_color": "#12183a",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
