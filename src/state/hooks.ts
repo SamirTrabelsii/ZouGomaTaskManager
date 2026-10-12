@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { todayStr } from '../domain/dates';
+import { isNightLook, todayStr } from '../domain/dates';
 import { useStore } from './store';
 
 /** Current local date; rolls over at midnight without a reload. */
@@ -36,7 +36,7 @@ export function useNight(): boolean {
     const id = setInterval(() => setHour(new Date().getHours()), 60_000);
     return () => clearInterval(id);
   }, []);
-  return theme === 'evening' || (theme === 'auto' && (hour >= 19 || hour < 6));
+  return isNightLook(theme, hour);
 }
 
 export function useMedia(query: string): boolean {

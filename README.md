@@ -39,6 +39,8 @@ docker compose up -d --build
 
 Tests: `npm test` (the API tests need `npm run db:up`; they are skipped if PostgreSQL is unreachable and use a separate `lifeos_test` database).
 
+Browser tests: `npm run test:e2e` (Playwright, uses the Chrome installed on your machine; needs `npm run db:up`). It starts its own API on :3101 and dev server on :5273, wipes and uses only the `lifeos_test` database (refuses any other), and never touches your real `lifeos` data. `node e2e/perf-quality.mjs [--dpr=2]` measures frame pacing at each graphics quality.
+
 ## Account, sync and safety
 
 - **Local first.** Every change is saved in the browser immediately, then pushed to the server a moment later. The app keeps working offline and syncs when the server returns (header cloud icon shows the state).

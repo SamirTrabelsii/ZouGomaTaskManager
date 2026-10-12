@@ -1,6 +1,9 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
+// The e2e suite runs its own API (on the lifeos_test database) and points the dev server at it.
+const api = process.env.LIFEOS_API_URL ?? 'http://localhost:3001';
+
 export default defineConfig({
   plugins: [react()],
   build: {
@@ -11,7 +14,7 @@ export default defineConfig({
       },
     },
   },
-  server: { proxy: { '/api': { target: 'http://localhost:3001', changeOrigin: false } } },
-  preview: { proxy: { '/api': { target: 'http://localhost:3001', changeOrigin: false } } },
+  server: { proxy: { '/api': { target: api, changeOrigin: false } } },
+  preview: { proxy: { '/api': { target: api, changeOrigin: false } } },
   test: { environment: 'node', fileParallelism: false, include: ['src/**/*.test.ts', 'server/**/*.test.ts'] },
 });

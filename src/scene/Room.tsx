@@ -97,7 +97,8 @@ export function RoomShell({ evening }: { evening: boolean }) {
 
       {/* window: sky, glass, frame, sill */}
       <mesh position={[-4.2, 1.75, -0.4]} rotation={[0, Math.PI / 2, 0]}><planeGeometry args={[1.8, 1.5]} />
-        {evening ? <meshBasicMaterial map={skyTex} toneMapped={false} /> : <meshBasicMaterial color={sky} toneMapped={false} />}
+        {/* keyed: toggling `map` on one material instance does not recompile its shader, leaving the day sky stuck navy */}
+        {evening ? <meshBasicMaterial key="night" map={skyTex} toneMapped={false} /> : <meshBasicMaterial key="day" color={sky} toneMapped={false} />}
       </mesh>
       {/* half-drawn blinds */}
       {Array.from({ length: 7 }, (_, i) => (

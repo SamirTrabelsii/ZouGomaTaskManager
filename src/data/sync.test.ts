@@ -112,6 +112,19 @@ describe('cloud sync', () => {
     expect(server.revision).toBe(5); // untouched
   });
 
+  it('does not ask which version to keep when both sides hold identical data, whatever the key order', async () => {
+    const mine = withTasks(3);
+    expect(Object.keys(mine)).not.toEqual(Object.keys(mine).reverse());
+    // JSONB hands keys back in a different order
+    server.data = JSON.parse(JSON.stringify(mine, (_k, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).reverse()) : x))); server.revision = 7;
+    const t = make();
+    await t.local.save(mine); // e.g. left behind by a sign-out, which clears the sync marker
+    await t.syncer.start();
+    expect(t.cloud.status).toBe('idle');
+    expect(t.cloud.conflict).toBeNull();
+    expect(server.revision).toBe(7);
+  });
+
   it('treats never-synced local data plus existing cloud data as a conflict (second device)', async () => {
     server.data = withTasks(9); server.revision = 5;
     const t = make();

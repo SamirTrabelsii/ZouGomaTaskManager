@@ -22,7 +22,7 @@ export function Decor({ evening, reduceMotion, rain }: { evening: boolean; reduc
       <Candle reduceMotion={reduceMotion} />
       <CozyExtras evening={evening} reduceMotion={reduceMotion} />
       <PirateGoodies evening={evening} reduceMotion={reduceMotion} />
-      {rain && <Rain reduceMotion={reduceMotion} />}
+      {rain && <Rain reduceMotion={reduceMotion} evening={evening} />}
     </group>
   );
 }
@@ -195,12 +195,13 @@ function Candle({ reduceMotion }: { reduceMotion: boolean }) {
 }
 
 /* ───────── Rain on the window ───────── */
-function Rain({ reduceMotion }: { reduceMotion: boolean }) {
+function Rain({ reduceMotion, evening }: { reduceMotion: boolean; evening: boolean }) {
   const tex = useMemo(() => {
     const c = document.createElement('canvas');
     c.width = 128; c.height = 256;
     const g = c.getContext('2d')!;
-    g.strokeStyle = 'rgba(190,215,255,.75)'; g.lineCap = 'round';
+    // pale streaks vanish against the pale day sky, so day drops are a darker steel blue
+    g.strokeStyle = evening ? 'rgba(190,215,255,.75)' : 'rgba(70,105,150,.8)'; g.lineCap = 'round';
     for (let i = 0; i < 26; i++) {
       const x = Math.random() * 128, y = Math.random() * 256, l = 14 + Math.random() * 30;
       g.lineWidth = 1 + Math.random() * 1.2;
@@ -210,7 +211,7 @@ function Rain({ reduceMotion }: { reduceMotion: boolean }) {
     t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(2, 1.4);
     t.colorSpace = THREE.SRGBColorSpace;
     return t;
-  }, []);
+  }, [evening]);
   useEffect(() => () => tex.dispose(), [tex]);
   useFrame((_, dt) => { if (!reduceMotion) tex.offset.y -= dt * 0.9; });
   return (
