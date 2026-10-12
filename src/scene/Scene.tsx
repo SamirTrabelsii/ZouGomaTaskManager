@@ -6,7 +6,8 @@ import { Bloom, BrightnessContrast, EffectComposer, HueSaturation, Vignette } fr
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { useStore } from '../state/store';
 import { useNight } from '../state/hooks';
-import type { Quality, SceneObjectId } from '../domain/types';
+import type { SceneObjectId } from '../domain/types';
+import { resolveQuality } from './quality';
 import { Lighting, RoomShell } from './Room';
 import { Bookshelf, Desk, Notebook, Plants, WallCalendar } from './objects';
 import { Decor } from './decor';
@@ -26,14 +27,6 @@ const FOCUS: Record<SceneObjectId, { target: [number, number, number]; dist: num
 
 /** Reading view for the wall poster: as close and as square-on as the orbit limits allow. */
 const POSTER_VIEW = { target: [-3.97, 2.2, 1.35] as [number, number, number], offset: [5.0, 1.0, 1.1] as [number, number, number] };
-
-export function resolveQuality(q: Quality): Exclude<Quality, 'auto'> {
-  if (q !== 'auto') return q;
-  const w = window.innerWidth;
-  const cores = navigator.hardwareConcurrency ?? 4;
-  return w < 800 || cores <= 2 ? 'low' : 'high';
-}
-
 
 interface Goal { pos: THREE.Vector3; target: THREE.Vector3 }
 
