@@ -37,9 +37,22 @@ export const cloud = {
   async health(): Promise<Health | null> {
     try { return await api<Health>('/health', { timeoutMs: 2500 }); } catch { return null; }
   },
-  me: () => api<{ email: string }>('/auth/me'),
+  me: () => api<{ email: string; hasRecoveryCode: boolean }>('/auth/me'),
   login: (email: string, password: string) => api<{ email: string }>('/auth/login', { method: 'POST', body: { email, password } }),
-  register: (email: string, password: string) => api<{ email: string }>('/auth/register', { method: 'POST', body: { email, password } }),
+  register: (email: string, password: string) => api<{ email: string; recoveryCode: string }>('/auth/register', { method: 'POST', body: { email, password } }),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    api<{ ok: true; otherSessionsEnded: number }>('/auth/change-password', { method: 'POST', body: { currentPassword, newPassword } }),
+  newRecoveryCode: (password: string) => api<{ recoveryCode: string }>('/auth/recovery-code', { method: 'POST', body: { password } }),
+  resetPassword: (email: string, recoveryCode: string, newPassword: string) =>
+    api<{ email: string; recoveryCode: string }>('/auth/reset-password', { method: 'POST', body: { email, recoveryCode, newPassword } }),
+  /** Everything the server holds for the account, as a JSON file. */
+  async exportAccount(): Promise<{ blob: Blob; filename: string }> {
+    let res: Response;
+    try { res = await fetch('/api/account/export', { credentials: 'same-origin' }); } catch { throw new NetworkError('Cannot reach the LifeOS server.'); }
+    if (!res.ok) throw new ApiError(res.status, res.status === 401 ? 'Your session ended. Sign in again.' : `Export failed (${res.status})`);
+    const name = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') ?? '')?.[1];
+    return { blob: await res.blob(), filename: name ?? `lifeos-account-${new Date().toISOString().slice(0, 10)}.json` };
+  },
   logout: () => api<{ ok: true }>('/auth/logout', { method: 'POST', body: {} }),
   getData: () => api<{ data: unknown | null; revision: number }>('/data'),
   putData: (data: unknown, baseRevision: number, force = false) =>
