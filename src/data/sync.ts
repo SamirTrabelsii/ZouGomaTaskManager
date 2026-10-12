@@ -33,6 +33,11 @@ export type StartResult =
   | { kind: 'ready'; data: AppData }
   | { kind: 'corrupt'; error: string; raw: string };
 
+/** JSON with sorted keys: PostgreSQL JSONB does not keep key order, so plain stringify can't compare. */
+export function stableJson(v: unknown): string {
+  return JSON.stringify(v, (_k, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) : x));
+}
+
 interface Meta { revision: number; dirty: boolean }
 const META_KEY = 'lifeos.v1.sync';
 const readMeta = (): Meta | null => {
@@ -138,6 +143,13 @@ export class Syncer {
 
     // 2. This device has edits the server hasn't seen.
     const unsynced = stored ? stored.dirty : hasLocalWork; // never-synced local data counts as unsynced work
+    // Same content on both sides (e.g. signing back in after a sign-out wiped the sync marker): nothing to ask.
+    if (unsynced && localOk && stableJson(localOk.data) === stableJson(serverData)) {
+      this.meta = { revision: server.revision, dirty: false };
+      writeMeta(this.meta);
+      this.ctx.setCloud({ lastSyncedAt: new Date().toISOString(), status: 'idle' });
+      return { kind: 'ready', data: localOk.data };
+    }
     if (unsynced && localOk) {
       if (stored && stored.revision === server.revision) {
         // server unchanged since we last synced: our edits simply go up

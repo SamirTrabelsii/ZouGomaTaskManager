@@ -48,6 +48,7 @@
         "typecheck": "tsc --noEmit",
         "server": "tsx server/index.ts",
         "db:up": "docker compose up -d db",
-        "dev:all": "concurrently -k -n web,api \"vite\" \"tsx watch server/index.ts\""
+        "dev:all": "concurrently -k -n web,api \"vite\" \"tsx watch server/index.ts\"",
+        "test:e2e": "playwright test"
     }
 }
