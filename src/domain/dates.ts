@@ -70,3 +70,8 @@ export function formatTime(t: string | null): string {
   const [h, m] = t.split(':').map(Number);
   return new Date(2000, 0, 1, h, m).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 }
+
+/** The room's night look: explicit 'evening', or 'auto' following the local clock (19:00–05:59). */
+export function isNightLook(theme: 'day' | 'evening' | 'auto', hour: number): boolean {
+  return theme === 'evening' || (theme === 'auto' && (hour >= 19 || hour < 6));
+}
