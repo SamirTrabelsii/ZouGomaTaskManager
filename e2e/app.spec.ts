@@ -236,3 +236,52 @@ test('forgot password: the recovery code resets it, shows a new code, and the us
   expect((await page.request.post('/api/auth/reset-password', { data: { email: EMAIL, recoveryCode, newPassword: 'another-new-passphrase' } })).status()).toBe(401);
   recoveryCode = fresh;
 });
+
+test('scopes, sizes and statuses: a blocked task keeps its note, a quick status change clears it, and size filters work', async ({ page }) => {
+  await without3D(page);
+  await signIn(page);
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Tasks' }).click();
+
+  await page.getByRole('button', { name: /New task/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'New task' });
+  /** Dialog fields are wrapped in <label><span class="label">…</span>control</label>. */
+  const field = (name: string) => dialog.locator('label').filter({ has: page.locator('span.label', { hasText: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) }) });
+  await dialog.getByPlaceholder('What needs doing?').fill('Draft contract');
+  await field('Size (story points)').locator('select').selectOption('L');
+  await field('Status').locator('select').selectOption('blocked');
+  await field('Blocked by').locator('input').fill('counsel feedback');
+  // create a scope on the spot; it is selected right away
+  await dialog.getByRole('button', { name: 'Create a new scope' }).click();
+  await dialog.getByLabel('New scope name').fill('Legal');
+  await dialog.getByLabel('New scope name').press('Enter');
+  await expect(field('Scope').locator('select')).toContainText('Legal');
+  await dialog.getByRole('button', { name: 'Add task' }).click();
+
+  const row = page.getByRole('button', { name: 'Edit Draft contract' });
+  await expect(row).toContainText('counsel feedback');
+  await expect(row).toContainText('5'); // size L = 5 points
+  await expect(row).toContainText('Legal');
+
+  type Saved = { title: string; status: string; size: string | null; blockedBy: string; scopeId: string | null };
+  const saved = async () => ((await cloudData(page)).data.tasks as unknown as Saved[]).find((t) => t.title === 'Draft contract');
+  await expect.poll(async () => (await saved())?.size).toBe('L');
+  expect(await saved()).toMatchObject({ status: 'blocked', blockedBy: 'counsel feedback' });
+  expect((await saved())?.scopeId).toBeTruthy();
+
+  // one-click status change from the row; the blocked note goes with the status
+  await page.getByLabel('Status of Draft contract').selectOption('onhold');
+  await expect(row).not.toContainText('counsel feedback');
+  await expect.poll(async () => (await saved())?.status).toBe('onhold');
+  expect((await saved())?.blockedBy).toBe('');
+
+  // size filter
+  await page.getByLabel('Size', { exact: true }).selectOption('XS');
+  await expect(row).toBeHidden();
+  await page.getByLabel('Size', { exact: true }).selectOption('L');
+  await expect(row).toBeVisible();
+
+  // scope filter chip
+  await page.getByRole('button', { name: /^Legal/ }).click();
+  await expect(row).toBeVisible();
+  await page.getByRole('button', { name: 'All', exact: true }).click();
+});

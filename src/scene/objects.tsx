@@ -5,7 +5,7 @@ import { RoundedBox } from '@react-three/drei';
 import { useStore } from '../state/store';
 import { useToday } from '../state/hooks';
 import { useAgenda } from '../state/feeds';
-import { dailyProgress, goalProgress, plantGrowth, projectProgress, isOpen } from '../domain/services';
+import { dailyProgress, goalProgress, plantGrowth, projectProgress, isActive } from '../domain/services';
 import { drawCalendarTexture, drawMonitorTexture } from './textures';
 import { Interactive } from './Interactive';
 
@@ -20,7 +20,7 @@ export function Desk({ reduceMotion, evening }: { reduceMotion: boolean; evening
   const tasks = useStore((s) => s.data.tasks);
   const today = useToday();
   const prog = useMemo(() => dailyProgress(tasks, today), [tasks, today]);
-  const sheets = Math.min(9, tasks.filter(isOpen).length);
+  const sheets = Math.min(9, tasks.filter(isActive).length);
 
   const texRef = useRef<THREE.CanvasTexture | null>(null);
   const matRef = useRef<THREE.MeshBasicMaterial>(null);

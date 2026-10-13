@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { consistency, dailyProgress, pointsBetween, pointsByDay, SIZE_POINTS, sumPoints, taskPoints, dueTone, goalProgress, plantGrowth, projectProgress, streaks, weeklySummary } from './services';
+import { consistency, dailyProgress, isActive, pointsBetween, readyToResume, sortTasks, pointsByDay, SIZE_POINTS, sumPoints, taskPoints, dueTone, goalProgress, plantGrowth, projectProgress, streaks, weeklySummary } from './services';
 import { emptyData, normalize } from '../data/storage';
 import type { Habit, HabitLog, Task } from './types';
 
@@ -9,7 +9,7 @@ const habit = (o: Partial<Habit> = {}): Habit => ({
 const logs = (...dates: string[]): HabitLog[] => dates.map((date, i) => ({ id: String(i), habitId: 'h', date }));
 const task = (o: Partial<Task>): Task => ({
   id: Math.random().toString(), title: 't', notes: '', status: 'todo', priority: 'medium', size: null, dueDate: null,
-  projectId: null, milestoneId: null, goalId: null, scopeId: null, createdAt: '2026-03-01T10:00:00', completedAt: null, ...o,
+  projectId: null, milestoneId: null, goalId: null, scopeId: null, blockedBy: '', resumeOn: null, createdAt: '2026-03-01T10:00:00', completedAt: null, ...o,
 });
 
 describe('habit streaks', () => {
@@ -169,5 +169,41 @@ describe('points per period', () => {
     expect(pointsBetween(ts, '2026-03-09', '2026-03-15')).toBe(8);
     const d = { ...emptyData(), tasks: ts };
     expect(weeklySummary(d, '2026-03-09').pointsCompleted).toBe(8);
+  });
+});
+
+describe('parked and blocked tasks', () => {
+  it('on-hold and finished tasks are not active', () => {
+    expect(isActive(task({ status: 'doing' }))).toBe(true);
+    expect(isActive(task({ status: 'blocked' }))).toBe(true);
+    expect(isActive(task({ status: 'onhold' }))).toBe(false);
+    expect(isActive(task({ status: 'done' }))).toBe(false);
+  });
+  it('lists on-hold tasks whose resume date has come', () => {
+    const ts = [
+      task({ id: 'due', status: 'onhold', resumeOn: '2026-03-10' }),
+      task({ id: 'past', status: 'onhold', resumeOn: '2026-03-01' }),
+      task({ id: 'later', status: 'onhold', resumeOn: '2026-03-11' }),
+      task({ id: 'nodate', status: 'onhold' }),
+      task({ id: 'todo', status: 'todo', resumeOn: '2026-03-01' }),
+    ];
+    expect(readyToResume(ts, '2026-03-10').map((t) => t.id).sort()).toEqual(['due', 'past']);
+  });
+  it('sorts by size, largest first, unsized last', () => {
+    const ts = [task({ id: 'n' }), task({ id: 's', size: 'S' }), task({ id: 'x', size: 'XL' })];
+    expect(sortTasks(ts, 'size').map((t) => t.id)).toEqual(['x', 's', 'n']);
+  });
+  it('keeps the blocked note and resume date only for their own status when loading', () => {
+    const d = normalize({
+      ...emptyData(),
+      tasks: [
+        { id: 'a', title: 'A', status: 'blocked', blockedBy: 'legal' },
+        { id: 'b', title: 'B', status: 'todo', blockedBy: 'stale', resumeOn: '2026-04-01' },
+        { id: 'c', title: 'C', status: 'onhold', resumeOn: '2026-04-01' },
+        { id: 'd', title: 'D', status: 'onhold', resumeOn: 'soon' },
+      ],
+    });
+    const t = Object.fromEntries(d.tasks.map((x) => [x.id, x]));
+    expect([t.a.blockedBy, t.b.blockedBy, t.b.resumeOn, t.c.resumeOn, t.d.resumeOn]).toEqual(['legal', '', null, '2026-04-01', null]);
   });
 });

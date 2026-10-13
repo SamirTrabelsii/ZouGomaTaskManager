@@ -285,7 +285,7 @@ export const useStore = create<Store>((set, get) => {
     addTask(input) {
       const t: Task = {
         id: uid(), notes: '', status: 'todo', priority: 'medium', size: null, dueDate: null,
-        projectId: null, milestoneId: null, goalId: null, scopeId: null, createdAt: nowIso(), completedAt: null,
+        projectId: null, milestoneId: null, goalId: null, scopeId: null, blockedBy: '', resumeOn: null, createdAt: nowIso(), completedAt: null,
         ...input, title: input.title.trim(),
       };
       if (t.status === 'done' && !t.completedAt) t.completedAt = nowIso();
@@ -300,6 +300,9 @@ export const useStore = create<Store>((set, get) => {
       if (patch.status && patch.status !== before.status) {
         next.completedAt = patch.status === 'done' ? nowIso() : null;
       }
+      // the blocked note / resume date only make sense in their own status
+      if (next.status !== 'blocked') next.blockedBy = '';
+      if (next.status !== 'onhold') next.resumeOn = null;
       if (patch.projectId !== undefined && patch.projectId !== before.projectId && !('milestoneId' in patch)) next.milestoneId = null;
       commit((d) => ({ ...d, tasks: d.tasks.map((t) => (t.id === id ? next : t)) }));
       if (next.status === 'done' && before.status !== 'done') {

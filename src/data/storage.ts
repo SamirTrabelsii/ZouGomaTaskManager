@@ -33,6 +33,8 @@ function normalizeTasks(tasks: any[], scopes: any[]): any[] {
     ...t,
     status: TASK_STATUSES.has(t.status) ? t.status : 'todo',
     size: TASK_SIZES.has(t.size) ? t.size : null,
+    blockedBy: t.status === 'blocked' && typeof t.blockedBy === 'string' ? t.blockedBy : '',
+    resumeOn: t.status === 'onhold' && typeof t.resumeOn === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(t.resumeOn) ? t.resumeOn : null,
     scopeId: typeof t.scopeId === 'string' && ids.has(t.scopeId) ? t.scopeId : null,
   }));
 }

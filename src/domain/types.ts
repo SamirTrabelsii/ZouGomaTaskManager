@@ -22,6 +22,10 @@ export interface Task {
   goalId: ID | null;
   /** The scope (a named group / tag) this task belongs to, if any. */
   scopeId: ID | null;
+  /** Why/what a Blocked task is waiting on. Only kept while the status is blocked. */
+  blockedBy: string;
+  /** When an On hold task should come back (YYYY-MM-DD). Only kept while the status is onhold. */
+  resumeOn: string | null;
   createdAt: string; // ISO
   completedAt: string | null; // ISO
 }

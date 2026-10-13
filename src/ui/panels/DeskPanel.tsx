@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../../state/store';
 import { useToday } from '../../state/hooks';
-import { dailyProgress, dueTone, pointsBetween, sortTasks } from '../../domain/services';
+import { dailyProgress, dueTone, isActive, pointsBetween, readyToResume, sortTasks } from '../../domain/services';
 import { startOfWeek } from '../../domain/dates';
 import type { TaskStatus } from '../../domain/types';
 import { QuickAdd, ScopeBar, TaskList, TONE, useTaskDialog } from '../common/tasks';
@@ -38,7 +38,8 @@ export function DeskPanel() {
     return { todo: by('todo'), doing: by('doing'), blocked: by('blocked'), onhold: by('onhold'), done: recentlyDone };
   }, [tasks, scope]);
   const overdueCount = tasks.filter((t) => dueTone(t, today) === 'overdue').length;
-  const priorities = sortTasks(tasks.filter((t) => t.status !== 'done' && t.priority === 'high'), 'due').slice(0, 3);
+  const priorities = sortTasks(tasks.filter((t) => isActive(t) && t.priority === 'high'), 'due').slice(0, 3);
+  const resumable = readyToResume(tasks, today);
   const pendingReminders = reminders
     .filter((r) => r.at.slice(0, 10) <= today && !r.ackedAt && r.deliveredAt)
     .slice(0, 3);
@@ -65,6 +66,20 @@ export function DeskPanel() {
               <li key={r.id} className="card flex items-center gap-2 py-2 text-sm">
                 <span aria-hidden>🔔</span><span className="flex-1 truncate">{r.title}</span>
                 <button className="btn btn-ghost px-2 text-xs" onClick={() => useStore.getState().ackReminder(r.id)}>Got it</button>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      {resumable.length > 0 && (
+        <Section title="Ready to resume">
+          <ul className="space-y-1">
+            {resumable.map((t) => (
+              <li key={t.id} className="card flex items-center gap-2 py-2 text-sm">
+                <StatusIcon status="onhold" size={15} />
+                <button className="min-w-0 flex-1 truncate text-left" onClick={() => dlg.open(t.id)}>{t.title}</button>
+                <button className="btn btn-ghost px-2 text-xs" onClick={() => useStore.getState().updateTask(t.id, { status: 'todo' })}>Resume</button>
               </li>
             ))}
           </ul>
