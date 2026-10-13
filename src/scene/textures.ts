@@ -87,7 +87,7 @@ export function drawCalendarTexture(tex: THREE.CanvasTexture | null, items: Agen
   g.fillStyle = '#fbf8f2'; g.fillRect(0, 0, W, H);
   g.fillStyle = '#4e7342'; g.fillRect(0, 0, W, 110);
   g.fillStyle = '#fff'; g.font = '600 56px Georgia, serif'; g.textBaseline = 'middle';
-  g.fillText(t.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }), 40, 56);
+  g.fillText(t.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }), 40, 56);
   const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
   const cw = W / 7, top = 150, ch = (H - top - 14) / 6;
   g.fillStyle = '#7a6f61'; g.font = '600 28px sans-serif'; g.textAlign = 'center';

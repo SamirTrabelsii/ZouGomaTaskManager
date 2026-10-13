@@ -88,7 +88,7 @@ export function DeskPanel() {
 
       {priorities.length > 0 && (
         <Section title="Top priorities">
-          <TaskList tasks={priorities} onEdit={(id) => dlg.open(id)} compact />
+          <TaskList tasks={priorities} onEdit={(id) => dlg.open(id)} compact shortDays />
         </Section>
       )}
 
@@ -117,7 +117,7 @@ export function DeskPanel() {
         </ul>
         <div className="mt-2">
           <TaskList
-            tasks={lists[tab]} onEdit={(id) => dlg.open(id)}
+            tasks={lists[tab]} onEdit={(id) => dlg.open(id)} shortDays
             empty={{
               todo: { title: 'Nothing to do', hint: 'Add a task above, or enjoy the calm.' },
               doing: { title: 'Nothing in progress', hint: 'Start a task and it shows up here.' },

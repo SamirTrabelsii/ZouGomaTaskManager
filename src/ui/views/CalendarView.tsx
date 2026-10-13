@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useToday } from '../../state/hooks';
-import { formatDay, monthGrid, parseDay, toDay } from '../../domain/dates';
+import { formatDay, LOCALE, monthGrid, parseDay, toDay } from '../../domain/dates';
 import { useAgenda } from '../../state/feeds';
 import { Agenda, EventDialog, KIND_ICON, KIND_LABEL, KindMark, ReminderDialog } from '../common/calendar';
 import { useAgendaOpener } from '../panels/CalendarPanel';
@@ -19,7 +19,7 @@ export function CalendarView() {
   }, [items]);
   const grid = monthGrid(cursor.y, cursor.m);
   const shift = (n: number) => setCursor((c) => { const d = new Date(c.y, c.m + n, 1); return { y: d.getFullYear(), m: d.getMonth() }; });
-  const title = new Date(cursor.y, cursor.m, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  const title = new Date(cursor.y, cursor.m, 1).toLocaleDateString(LOCALE, { month: 'long', year: 'numeric' });
 
   return (
     <div className="mx-auto grid h-full max-w-6xl gap-4 px-4 pb-20 pt-20 md:pb-6 lg:grid-cols-[1fr_20rem]">

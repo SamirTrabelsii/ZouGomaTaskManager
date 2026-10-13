@@ -276,7 +276,7 @@ export const TONE: Record<DueTone, { bar: string; chip: string; label: string; I
   later: { bar: 'border-l-cream-300', chip: '', label: 'Later', Icon: CalendarIcon },
 };
 
-export function TaskRow({ task, onEdit, compact }: { task: Task; onEdit: (id: string) => void; compact?: boolean }) {
+export function TaskRow({ task, onEdit, compact, shortDays }: { task: Task; onEdit: (id: string) => void; compact?: boolean; shortDays?: boolean }) {
   const today = useToday();
   const toggle = useStore((s) => s.toggleTask);
   const project = useStore((s) => s.data.projects.find((p) => p.id === task.projectId));
@@ -299,7 +299,7 @@ export function TaskRow({ task, onEdit, compact }: { task: Task; onEdit: (id: st
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
             {task.dueDate && (
               <span className={`chip ${t?.chip ?? ''}`}>
-                {t ? <t.Icon /> : <CalendarIcon />}{relativeDay(task.dueDate, today)}
+                {t ? <t.Icon /> : <CalendarIcon />}{relativeDay(task.dueDate, today, shortDays)}
               </span>
             )}
             {task.priority !== 'medium' && (
@@ -310,7 +310,7 @@ export function TaskRow({ task, onEdit, compact }: { task: Task; onEdit: (id: st
               <span className="chip max-w-full border-clay-500/60" title={`Blocked by ${task.blockedBy}`}><StatusIcon status="blocked" size={12} /><span className="truncate">{task.blockedBy}</span></span>
             )}
             {task.status === 'onhold' && task.resumeOn && (
-              <span className={`chip ${task.resumeOn <= today ? 'border-moss-500 text-moss-400' : ''}`}><StatusIcon status="onhold" size={12} />Resume {relativeDay(task.resumeOn, today)}</span>
+              <span className={`chip ${task.resumeOn <= today ? 'border-moss-500 text-moss-400' : ''}`}><StatusIcon status="onhold" size={12} />Resume {relativeDay(task.resumeOn, today, shortDays)}</span>
             )}
             {scope && (
               <span className="chip" style={{ borderColor: `${scope.color}99`, background: `${scope.color}1f` }} title={`Scope: ${scope.title}`}>
@@ -376,9 +376,9 @@ export function FilterBar({ f, setF }: { f: TaskFilters; setF: (f: TaskFilters) 
   );
 }
 
-export function TaskList({ tasks, onEdit, empty, compact }: { tasks: Task[]; onEdit: (id: string) => void; empty?: { title: string; hint?: string }; compact?: boolean }) {
+export function TaskList({ tasks, onEdit, empty, compact, shortDays }: { tasks: Task[]; onEdit: (id: string) => void; empty?: { title: string; hint?: string }; compact?: boolean; shortDays?: boolean }) {
   if (!tasks.length) return <EmptyState icon="🗒️" title={empty?.title ?? 'No tasks here'} hint={empty?.hint} />;
-  return <ul className="space-y-0.5">{tasks.map((t) => <TaskRow key={t.id} task={t} onEdit={onEdit} compact={compact} />)}</ul>;
+  return <ul className="space-y-0.5">{tasks.map((t) => <TaskRow key={t.id} task={t} onEdit={onEdit} compact={compact} shortDays={shortDays} />)}</ul>;
 }
 
 export function useTaskDialog() {

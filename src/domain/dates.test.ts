@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isNightLook } from './dates';
+import { isNightLook, relativeDay } from './dates';
 
 describe('isNightLook', () => {
   it('auto follows the clock: night 19:00–05:59, day otherwise', () => {
@@ -9,5 +9,14 @@ describe('isNightLook', () => {
   it('explicit themes ignore the clock', () => {
     expect(isNightLook('evening', 12)).toBe(true);
     expect(isNightLook('day', 23)).toBe(false);
+  });
+});
+
+describe('relativeDay', () => {
+  it('uses English day names, in full or as three letters', () => {
+    expect(relativeDay('2026-03-12', '2026-03-10')).toBe('Thursday');
+    expect(relativeDay('2026-03-12', '2026-03-10', true)).toBe('Thu');
+    expect(relativeDay('2026-03-11', '2026-03-10', true)).toBe('Tomorrow');
+    expect(relativeDay('2026-03-08', '2026-03-10', true)).toBe('2 days overdue');
   });
 });
