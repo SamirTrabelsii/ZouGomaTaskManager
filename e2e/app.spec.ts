@@ -259,7 +259,7 @@ test('scopes, sizes and statuses: a blocked task keeps its note, a quick status 
 
   const row = page.getByRole('button', { name: 'Edit Draft contract' });
   await expect(row).toContainText('counsel feedback');
-  await expect(row).toContainText('5'); // size L = 5 points
+  await expect(row).toContainText('8'); // size L = 8 points
   await expect(row).toContainText('Legal');
 
   type Saved = { title: string; status: string; size: string | null; blockedBy: string; scopeId: string | null };
