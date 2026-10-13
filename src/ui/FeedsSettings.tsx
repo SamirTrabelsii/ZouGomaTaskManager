@@ -26,6 +26,12 @@ function Swatches({ value, onChange, label }: { value: string; onChange: (c: str
 export const nextColor = (feeds: Pick<CalendarFeed, 'color'>[]) =>
   FEED_COLORS.find((c) => !feeds.some((f) => f.color.toLowerCase() === c)) ?? FEED_COLORS[feeds.length % FEED_COLORS.length];
 
+const REMIND_OPTIONS: { value: string; label: string }[] = [
+  { value: '', label: 'No reminder' }, { value: '0', label: 'At the start' }, { value: '5', label: '5 minutes before' },
+  { value: '10', label: '10 minutes before' }, { value: '15', label: '15 minutes before' }, { value: '30', label: '30 minutes before' }, { value: '60', label: '1 hour before' },
+];
+const remindText = (m: number | null) => (m === null ? '' : m === 0 ? ' · 🔔 at the start' : m === 60 ? ' · 🔔 1 h before' : ` · 🔔 ${m} min before`);
+
 const ago = (iso: string | null) => {
   if (!iso) return 'not yet';
   const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60_000));
@@ -38,6 +44,7 @@ function FeedRow({ feed }: { feed: CalendarFeed }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(feed.name);
   const [color, setColor] = useState(feed.color);
+  const [remind, setRemind] = useState(feed.remindBefore === null ? '' : String(feed.remindBefore));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
 
@@ -56,7 +63,7 @@ function FeedRow({ feed }: { feed: CalendarFeed }) {
         <div className="min-w-0 flex-1">
           <div className="truncate font-medium">{feed.name}</div>
           <div className="truncate text-xs text-ink-500">
-            {feed.host} · {feed.eventCount} meeting{feed.eventCount === 1 ? '' : 's'} · updated {ago(feed.lastSyncAt)}
+            {feed.host} · {feed.eventCount} meeting{feed.eventCount === 1 ? '' : 's'} · updated {ago(feed.lastSyncAt)}{remindText(feed.remindBefore)}
           </div>
         </div>
         <button className="btn text-xs" disabled={busy} onClick={() => void run(() => refreshOne(feed.id), 'Calendar updated')}>{busy ? '…' : 'Update now'}</button>
@@ -68,11 +75,17 @@ function FeedRow({ feed }: { feed: CalendarFeed }) {
       {editing && (
         <form className="mt-2 space-y-2 border-t border-cream-300 pt-2" onSubmit={async (e) => {
           e.preventDefault();
-          if (await run(() => update(feed.id, { name: name.trim(), color }), 'Calendar saved')) setEditing(false);
+          if (await run(() => update(feed.id, { name: name.trim(), color, remindBefore: remind === '' ? null : Number(remind) }), 'Calendar saved')) setEditing(false);
         }}>
           <Field label="Name"><input className="input" value={name} maxLength={60} onChange={(e) => setName(e.target.value)} /></Field>
           <div><span className="label">Colour</span><Swatches label={`Colour for ${feed.name}`} value={color} onChange={setColor} /></div>
-          <div className="flex justify-end gap-2"><button type="button" className="btn" onClick={() => { setEditing(false); setName(feed.name); setColor(feed.color); }}>Cancel</button><button className="btn btn-primary" disabled={busy || !name.trim()}>Save</button></div>
+          <Field label="Remind me about meetings">
+            <select className="input" value={remind} onChange={(e) => setRemind(e.target.value)}>
+              {REMIND_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+            {remind !== '' && <span className="mt-1 block text-xs text-ink-500">Sent as a background notification, so turn on <em>Background reminders</em> in Settings → Reminders on each device you want to be notified on. All-day entries never trigger a reminder.</span>}
+          </Field>
+          <div className="flex justify-end gap-2"><button type="button" className="btn" onClick={() => { setEditing(false); setName(feed.name); setColor(feed.color); setRemind(feed.remindBefore === null ? '' : String(feed.remindBefore)); }}>Cancel</button><button className="btn btn-primary" disabled={busy || !name.trim()}>Save</button></div>
         </form>
       )}
     </li>

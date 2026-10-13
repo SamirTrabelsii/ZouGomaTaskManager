@@ -19,7 +19,7 @@ interface FeedsState {
   refresh(): Promise<void>;
   /** Returns an error message, or null on success. */
   add(input: { name: string; color: string; url: string }): Promise<string | null>;
-  update(id: string, patch: { name?: string; color?: string }): Promise<string | null>;
+  update(id: string, patch: { name?: string; color?: string; remindBefore?: number | null }): Promise<string | null>;
   remove(id: string): Promise<string | null>;
   refreshOne(id: string): Promise<string | null>;
   reset(): void;
@@ -74,10 +74,16 @@ export const useFeeds = create<FeedsState>((set, get) => {
   };
 });
 
+/** Imported meetings as agenda items (local time, coloured by calendar). */
+export function useExternalItems() {
+  const events = useFeeds((s) => s.events);
+  const feeds = useFeeds((s) => s.feeds);
+  return useMemo(() => externalAgendaItems(events, feeds), [events, feeds]);
+}
+
 /** Everything on the calendar: the user's own items plus imported meetings (already in local time). */
 export function useAgenda() {
   const data = useStore((s) => s.data);
-  const events = useFeeds((s) => s.events);
-  const feeds = useFeeds((s) => s.feeds);
-  return useMemo(() => agendaItems(data, externalAgendaItems(events, feeds)), [data, events, feeds]);
+  const imported = useExternalItems();
+  return useMemo(() => agendaItems(data, imported), [data, imported]);
 }

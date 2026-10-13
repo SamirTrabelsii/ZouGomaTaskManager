@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../state/store';
 import { useToday } from '../state/hooks';
-import { agendaItems, dailyProgress, habitCompletionToday, nextEvent, sortTasks } from '../domain/services';
+import { agendaItems, dailyProgress, habitCompletionToday, nextUp, sortTasks } from '../domain/services';
+import { useExternalItems } from '../state/feeds';
 import { addDays, formatDay, formatTime, relativeDay } from '../domain/dates';
 import { Ring } from './common/ui';
 
@@ -14,7 +15,8 @@ export function Overview() {
 
   const prog = dailyProgress(data.tasks, today);
   const hab = habitCompletionToday(data.habits, data.habitLogs, today);
-  const next = nextEvent(data.events);
+  const imported = useExternalItems();
+  const next = nextUp(data.events, imported);
   const priorities = useMemo(
     () => sortTasks(data.tasks.filter((t) => t.status !== 'done' && (t.priority === 'high' || (t.dueDate && t.dueDate <= today))), 'priority').slice(0, 3),
     [data.tasks, today],
@@ -45,7 +47,7 @@ export function Overview() {
           </div>
           <div>
             <h3 className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-ink-500">Next event</h3>
-            {next ? <button className="w-full truncate text-left hover:underline" onClick={() => select('calendar')}>● {next.title} · {relativeDay(next.date, today)}{next.time && ` ${formatTime(next.time)}`}</button> : <p className="text-xs text-ink-500">No upcoming events.</p>}
+            {next ? <button className="w-full truncate text-left hover:underline" onClick={() => select('calendar')}>{next.color ? <span aria-hidden className="mr-1 inline-block h-2 w-2 rounded-full align-middle" style={{ background: next.color }} /> : '● '}{next.title} · {relativeDay(next.date, today)}{next.time && ` ${formatTime(next.time)}`}</button> : <p className="text-xs text-ink-500">No upcoming events.</p>}
           </div>
           <div>
             <h3 className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-ink-500">Deadlines · 7 days</h3>

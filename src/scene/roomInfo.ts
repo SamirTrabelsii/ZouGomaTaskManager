@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { useStore } from '../state/store';
 import { useToday } from '../state/hooks';
-import { dailyProgress, habitCompletionToday, nextEvent } from '../domain/services';
+import { dailyProgress, habitCompletionToday, nextUp } from '../domain/services';
+import { useExternalItems } from '../state/feeds';
 import { relativeDay } from '../domain/dates';
 import type { SceneObjectId } from '../domain/types';
 
@@ -21,6 +22,7 @@ export function useFirstRun(): boolean {
 export function useRoomInfo(id: SceneObjectId): { summary: string; prompt: string | null } {
   const data = useStore((s) => s.data);
   const today = useToday();
+  const imported = useExternalItems();
   return useMemo(() => {
     switch (id) {
       case 'desk': {
@@ -42,14 +44,14 @@ export function useRoomInfo(id: SceneObjectId): { summary: string; prompt: strin
         return { summary: h.total ? `${h.done}/${h.total} habits today` : 'No habits yet', prompt: h.total ? null : 'Plant your first habit' };
       }
       case 'calendar': {
-        const n = nextEvent(data.events);
+        const n = nextUp(data.events, imported);
         return {
           summary: n ? `Next: ${n.title} · ${relativeDay(n.date, today)}` : 'Nothing scheduled',
-          prompt: data.events.length + data.reminders.length ? null : 'Add an event or reminder',
+          prompt: data.events.length + data.reminders.length + imported.length ? null : 'Add an event or reminder',
         };
       }
       case 'notebook':
         return { summary: `${data.notes.length} note${data.notes.length === 1 ? '' : 's'}`, prompt: data.notes.length ? null : 'Write your first note' };
     }
-  }, [id, data, today]);
+  }, [id, data, today, imported]);
 }

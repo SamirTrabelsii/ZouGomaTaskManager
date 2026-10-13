@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { describeWhen, externalAgendaItems, localSpan } from './external';
-import { agendaItems } from './services';
+import { agendaItems, nextUp } from './services';
 import { emptyData } from '../data/storage';
 import type { CalendarFeed, ExternalEvent } from './types';
 
 // The device zone decides which local day/time an instant falls on.
 process.env.TZ = 'Europe/Paris';
 
-const feed = (id: string, name = 'Work', color = '#4f7f9c'): CalendarFeed => ({ id, name, color, host: 'x', lastSyncAt: null, lastError: null, warnings: [], eventCount: 0 });
+const feed = (id: string, name = 'Work', color = '#4f7f9c'): CalendarFeed => ({ id, name, color, host: 'x', lastSyncAt: null, lastError: null, warnings: [], eventCount: 0, remindBefore: null });
 const ev = (over: Partial<ExternalEvent>): ExternalEvent => ({ id: 'e1', feedId: '1', title: 'Sync', location: '', description: '', allDay: false, start: '2026-06-10T07:30:00Z', end: '2026-06-10T08:30:00Z', ...over });
 
 describe('time zones on this device', () => {
@@ -51,7 +51,7 @@ describe('spans', () => {
 describe('agenda items', () => {
   it('carry the calendar colour and name, and are marked as imported', () => {
     const [i] = externalAgendaItems([ev({})], [feed('1', 'Team', '#c06c46')]);
-    expect(i).toMatchObject({ kind: 'external', title: 'Sync', color: '#c06c46', feedName: 'Team', refId: 'e1', date: '2026-06-10', time: '09:30' });
+    expect(i).toMatchObject({ kind: 'external', title: 'Sync', color: '#c06c46', feedName: 'Team', refId: 'e1', date: '2026-06-10', time: '09:30', endTime: '10:30' });
   });
   it('give each day of a multi-day meeting its own key', () => {
     const keys = externalAgendaItems([ev({ allDay: true, start: '2026-06-10', end: '2026-06-13' })], [feed('1')]).map((i) => i.key);
@@ -77,5 +77,42 @@ describe('describeWhen', () => {
     expect(describeWhen(ev({}), day, time)).toBe('2026-06-10 · 09:30 – 10:30');
     expect(describeWhen(ev({ allDay: true, start: '2026-06-10', end: '2026-06-11' }), day, time)).toBe('2026-06-10 · all day');
     expect(describeWhen(ev({ allDay: true, start: '2026-06-10', end: '2026-06-13' }), day, time)).toBe('2026-06-10 – 2026-06-12 · all day');
+  });
+});
+
+describe('nextUp (the "next event" shown in the overview and on the room hover card)', () => {
+  const NOW = new Date('2026-06-10T08:00:00Z'); // 10:00 in Paris
+  const own = (id: string, time: string | null, endTime: string | null = null, date = '2026-06-10') =>
+    ({ id, title: `Mine ${id}`, kind: 'event' as const, date, time, endTime, notes: '', remindBefore: null });
+  const imported = (...evs: Partial<ExternalEvent>[]) => externalAgendaItems(evs.map((e, i) => ev({ id: `x${i}`, ...e })), [feed('1', 'Work', '#c06c46')]);
+  const at = (hhmmUtc: string, mins = 60) => {
+    const start = new Date(`2026-06-10T${hhmmUtc}:00Z`);
+    return { start: start.toISOString(), end: new Date(start.getTime() + mins * 60_000).toISOString() };
+  };
+
+  it('picks an imported meeting that is earlier than your own next event, with its colour', () => {
+    const n = nextUp([own('a', '16:00')], imported({ title: 'Standup', ...at('10:00') }), NOW);
+    expect(n).toMatchObject({ title: 'Standup', date: '2026-06-10', time: '12:00', color: '#c06c46' });
+  });
+  it('picks your own event when it comes first', () => {
+    const n = nextUp([own('a', '11:00')], imported({ title: 'Standup', ...at('10:00') }), NOW);
+    expect(n).toMatchObject({ title: 'Mine a', time: '11:00' });
+    expect(n?.color).toBeUndefined();
+  });
+  it('still counts a meeting that is in progress, and ignores one that has ended', () => {
+    expect(nextUp([], imported({ title: 'Running', ...at('07:30', 90) }), NOW)?.title).toBe('Running'); // 09:30–11:00 Paris
+    expect(nextUp([], imported({ title: 'Over', ...at('06:00') }, { id: 'later', title: 'Later', ...at('13:00') }), NOW)?.title).toBe('Later');
+  });
+  it('never lets an imported all-day entry (holiday, out of office) hide a real meeting', () => {
+    const items = imported({ title: 'Holiday', allDay: true, start: '2026-06-10', end: '2026-06-12' }, { title: 'Standup', ...at('10:00') });
+    expect(nextUp([], items, NOW)?.title).toBe('Standup');
+    expect(nextUp([], imported({ title: 'Holiday', allDay: true, start: '2026-06-10', end: '2026-06-12' }), NOW)).toBeNull();
+  });
+  it('uses imported meetings on later days and returns null when there is nothing', () => {
+    expect(nextUp([], imported({ title: 'Tomorrow', start: '2026-06-11T07:00:00Z', end: '2026-06-11T08:00:00Z' }), NOW)).toMatchObject({ title: 'Tomorrow', date: '2026-06-11', time: '09:00' });
+    expect(nextUp([], [], NOW)).toBeNull();
+  });
+  it('keeps the old behaviour for your own events alone', () => {
+    expect(nextUp([own('a', '09:00', '09:30'), own('b', '15:00')], [], NOW)).toMatchObject({ title: 'Mine b' });
   });
 });

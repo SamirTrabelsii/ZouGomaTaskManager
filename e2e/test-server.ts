@@ -25,7 +25,12 @@ const iso = (hhmm: string) => `${now.getUTCFullYear()}-${pad(now.getUTCMonth() +
 
 const wrap = (body: string) => `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//e2e//EN\r\n${body}END:VCALENDAR\r\n`;
 
+const inTwoHours = new Date(now.getTime() + 2 * 3600_000);
+const stampUtc = (d: Date) => d.toISOString().replace(/[-:]|\.\d{3}/g, '');
+
 const FIXTURES: Record<string, string> = {
+  // a single meeting that starts in two hours (for "next event" checks)
+  '/soon.ics': wrap(`BEGIN:VEVENT\r\nUID:s1@e2e\r\nDTSTART:${stampUtc(inTwoHours)}\r\nDTEND:${stampUtc(new Date(inTwoHours.getTime() + 3600_000))}\r\nSUMMARY:Soon meeting\r\nEND:VEVENT\r\n`),
   // Google style: UTC instants
   '/google.ics': wrap(
     `BEGIN:VEVENT\r\nUID:g1@e2e\r\nDTSTART:${ymd}T120000Z\r\nDTEND:${ymd}T130000Z\r\nSUMMARY:Team sync\r\nLOCATION:Room 4\r\nDESCRIPTION:Weekly catch-up\r\nEND:VEVENT\r\n` +

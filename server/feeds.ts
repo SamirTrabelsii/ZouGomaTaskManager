@@ -2,6 +2,8 @@ import express, { type RequestHandler } from 'express';
 import type pg from 'pg';
 import { FeedError, normaliseFeedUrl, safeFetchText, type FeedFetcher } from './feedFetch';
 import { approxMs, parseIcs } from './ical';
+import { zonedToInstant } from './time';
+import type { PushPayload, PushSubscriptionRow, Sender } from './push';
 
 export const FEEDS_SCHEMA = `
 CREATE TABLE IF NOT EXISTS calendar_feeds (
@@ -16,6 +18,8 @@ CREATE TABLE IF NOT EXISTS calendar_feeds (
   last_error      TEXT,
   warnings        TEXT[] NOT NULL DEFAULT '{}'
 );
+-- minutes before a meeting to push a reminder (NULL = no reminders for this calendar)
+ALTER TABLE calendar_feeds ADD COLUMN IF NOT EXISTS remind_before INTEGER;
 CREATE INDEX IF NOT EXISTS calendar_feeds_user_idx ON calendar_feeds(user_id);
 CREATE TABLE IF NOT EXISTS feed_events (
   feed_id     BIGINT NOT NULL REFERENCES calendar_feeds(id) ON DELETE CASCADE,
@@ -29,7 +33,19 @@ CREATE TABLE IF NOT EXISTS feed_events (
   ends        TEXT NOT NULL,
   PRIMARY KEY (feed_id, uid, occ)
 );
+-- one row per (meeting instance, start time): a moved meeting has a new start, which re-arms its reminder
+CREATE TABLE IF NOT EXISTS feed_reminders_sent (
+  feed_id BIGINT NOT NULL REFERENCES calendar_feeds(id) ON DELETE CASCADE,
+  uid     TEXT NOT NULL,
+  occ     TEXT NOT NULL,
+  starts  TEXT NOT NULL,
+  sent_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (feed_id, uid, occ, starts)
+);
 `;
+
+/** Choices offered for "remind me before a meeting", in minutes. */
+export const REMIND_CHOICES = [0, 5, 10, 15, 30, 60] as const;
 
 export const SYNC_EVERY_MS = 15 * 60_000;
 export const MAX_FEEDS = 10;
@@ -39,7 +55,7 @@ const FUTURE_DAYS = 400;
 
 interface FeedRow {
   id: string; user_id: string; name: string; color: string; url: string;
-  last_attempt_at: Date | null; last_sync_at: Date | null; last_error: string | null; warnings: string[];
+  last_attempt_at: Date | null; last_sync_at: Date | null; last_error: string | null; warnings: string[]; remind_before: number | null;
 }
 
 /**
@@ -114,6 +130,51 @@ export function startFeedScheduler(pool: pg.Pool, fetchText: FeedFetcher = safeF
   return () => clearInterval(id);
 }
 
+/**
+ * Pushes a reminder for each timed meeting of a feed that has reminders on, `remind_before` minutes ahead of its start,
+ * once per (meeting, start time). Meetings that already started are skipped (a late "starts in 5 min" would be wrong).
+ * Reads the stored meetings only; like the reminder push it never touches the user's own data.
+ */
+export async function runDueFeedReminders(pool: pg.Pool, send: Sender, now = Date.now()): Promise<{ sent: number }> {
+  const { rows: feeds } = await pool.query<{ id: string; user_id: string; name: string; remind_before: number }>(
+    'SELECT id, user_id, name, remind_before FROM calendar_feeds WHERE remind_before IS NOT NULL ORDER BY id');
+  if (!feeds.length) return { sent: 0 };
+  const { rows: subs } = await pool.query<PushSubscriptionRow>(
+    'SELECT id, user_id, endpoint, p256dh, auth, tz FROM push_subscriptions WHERE user_id = ANY($1::bigint[])', [[...new Set(feeds.map((f) => f.user_id))]]);
+  let sent = 0;
+  for (const feed of feeds) {
+    const userSubs = subs.filter((s) => String(s.user_id) === String(feed.user_id));
+    if (!userSubs.length) continue; // no device to notify
+    const tz = userSubs[0].tz; // floating (zone-less) meeting times are read in the user's zone
+    const lead = feed.remind_before * 60_000;
+    // coarse text filter (a day of slack for zone offsets); the exact check is done on real instants below
+    const lo = new Date(now - 86400_000).toISOString().slice(0, 19), hi = new Date(now + lead + 86400_000).toISOString().slice(0, 19);
+    const { rows } = await pool.query<{ uid: string; occ: string; title: string; location: string; starts: string }>(
+      'SELECT uid, occ, title, location, starts FROM feed_events WHERE feed_id=$1 AND NOT all_day AND substr(starts,1,19) BETWEEN $2 AND $3', [feed.id, lo, hi]);
+    for (const e of rows) {
+      const start = e.starts.endsWith('Z') ? Date.parse(e.starts) : zonedToInstant(e.starts, tz);
+      if (start === null || Number.isNaN(start)) continue;
+      if (now < start - lead || now > start) continue;
+      // claim first, so overlapping runs can't double-send
+      const claim = await pool.query('INSERT INTO feed_reminders_sent (feed_id, uid, occ, starts) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING', [feed.id, e.uid, e.occ, e.starts]);
+      if (!claim.rowCount) continue;
+      const time = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(start));
+      const payload: PushPayload = {
+        title: e.title.slice(0, 120),
+        body: [`Starts at ${time}`, e.location.slice(0, 80), feed.name].filter(Boolean).join(' · '),
+        tag: `lifeos-feed-${feed.id}-${start}`, url: '/',
+      };
+      for (const s of userSubs) {
+        const r = await send(s, payload);
+        if (r === 'gone') await pool.query('DELETE FROM push_subscriptions WHERE id=$1', [s.id]);
+        else if (r === 'ok') sent++;
+      }
+    }
+  }
+  await pool.query("DELETE FROM feed_reminders_sent WHERE sent_at < now() - interval '30 days'");
+  return { sent };
+}
+
 const COLOR = /^#[0-9a-fA-F]{6}$/;
 
 const publicFeed = (r: FeedRow & { event_count?: string | number }) => {
@@ -122,7 +183,7 @@ const publicFeed = (r: FeedRow & { event_count?: string | number }) => {
   return {
     id: String(r.id), name: r.name, color: r.color, host,
     lastSyncAt: r.last_sync_at, lastError: r.last_error, warnings: r.warnings ?? [],
-    eventCount: Number(r.event_count ?? 0),
+    eventCount: Number(r.event_count ?? 0), remindBefore: r.remind_before ?? null,
   };
 };
 
@@ -190,11 +251,16 @@ export function feedRouter(pool: pg.Pool, requireAuth: RequestHandler, userIdOf:
     try {
       const feed = await owned(req);
       if (!feed) return res.status(404).json({ error: 'Calendar not found.' });
-      const b = req.body as { name?: unknown; color?: unknown };
+      const b = req.body as { name?: unknown; color?: unknown; remindBefore?: unknown };
+      let remind = feed.remind_before;
+      if (b.remindBefore !== undefined) {
+        if (b.remindBefore !== null && !REMIND_CHOICES.includes(b.remindBefore as never)) return res.status(400).json({ error: 'Choose one of the reminder times.' });
+        remind = b.remindBefore as number | null;
+      }
       const name = b.name === undefined ? feed.name : cleanName(b.name);
       const color = b.color === undefined ? feed.color : (typeof b.color === 'string' && COLOR.test(b.color) ? b.color.toLowerCase() : null);
       if (!name || !color) return res.status(400).json({ error: 'Enter a name (up to 60 characters) and a valid colour.' });
-      await pool.query('UPDATE calendar_feeds SET name=$2, color=$3 WHERE id=$1', [feed.id, name, color]);
+      await pool.query('UPDATE calendar_feeds SET name=$2, color=$3, remind_before=$4 WHERE id=$1', [feed.id, name, color, remind]);
       res.json({ feed: (await list(userIdOf(req))).find((f) => f.id === String(feed.id)) });
     } catch (e) { next(e); }
   });

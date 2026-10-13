@@ -38,6 +38,7 @@ export function externalAgendaItems(events: ExternalEvent[], feeds: CalendarFeed
       out.push({
         key: `x${e.id}@${day}`, kind: 'external', date: day, time: i === 0 ? span.startTime : null,
         title: e.title, refId: e.id, color: feed.color, feedName: feed.name,
+        endTime: i === 0 && span.startDay === span.lastDay ? span.endTime : null,
       });
     }
   }
