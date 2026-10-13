@@ -139,19 +139,19 @@ describe('task statuses and scopes', () => {
 
 describe('story points', () => {
   it('maps each size to its points', () => {
-    expect(SIZE_POINTS).toEqual({ XS: 1, S: 2, M: 3, L: 5, XL: 8, XXL: 13, HUGE: 21 });
-    expect(taskPoints(task({ size: 'L' }))).toBe(5);
+    expect(SIZE_POINTS).toEqual({ XS: 1, S: 2, M: 4, L: 8, XL: 16, XXL: 32 });
+    expect(taskPoints(task({ size: 'L' }))).toBe(8);
     expect(taskPoints(task({ size: null }))).toBe(0);
   });
   it('sums points and counts them on the day a task was finished', () => {
     const day = new Date(2026, 2, 10, 9).toISOString();
     const ts = [task({ size: 'M', status: 'done', completedAt: day }), task({ size: 'XL', status: 'done', completedAt: day }), task({ size: 'S' })];
-    expect(sumPoints(ts)).toBe(13);
-    expect(pointsByDay(ts, '2026-03-10', 2).map((d) => d.points)).toEqual([0, 11]);
+    expect(sumPoints(ts)).toBe(22);
+    expect(pointsByDay(ts, '2026-03-10', 2).map((d) => d.points)).toEqual([0, 20]);
   });
-  it('migration keeps valid sizes and clears unknown ones', () => {
-    const d = normalize({ ...emptyData(), tasks: [{ id: 'a', title: 'A', size: 'XXL' }, { id: 'b', title: 'B', size: 'giant' }, { id: 'c', title: 'C' }] });
-    expect(d.tasks.map((t) => t.size)).toEqual(['XXL', null, null]);
+  it('migration keeps valid sizes, turns the retired HUGE into XXL and clears unknown ones', () => {
+    const d = normalize({ ...emptyData(), tasks: [{ id: 'a', title: 'A', size: 'XXL' }, { id: 'b', title: 'B', size: 'giant' }, { id: 'c', title: 'C' }, { id: 'd', title: 'D', size: 'HUGE' }] });
+    expect(d.tasks.map((t) => t.size)).toEqual(['XXL', null, null, 'XXL']);
   });
 });
 
@@ -166,9 +166,9 @@ describe('points per period', () => {
   it('sums points finished within a date range and reports them in the weekly summary', () => {
     const at = (d: number) => new Date(2026, 2, d, 12).toISOString();
     const ts = [task({ size: 'M', status: 'done', completedAt: at(9) }), task({ size: 'L', status: 'done', completedAt: at(11) }), task({ size: 'XL', status: 'done', completedAt: at(20) })];
-    expect(pointsBetween(ts, '2026-03-09', '2026-03-15')).toBe(8);
+    expect(pointsBetween(ts, '2026-03-09', '2026-03-15')).toBe(12);
     const d = { ...emptyData(), tasks: ts };
-    expect(weeklySummary(d, '2026-03-09').pointsCompleted).toBe(8);
+    expect(weeklySummary(d, '2026-03-09').pointsCompleted).toBe(12);
   });
 });
 

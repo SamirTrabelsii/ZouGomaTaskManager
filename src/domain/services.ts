@@ -11,7 +11,7 @@ export const readyToResume = (tasks: Task[], today: string) =>
   tasks.filter((t) => t.status === 'onhold' && t.resumeOn && t.resumeOn <= today);
 
 /** Story points behind each task size. */
-export const SIZE_POINTS: Record<TaskSize, number> = { XS: 1, S: 2, M: 3, L: 5, XL: 8, XXL: 13, HUGE: 21 };
+export const SIZE_POINTS: Record<TaskSize, number> = { XS: 1, S: 2, M: 4, L: 8, XL: 16, XXL: 32 };
 export const TASK_SIZES = Object.keys(SIZE_POINTS) as TaskSize[];
 /** Points a task is worth; unsized tasks count 0. */
 export const taskPoints = (t: Pick<Task, 'size'>) => (t.size ? SIZE_POINTS[t.size] ?? 0 : 0);

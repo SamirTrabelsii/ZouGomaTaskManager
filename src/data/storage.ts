@@ -23,7 +23,7 @@ export function emptyData(): AppData {
 
 const arr = (v: unknown): any[] => (Array.isArray(v) ? v.filter((x) => x && typeof x === 'object' && typeof (x as any).id === 'string') : []);
 
-const TASK_SIZES = new Set(['XS', 'S', 'M', 'L', 'XL', 'XXL', 'HUGE']);
+const TASK_SIZES = new Set(['XS', 'S', 'M', 'L', 'XL', 'XXL']);
 const TASK_STATUSES = new Set(['todo', 'doing', 'blocked', 'onhold', 'done']);
 
 /** Older data has no `scopeId`; a task pointing at a scope that no longer exists simply becomes unscoped. */
@@ -32,7 +32,8 @@ function normalizeTasks(tasks: any[], scopes: any[]): any[] {
   return tasks.map(({ parentId: _legacy, ...t }) => ({
     ...t,
     status: TASK_STATUSES.has(t.status) ? t.status : 'todo',
-    size: TASK_SIZES.has(t.size) ? t.size : null,
+    // HUGE was the old top size; it now maps to XXL, the new largest
+    size: t.size === 'HUGE' ? 'XXL' : TASK_SIZES.has(t.size) ? t.size : null,
     blockedBy: t.status === 'blocked' && typeof t.blockedBy === 'string' ? t.blockedBy : '',
     resumeOn: t.status === 'onhold' && typeof t.resumeOn === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(t.resumeOn) ? t.resumeOn : null,
     scopeId: typeof t.scopeId === 'string' && ids.has(t.scopeId) ? t.scopeId : null,

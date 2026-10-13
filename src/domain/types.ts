@@ -2,7 +2,7 @@ export type ID = string;
 export type Priority = 'low' | 'medium' | 'high';
 export type TaskStatus = 'todo' | 'doing' | 'blocked' | 'onhold' | 'done';
 /** T-shirt size of a task; each size is worth a fixed number of story points (see SIZE_POINTS). */
-export type TaskSize = 'XS' | 'S' | 'M' | 'L' | 'XL' | 'XXL' | 'HUGE';
+export type TaskSize = 'XS' | 'S' | 'M' | 'L' | 'XL' | 'XXL';
 export type ProjectStatus = 'active' | 'paused' | 'done';
 export type NoteKind = 'note' | 'idea' | 'journal' | 'reflection' | 'review' | 'lesson';
 export type SceneObjectId = 'desk' | 'bookshelf' | 'plants' | 'calendar' | 'notebook';
