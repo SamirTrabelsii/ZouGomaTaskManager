@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useStore } from '../../state/store';
 import { useToday } from '../../state/hooks';
 import { formatDay, formatTime, nowLocalInput, relativeDay } from '../../domain/dates';
-import { describeWhen } from '../../domain/external';
+import { describeSpan, describeWhen } from '../../domain/external';
 import { useFeeds } from '../../state/feeds';
 import type { AgendaItem } from '../../domain/services';
 import { ConfirmButton, Dialog, Field } from './ui';
@@ -111,6 +111,7 @@ export function ReminderDialog({ onClose }: { onClose: () => void }) {
 /** Items grouped by day. Clicking an item routes to the right editor / panel. */
 export function Agenda({ items, onOpen, empty }: { items: AgendaItem[]; onOpen: (i: AgendaItem) => void; empty?: string }) {
   const today = useToday();
+  const range = (i: AgendaItem) => describeSpan(i, (d) => formatDay(d), formatTime);
   if (!items.length) return <p className="rounded-lg border border-dashed border-cream-300 p-4 text-center text-sm text-ink-500">{empty ?? 'Nothing scheduled.'}</p>;
   const groups = new Map<string, AgendaItem[]>();
   items.forEach((i) => groups.set(i.date, [...(groups.get(i.date) ?? []), i]));
@@ -124,7 +125,10 @@ export function Agenda({ items, onOpen, empty }: { items: AgendaItem[]; onOpen: 
               <li key={i.key}>
                 <button onClick={() => onOpen(i)} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-cream-100">
                   <span className="w-5 text-center"><KindMark item={i} /></span>
-                  <span className={`min-w-0 flex-1 truncate text-sm ${i.done ? 'text-ink-400 line-through' : ''}`}>{i.title}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className={`block truncate text-sm ${i.done ? 'text-ink-400 line-through' : ''}`}>{i.title}</span>
+                    {range(i) && <span className="block truncate text-xs text-ink-500">{range(i)}</span>}
+                  </span>
                   <span className="shrink-0 text-xs text-ink-500">{i.time ? formatTime(i.time) : i.kind === 'external' ? `All day · ${i.feedName}` : KIND_LABEL[i.kind]}</span>
                 </button>
               </li>

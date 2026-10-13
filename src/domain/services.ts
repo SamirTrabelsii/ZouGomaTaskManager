@@ -161,12 +161,14 @@ export interface AgendaItem {
   feedName?: string;
   /** End of an imported single-day timed meeting (HH:mm). */
   endTime?: string | null;
+  /** Full extent of an imported meeting (local time), repeated on every day it touches. */
+  span?: { startDay: string; lastDay: string; startTime: string | null; endTime: string | null; allDay: boolean };
 }
 
 /** Everything that lands on a date: events, deadlines, scheduled tasks, milestones, reminders – plus any imported meetings passed in. */
 export function agendaItems(d: AppData, imported: AgendaItem[] = []): AgendaItem[] {
   const out: AgendaItem[] = [...imported];
-  d.events.forEach((e) => out.push({ key: 'e' + e.id, kind: e.kind, date: e.date, time: e.time, title: e.title, refId: e.id }));
+  d.events.forEach((e) => out.push({ key: 'e' + e.id, kind: e.kind, date: e.date, time: e.time, endTime: e.endTime, title: e.title, refId: e.id }));
   d.tasks.forEach((t) => {
     if (t.dueDate) out.push({ key: 't' + t.id, kind: 'task', date: t.dueDate, time: null, title: t.title, refId: t.id, done: t.status === 'done' });
   });

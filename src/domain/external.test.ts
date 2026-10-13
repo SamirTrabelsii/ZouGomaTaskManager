@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describeWhen, externalAgendaItems, localSpan } from './external';
+import { describeSpan, describeWhen, externalAgendaItems, localSpan } from './external';
 import { agendaItems, nextUp } from './services';
 import { emptyData } from '../data/storage';
 import type { CalendarFeed, ExternalEvent } from './types';
@@ -114,5 +114,28 @@ describe('nextUp (the "next event" shown in the overview and on the room hover c
   });
   it('keeps the old behaviour for your own events alone', () => {
     expect(nextUp([own('a', '09:00', '09:30'), own('b', '15:00')], [], NOW)).toMatchObject({ title: 'Mine b' });
+  });
+});
+
+describe('describeSpan', () => {
+  const day = (d: string) => d;
+  const time = (t: string | null) => t ?? '';
+  const items = (e: ExternalEvent) => externalAgendaItems([e], [feed('1')]);
+
+  it('shows the time range of a single-day meeting', () => {
+    expect(describeSpan(items(ev({}))[0], day, time)).toBe('09:30 – 10:30');
+  });
+  it('shows start and end dates with times when a meeting spans days', () => {
+    const [first, second] = items(ev({ start: '2026-06-10T20:00:00Z', end: '2026-06-11T08:00:00Z' }));
+    const line = '2026-06-10, 22:00 → 2026-06-11, 10:00';
+    expect(describeSpan(first, day, time)).toBe(line);
+    expect(describeSpan(second, day, time)).toBe(line);
+  });
+  it('shows only dates for multi-day all-day events', () => {
+    const [first] = items(ev({ allDay: true, start: '2026-06-10', end: '2026-06-13' }));
+    expect(describeSpan(first, day, time)).toBe('2026-06-10 → 2026-06-12');
+  });
+  it('is empty when there is nothing to add', () => {
+    expect(describeSpan(items(ev({ allDay: true, start: '2026-06-10', end: '2026-06-11' }))[0], day, time)).toBe('');
   });
 });

@@ -39,6 +39,7 @@ export function externalAgendaItems(events: ExternalEvent[], feeds: CalendarFeed
         key: `x${e.id}@${day}`, kind: 'external', date: day, time: i === 0 ? span.startTime : null,
         title: e.title, refId: e.id, color: feed.color, feedName: feed.name,
         endTime: i === 0 && span.startDay === span.lastDay ? span.endTime : null,
+        span: { ...span, allDay: e.allDay },
       });
     }
   }
@@ -54,4 +55,20 @@ export function describeWhen(e: ExternalEvent, fmtDay: (d: string) => string, fm
     ? `${fmtDay(s.startDay)} ${fmtTime(s.startTime)} → ${fmtDay(s.lastDay)} ${fmtTime(s.endTime)}`
     : `${fmtDay(s.startDay)} · ${fmtTime(s.startTime)}${s.endTime && s.endTime !== s.startTime ? ` – ${fmtTime(s.endTime)}` : ''}`;
   return when;
+}
+
+/** Start → end line for an agenda row. Dates appear only when the meeting spans several days. */
+export function describeSpan(
+  i: Pick<AgendaItem, 'time' | 'endTime' | 'span'>,
+  fmtDay: (d: string) => string,
+  fmtTime: (t: string | null) => string,
+): string {
+  const s = i.span;
+  if (s && s.lastDay > s.startDay) {
+    const a = s.allDay ? fmtDay(s.startDay) : `${fmtDay(s.startDay)}, ${fmtTime(s.startTime)}`;
+    const b = s.allDay ? fmtDay(s.lastDay) : `${fmtDay(s.lastDay)}, ${fmtTime(s.endTime)}`;
+    return `${a} → ${b}`;
+  }
+  if (i.time && i.endTime && i.endTime !== i.time) return `${fmtTime(i.time)} – ${fmtTime(i.endTime)}`;
+  return '';
 }
