@@ -1,7 +1,6 @@
 import * as THREE from 'three';
-import type { AppData } from '../domain/types';
 import { monthGrid, parseDay } from '../domain/dates';
-import { agendaItems } from '../domain/services';
+import type { AgendaItem } from '../domain/services';
 
 function canvas(w: number, h: number) {
   const c = document.createElement('canvas');
@@ -79,7 +78,7 @@ export function makeRugTexture() {
 }
 
 /** Wall calendar, painted from live data: month grid, today ring, event/deadline/task markers. */
-export function drawCalendarTexture(tex: THREE.CanvasTexture | null, data: AppData, today: string): THREE.CanvasTexture {
+export function drawCalendarTexture(tex: THREE.CanvasTexture | null, items: AgendaItem[], today: string): THREE.CanvasTexture {
   const W = 1024, H = 740;
   const cv = tex?.image as HTMLCanvasElement | undefined ?? canvas(W, H).c;
   const g = cv.getContext('2d')!;
@@ -93,9 +92,9 @@ export function drawCalendarTexture(tex: THREE.CanvasTexture | null, data: AppDa
   const cw = W / 7, top = 150, ch = (H - top - 14) / 6;
   g.fillStyle = '#7a6f61'; g.font = '600 28px sans-serif'; g.textAlign = 'center';
   days.forEach((d, i) => g.fillText(d, cw * i + cw / 2, 130));
-  const items = agendaItems(data);
+  // one marker per kind per day; imported meetings get one per calendar colour
   const byDay = new Map<string, Set<string>>();
-  items.forEach((i) => { if (!i.done) byDay.set(i.date, (byDay.get(i.date) ?? new Set()).add(i.kind)); });
+  items.forEach((i) => { if (!i.done) byDay.set(i.date, (byDay.get(i.date) ?? new Set()).add(i.kind === 'external' ? `ext:${i.color}` : i.kind)); });
   monthGrid(year, month).forEach((d, idx) => {
     const col = idx % 7, row = Math.floor(idx / 7);
     const x = col * cw, y = top + row * ch;
@@ -113,7 +112,8 @@ export function drawCalendarTexture(tex: THREE.CanvasTexture | null, data: AppDa
       let mx = x + 16;
       const my = y + ch - 22;
       const draw = (k: string) => {
-        if (k === 'event' || k === 'reminder') { g.fillStyle = '#4f7f9c'; g.beginPath(); g.arc(mx + 7, my, 8, 0, 7); g.fill(); }
+        if (k.startsWith('ext:')) { g.fillStyle = k.slice(4); g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 2; g.beginPath(); g.arc(mx + 7, my, 8, 0, 7); g.fill(); g.stroke(); }
+        else if (k === 'event' || k === 'reminder') { g.fillStyle = '#4f7f9c'; g.beginPath(); g.arc(mx + 7, my, 8, 0, 7); g.fill(); }
         else if (k === 'deadline' || k === 'project') { g.fillStyle = '#c06c46'; g.fillRect(mx, my - 8, 16, 16); }
         else if (k === 'milestone') { g.fillStyle = '#a07048'; g.beginPath(); g.moveTo(mx + 8, my - 10); g.lineTo(mx + 17, my); g.lineTo(mx + 8, my + 10); g.lineTo(mx - 1, my); g.fill(); }
         else { g.fillStyle = '#628a52'; g.beginPath(); g.moveTo(mx + 8, my - 9); g.lineTo(mx + 17, my + 8); g.lineTo(mx - 1, my + 8); g.fill(); }

@@ -95,6 +95,17 @@ Build the image (`docker compose build app`) and run it behind an HTTPS reverse 
 - **Honest limits:** on desktop the browser itself must be running (a background Chrome/Edge process is enough); on Android the system delivers it; iOS requires installing LifeOS to the Home Screen first. If the server is down at the reminder time it cannot push, and the app shows it when you next open it. The server only reads your data; it never edits it.
 - VAPID keys are generated on first start and kept in the database (or set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`). Push requires HTTPS or `localhost`.
 
+## Calendar feeds (Google, Outlook, any iCal link)
+
+*Settings → Calendar feeds* connects read-only calendars (needs the LifeOS server). Add as many as you like, each with a name and a colour.
+
+- **Google:** Settings → the calendar → *Integrate calendar* → **Secret address in iCal format**. **Outlook / Microsoft 365:** Settings → Calendar → *Shared calendars* → *Publish a calendar* → the **ICS** link. `webcal://` links work too.
+- The server downloads each feed when you add it (so a wrong link is reported at once) and then about every **15 minutes**. Meetings show in the month view, the Schedule panel and on the wall calendar in the calendar's colour, converted to your device's time zone.
+- Handled: repeating meetings (weekly, monthly, exceptions), time zones (Google's IANA names and Outlook's Windows names, across daylight-saving changes), all-day and multi-day entries, cancelled meetings and cancelled single occurrences, moved occurrences, repeated entries for one meeting, and the same meeting appearing in two connected calendars (shown once).
+- Imported meetings are **read-only** and live in their own tables, never in your synced data, so they cannot be edited, exported with your events or cause sync conflicts. If a feed can't be reached the last good copy stays visible and the error is shown in Settings. Only the next ~13 months (and the last 2) are kept.
+- **The link is a secret** (anyone holding it can read that calendar). It is stored only in your server's database and is never sent back to the browser or written to logs. The server refuses links that point at private/internal addresses, follows at most 4 redirects, and limits size (8 MB) and time (20 s). Up to 10 feeds.
+- Not included: two-way sync, editing, reminders for imported meetings, and Google sign-in (planned separately).
+
 ## Not included yet
 
 A template editor and multi-user sharing. Templates (`src/domain/templates.ts`) are versioned config only.

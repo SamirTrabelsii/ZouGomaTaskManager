@@ -2,8 +2,9 @@ import { useMemo, useState } from 'react';
 import { useStore } from '../../state/store';
 import { useToday } from '../../state/hooks';
 import { addDays } from '../../domain/dates';
-import { agendaItems, type AgendaItem } from '../../domain/services';
-import { Agenda, EventDialog, ReminderDialog } from '../common/calendar';
+import type { AgendaItem } from '../../domain/services';
+import { useAgenda } from '../../state/feeds';
+import { Agenda, EventDialog, ExternalEventDialog, ReminderDialog } from '../common/calendar';
 import { useTaskDialog } from '../common/tasks';
 import { PanelShell, Section } from './PanelShell';
 
@@ -11,8 +12,10 @@ import { PanelShell, Section } from './PanelShell';
 export function useAgendaOpener() {
   const taskDlg = useTaskDialog();
   const [eventId, setEventId] = useState<string | null>(null);
+  const [externalId, setExternalId] = useState<string | null>(null);
   const open = (i: AgendaItem) => {
     const st = useStore.getState();
+    if (i.kind === 'external') return setExternalId(i.refId);
     if (i.kind === 'event' || i.kind === 'deadline') setEventId(i.refId);
     else if (i.kind === 'task') taskDlg.open(i.refId);
     else if (i.kind === 'milestone') {
@@ -21,7 +24,7 @@ export function useAgendaOpener() {
     } else if (i.kind === 'project') { st.select('bookshelf'); st.setFocus({ type: 'project', id: i.refId }); }
     else if (i.kind === 'reminder') st.toast('Manage reminders in the Reminders list below the calendar.', 'info');
   };
-  const node = <>{taskDlg.node}{eventId && <EventDialog eventId={eventId} onClose={() => setEventId(null)} />}</>;
+  const node = <>{taskDlg.node}{eventId && <EventDialog eventId={eventId} onClose={() => setEventId(null)} />}{externalId && <ExternalEventDialog eventId={externalId} onClose={() => setExternalId(null)} />}</>;
   return { open, node };
 }
 
@@ -32,7 +35,7 @@ export function CalendarPanel() {
   const opener = useAgendaOpener();
   const [dlg, setDlg] = useState<null | 'event' | 'reminder'>(null);
 
-  const items = useMemo(() => agendaItems(data), [data]);
+  const items = useAgenda();
   const horizon = addDays(today, 14);
   const overdue = items.filter((i) => i.date < today && !i.done && (i.kind === 'deadline' || i.kind === 'project'));
   const upcoming = items.filter((i) => i.date >= today && i.date <= horizon && !i.done);

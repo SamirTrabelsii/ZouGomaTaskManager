@@ -26,7 +26,7 @@ export default defineConfig({
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'], channel: 'chrome', viewport: { width: 1280, height: 800 } } }],
   webServer: [
     {
-      command: 'npx tsx server/index.ts',
+      command: 'npx tsx e2e/test-server.ts', // the real app, with fixture calendar feeds
       url: `http://localhost:${API_PORT}/api/health`,
       reuseExistingServer: false,
       timeout: 60_000,

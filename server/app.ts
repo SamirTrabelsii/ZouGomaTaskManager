@@ -4,6 +4,8 @@ import bcrypt from 'bcryptjs';
 import type pg from 'pg';
 import { isValidTimeZone } from './time';
 import type { Sender } from './push';
+import { feedRouter } from './feeds';
+import { safeFetchText, type FeedFetcher } from './feedFetch';
 
 const COOKIE = 'lifeos_session';
 const SESSION_DAYS = 30;
@@ -22,6 +24,8 @@ export interface AppOptions {
   allowRegistration?: boolean;
   /** Web Push: the public VAPID key shown to browsers, and the function that delivers a push. */
   push?: { publicKey: string; send: Sender };
+  /** How calendar feeds are downloaded. Defaults to the SSRF-safe fetcher; tests inject their own. */
+  fetchFeed?: FeedFetcher;
 }
 
 /** Recovery codes: 100 random bits as 5 groups of 4 chars (no 0/O/1/I/L), e.g. K7QM-2XWD-… . Shown once; only a SHA-256 is stored. */
@@ -415,6 +419,9 @@ export function createApp(opts: AppOptions) {
       res.json({ delivered, devices: rows.length });
     } catch (e) { next(e); }
   });
+
+  /* ── calendar feeds (read-only iCal subscriptions) ── */
+  app.use('/api/feeds', feedRouter(pool, requireAuth, (req) => (req as Authed).userId, opts.fetchFeed ?? safeFetchText));
 
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));
 

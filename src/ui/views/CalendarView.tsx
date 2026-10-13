@@ -1,19 +1,17 @@
 import { useMemo, useState } from 'react';
-import { useStore } from '../../state/store';
 import { useToday } from '../../state/hooks';
 import { formatDay, monthGrid, parseDay, toDay } from '../../domain/dates';
-import { agendaItems } from '../../domain/services';
-import { Agenda, EventDialog, KIND_ICON, KIND_LABEL, ReminderDialog } from '../common/calendar';
+import { useAgenda } from '../../state/feeds';
+import { Agenda, EventDialog, KIND_ICON, KIND_LABEL, KindMark, ReminderDialog } from '../common/calendar';
 import { useAgendaOpener } from '../panels/CalendarPanel';
 
 export function CalendarView() {
-  const data = useStore((s) => s.data);
   const today = useToday();
   const [cursor, setCursor] = useState(() => { const d = parseDay(today); return { y: d.getFullYear(), m: d.getMonth() }; });
   const [sel, setSel] = useState(today);
   const [dlg, setDlg] = useState<null | 'event' | 'reminder'>(null);
   const opener = useAgendaOpener();
-  const items = useMemo(() => agendaItems(data), [data]);
+  const items = useAgenda();
   const byDay = useMemo(() => {
     const m = new Map<string, typeof items>();
     items.forEach((i) => m.set(i.date, [...(m.get(i.date) ?? []), i]));
@@ -48,7 +46,7 @@ export function CalendarView() {
                 <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs ${d === today ? 'bg-clay-500 font-bold text-white' : ''}`}>{parseDay(d).getDate()}</span>
                 <span className="hidden flex-col gap-0.5 md:flex">
                   {list.slice(0, 3).map((i) => (
-                    <span key={i.key} className={`truncate rounded bg-cream-200 px-1 text-[10px] ${i.done ? 'line-through opacity-60' : ''}`}><span aria-hidden>{KIND_ICON[i.kind]}</span> {i.title}</span>
+                    <span key={i.key} className={`flex items-center gap-0.5 truncate rounded bg-cream-200 px-1 text-[10px] ${i.done ? 'line-through opacity-60' : ''}`} style={i.color ? { borderLeft: `3px solid ${i.color}` } : undefined}><KindMark item={i} /> <span className="truncate">{i.title}</span></span>
                   ))}
                   {list.length > 3 && <span className="text-[10px] text-ink-500">+{list.length - 3} more</span>}
                 </span>

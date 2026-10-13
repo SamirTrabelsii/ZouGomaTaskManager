@@ -6,6 +6,7 @@ import { showSystemNotification } from '../state/notify';
 import { currentSubscription, disablePush, enablePush, pushSupported, sendTestPush } from '../state/push';
 import { cloud as cloudApi } from '../data/cloud';
 import { ConfirmButton, Dialog, Segmented } from './common/ui';
+import { FeedsSettings } from './FeedsSettings';
 
 type Perm = NotificationPermission | 'unsupported';
 const perm = (): Perm => (typeof Notification === 'undefined' ? 'unsupported' : Notification.permission);
@@ -134,6 +135,8 @@ export function Settings() {
             </div>
           </section>
         )}
+
+        {cloud.enabled && cloud.status !== 'signedout' && <FeedsSettings />}
 
         <section aria-labelledby="s-tpl">
           <h3 id="s-tpl" className="mb-1 font-semibold">Templates</h3>

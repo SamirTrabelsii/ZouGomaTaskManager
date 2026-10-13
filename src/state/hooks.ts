@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { isNightLook, todayStr } from '../domain/dates';
 import { useStore } from './store';
+import { useFeeds } from './feeds';
 
 /** Current local date; rolls over at midnight without a reload. */
 export function useToday(): string {
@@ -22,6 +23,19 @@ export function useReminderEngine(enabled: boolean) {
     const tick = () => useStore.getState().deliverDueReminders();
     tick();
     const id = setInterval(tick, 15_000);
+    const onVis = () => document.visibilityState === 'visible' && tick();
+    document.addEventListener('visibilitychange', onVis);
+    return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVis); };
+  }, [enabled]);
+}
+
+/** Keeps imported calendar feeds fresh while the app is open (the server itself re-reads each feed about every 15 minutes). */
+export function useFeedSync(enabled: boolean) {
+  useEffect(() => {
+    if (!enabled) { useFeeds.getState().reset(); return; }
+    const tick = () => void useFeeds.getState().refresh();
+    tick();
+    const id = setInterval(tick, 5 * 60_000);
     const onVis = () => document.visibilityState === 'visible' && tick();
     document.addEventListener('visibilitychange', onVis);
     return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVis); };
