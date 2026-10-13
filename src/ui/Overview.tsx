@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../state/store';
 import { useToday } from '../state/hooks';
-import { agendaItems, dailyProgress, habitCompletionToday, nextUp, sortTasks } from '../domain/services';
+import { agendaItems, dailyProgress, habitCompletionToday, isActive, nextUp, sortTasks } from '../domain/services';
 import { useExternalItems } from '../state/feeds';
 import { addDays, formatDay, formatTime, relativeDay } from '../domain/dates';
 import { Ring } from './common/ui';
@@ -18,7 +18,7 @@ export function Overview() {
   const imported = useExternalItems();
   const next = nextUp(data.events, imported);
   const priorities = useMemo(
-    () => sortTasks(data.tasks.filter((t) => t.status !== 'done' && (t.priority === 'high' || (t.dueDate && t.dueDate <= today))), 'priority').slice(0, 3),
+    () => sortTasks(data.tasks.filter((t) => isActive(t) && (t.priority === 'high' || (t.dueDate && t.dueDate <= today))), 'priority').slice(0, 3),
     [data.tasks, today],
   );
   const deadlines = useMemo(() => {

@@ -3,11 +3,11 @@ import type { Priority, Scope, Task, TaskSize, TaskStatus } from '../../domain/t
 import { useStore } from '../../state/store';
 import { useToday } from '../../state/hooks';
 import { relativeDay } from '../../domain/dates';
-import { dueTone, sortTasks, TASK_SIZES, type DueTone } from '../../domain/services';
+import { dueTone, SIZE_POINTS, sortTasks, TASK_SIZES, type DueTone } from '../../domain/services';
 import { resolveTemplates } from '../../domain/templates';
 import { ConfirmButton, Dialog, EmptyState, Field } from './ui';
 import {
-  AlertIcon, CalendarIcon, ClockIcon, PencilIcon, PlusIcon, PRIORITY_NAME, PriorityIcon, SCOPE_COLORS, SCOPE_ICONS, ScopeBadge, SizeChip, sizeLabel, STATUS_NAME, StatusIcon,
+  AlertIcon, CalendarIcon, ClockIcon, PencilIcon, PlusIcon, nextScopeStyle, PRIORITY_NAME, PriorityIcon, SCOPE_COLORS, SCOPE_ICONS, ScopeBadge, SizeChip, sizeLabel, STATUS_NAME, StatusIcon,
 } from './icons';
 
 /* ───────── Edit / create dialog ───────── */
@@ -60,6 +60,20 @@ export function TaskDialog({ taskId, defaults, onClose }: { taskId?: string; def
               {Object.entries(PRIORITY_NAME).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
           </Field>
+          {f.status === 'blocked' && (
+            <div className="col-span-2">
+              <Field label="Blocked by">
+                <input className="input" value={f.blockedBy ?? ''} onChange={(e) => set('blockedBy', e.target.value)} placeholder="What or who is it waiting on?" />
+              </Field>
+            </div>
+          )}
+          {f.status === 'onhold' && (
+            <div className="col-span-2">
+              <Field label="Resume on">
+                <input type="date" className="input" value={f.resumeOn ?? ''} onChange={(e) => set('resumeOn', e.target.value || null)} />
+              </Field>
+            </div>
+          )}
           <Field label="Size (story points)">
             <select className="input" value={f.size ?? ''} onChange={(e) => set('size', (e.target.value || null) as TaskSize | null)}>
               <option value="">Not sized</option>
@@ -123,8 +137,9 @@ function ScopeDialog({ scopeId, onClose, onCreated }: { scopeId?: string; onClos
   const existing = useStore((s) => s.data.scopes.find((x) => x.id === scopeId));
   const { addScope, updateScope, deleteScope } = useStore.getState();
   const [title, setTitle] = useState(existing?.title ?? '');
-  const [icon, setIcon] = useState(existing?.icon ?? SCOPE_ICONS[0]);
-  const [color, setColor] = useState(existing?.color ?? SCOPE_COLORS[0]);
+  const taken = useStore((s) => s.data.scopes);
+  const [icon, setIcon] = useState(() => existing?.icon ?? nextScopeStyle(taken).icon);
+  const [color, setColor] = useState(() => existing?.color ?? nextScopeStyle(taken).color);
   const save = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
@@ -178,7 +193,7 @@ function ScopeField({ value, onChange }: { value: string | null; onChange: (id: 
   const [name, setName] = useState<string | null>(null);
   const create = () => {
     if (!name?.trim()) return;
-    const made = useStore.getState().addScope({ title: name, icon: SCOPE_ICONS[scopes.length % SCOPE_ICONS.length], color: SCOPE_COLORS[scopes.length % SCOPE_COLORS.length] });
+    const made = useStore.getState().addScope({ title: name, ...nextScopeStyle(scopes) });
     onChange(made.id);
     setName(null);
   };
@@ -291,6 +306,12 @@ export function TaskRow({ task, onEdit, compact }: { task: Task; onEdit: (id: st
               <span className="chip" title={`${PRIORITY_NAME[task.priority]} priority`}><PriorityIcon priority={task.priority} size={12} />{PRIORITY_NAME[task.priority]}</span>
             )}
             {task.size && <SizeChip size={task.size} />}
+            {task.status === 'blocked' && task.blockedBy && (
+              <span className="chip max-w-full border-clay-500/60" title={`Blocked by ${task.blockedBy}`}><StatusIcon status="blocked" size={12} /><span className="truncate">{task.blockedBy}</span></span>
+            )}
+            {task.status === 'onhold' && task.resumeOn && (
+              <span className={`chip ${task.resumeOn <= today ? 'border-moss-500 text-moss-400' : ''}`}><StatusIcon status="onhold" size={12} />Resume {relativeDay(task.resumeOn, today)}</span>
+            )}
             {scope && (
               <span className="chip" style={{ borderColor: `${scope.color}99`, background: `${scope.color}1f` }} title={`Scope: ${scope.title}`}>
                 <span aria-hidden>{scope.icon}</span>{scope.title}
@@ -308,8 +329,8 @@ export function TaskRow({ task, onEdit, compact }: { task: Task; onEdit: (id: st
 
 /* ───────── Filtered list ───────── */
 
-export interface TaskFilters { q: string; scope: string; status: 'all' | 'open' | TaskStatus; priority: 'all' | Priority; project: string; sort: 'due' | 'priority' | 'created' | 'title' }
-export const defaultFilters: TaskFilters = { q: '', scope: 'all', status: 'open', priority: 'all', project: 'all', sort: 'due' };
+export interface TaskFilters { q: string; scope: string; status: 'all' | 'open' | TaskStatus; priority: 'all' | Priority; size: 'all' | 'none' | TaskSize; project: string; sort: 'due' | 'priority' | 'created' | 'title' | 'size' }
+export const defaultFilters: TaskFilters = { q: '', scope: 'all', status: 'open', priority: 'all', size: 'all', project: 'all', sort: 'due' };
 
 export function applyFilters(tasks: Task[], f: TaskFilters): Task[] {
   const q = f.q.trim().toLowerCase();
@@ -319,6 +340,7 @@ export function applyFilters(tasks: Task[], f: TaskFilters): Task[] {
       (f.status === 'all' || (f.status === 'open' ? t.status !== 'done' : t.status === f.status)) &&
       (f.scope === 'all' || t.scopeId === f.scope) &&
       (f.priority === 'all' || t.priority === f.priority) &&
+      (f.size === 'all' || (f.size === 'none' ? !t.size : t.size === f.size)) &&
       (f.project === 'all' || (f.project === 'none' ? !t.projectId : t.projectId === f.project)),
     ),
     f.sort,
@@ -337,6 +359,10 @@ export function FilterBar({ f, setF }: { f: TaskFilters; setF: (f: TaskFilters) 
       <select className="input w-auto" aria-label="Priority" value={f.priority} onChange={(e) => up('priority', e.target.value as TaskFilters['priority'])}>
         <option value="all">Any priority</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option>
       </select>
+      <select className="input w-auto" aria-label="Size" value={f.size} onChange={(e) => up('size', e.target.value as TaskFilters['size'])}>
+        <option value="all">Any size</option><option value="none">Not sized</option>
+        {TASK_SIZES.map((s) => <option key={s} value={s}>{s} · {SIZE_POINTS[s]} pts</option>)}
+      </select>
       {projects.length > 0 && (
         <select className="input w-auto" aria-label="Project" value={f.project} onChange={(e) => up('project', e.target.value)}>
           <option value="all">All projects</option><option value="none">No project</option>
@@ -344,7 +370,7 @@ export function FilterBar({ f, setF }: { f: TaskFilters; setF: (f: TaskFilters) 
         </select>
       )}
       <select className="input w-auto" aria-label="Sort by" value={f.sort} onChange={(e) => up('sort', e.target.value as TaskFilters['sort'])}>
-        <option value="due">Sort: due date</option><option value="priority">Sort: priority</option><option value="created">Sort: newest</option><option value="title">Sort: title</option>
+        <option value="due">Sort: due date</option><option value="priority">Sort: priority</option><option value="created">Sort: newest</option><option value="title">Sort: title</option><option value="size">Sort: size</option>
       </select>
     </div>
   );

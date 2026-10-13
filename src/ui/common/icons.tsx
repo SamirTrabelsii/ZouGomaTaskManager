@@ -122,4 +122,9 @@ export function ScopeBadge({ scope, size = 18 }: { scope: Pick<Scope, 'icon' | '
 }
 
 export const SCOPE_ICONS = ['📁', '💼', '🏠', '🎓', '💡', '🛠️', '🎯', '🧪', '📣', '💰', '❤️', '🌱'];
+/** The first icon and colour no scope uses yet (cycling once all are taken), so new scopes look different from each other. */
+export function nextScopeStyle(scopes: Pick<Scope, 'icon' | 'color'>[]) {
+  const pick = <T,>(all: T[], used: T[]) => all.find((x) => !used.includes(x)) ?? all[used.length % all.length];
+  return { icon: pick(SCOPE_ICONS, scopes.map((s) => s.icon)), color: pick(SCOPE_COLORS, scopes.map((s) => s.color)) };
+}
 export const SCOPE_COLORS = ['#62b4ff', '#eba14a', '#34d399', '#a78bfa', '#f472b6', '#ee7d6a', '#2dd4bf', '#facc15'];

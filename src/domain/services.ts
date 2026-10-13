@@ -4,6 +4,11 @@ import { addDays, dateTimeOf, daysRange, diffDays, isoToDay, startOfWeek } from 
 /* ───────── Tasks ───────── */
 
 export const isOpen = (t: Task) => t.status !== 'done';
+/** Open and not parked: what actually competes for attention today. */
+export const isActive = (t: Task) => t.status !== 'done' && t.status !== 'onhold';
+/** On-hold tasks whose resume date has come. */
+export const readyToResume = (tasks: Task[], today: string) =>
+  tasks.filter((t) => t.status === 'onhold' && t.resumeOn && t.resumeOn <= today);
 
 /** Story points behind each task size. */
 export const SIZE_POINTS: Record<TaskSize, number> = { XS: 1, S: 2, M: 3, L: 5, XL: 8, XXL: 13, HUGE: 21 };
@@ -24,7 +29,7 @@ export function pointsByDay(tasks: Task[], end: string, n: number) {
 }
 const prioRank = { high: 0, medium: 1, low: 2 } as const;
 
-export function sortTasks(tasks: Task[], by: 'due' | 'priority' | 'created' | 'title' = 'due'): Task[] {
+export function sortTasks(tasks: Task[], by: 'due' | 'priority' | 'created' | 'title' | 'size' = 'due'): Task[] {
   const arr = [...tasks];
   arr.sort((a, b) => {
     if (a.status === 'done' && b.status !== 'done') return 1;
@@ -32,6 +37,8 @@ export function sortTasks(tasks: Task[], by: 'due' | 'priority' | 'created' | 't
     switch (by) {
       case 'priority':
         return prioRank[a.priority] - prioRank[b.priority] || (a.dueDate ?? '9').localeCompare(b.dueDate ?? '9');
+      case 'size':
+        return taskPoints(b) - taskPoints(a) || prioRank[a.priority] - prioRank[b.priority] || (a.dueDate ?? '9999').localeCompare(b.dueDate ?? '9999');
       case 'created':
         return b.createdAt.localeCompare(a.createdAt);
       case 'title':
