@@ -104,9 +104,6 @@ export function Dialog({ title, onClose, children, wide }: { title: string; onCl
   );
 }
 
-export const PRIORITY_LABEL = { high: '▲▲▲ High', medium: '▲▲ Medium', low: '▲ Low' } as const;
-export const STATUS_LABEL = { todo: '○ To do', doing: '◐ In progress', done: '● Done' } as const;
-
 export function ConfirmButton({
   onConfirm, children, confirmLabel = 'Confirm?', className = 'btn btn-ghost text-clay-600',
 }: { onConfirm: () => void; children: ReactNode; confirmLabel?: string; className?: string }) {

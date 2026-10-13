@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { consistency, dailyProgress, goalProgress, plantGrowth, projectProgress, streaks, weeklySummary } from './services';
+import { consistency, dailyProgress, dueTone, goalProgress, plantGrowth, projectProgress, streaks, weeklySummary } from './services';
 import { emptyData, normalize } from '../data/storage';
 import type { Habit, HabitLog, Task } from './types';
 
@@ -9,7 +9,7 @@ const habit = (o: Partial<Habit> = {}): Habit => ({
 const logs = (...dates: string[]): HabitLog[] => dates.map((date, i) => ({ id: String(i), habitId: 'h', date }));
 const task = (o: Partial<Task>): Task => ({
   id: Math.random().toString(), title: 't', notes: '', status: 'todo', priority: 'medium', dueDate: null,
-  projectId: null, milestoneId: null, goalId: null, createdAt: '2026-03-01T10:00:00', completedAt: null, ...o,
+  projectId: null, milestoneId: null, goalId: null, scopeId: null, createdAt: '2026-03-01T10:00:00', completedAt: null, ...o,
 });
 
 describe('habit streaks', () => {
@@ -93,5 +93,46 @@ describe('data normalisation', () => {
   it('drops malformed rows instead of crashing', () => {
     const d = normalize({ version: 1, tasks: [{ id: 'a', title: 'ok' }, { nope: true }, 5] });
     expect(d.tasks).toHaveLength(1);
+  });
+});
+
+describe('due tones', () => {
+  const today = '2026-03-10';
+  it('colours open tasks by how their date relates to today', () => {
+    expect(dueTone(task({ dueDate: '2026-03-09' }), today)).toBe('overdue');
+    expect(dueTone(task({ dueDate: today }), today)).toBe('today');
+    expect(dueTone(task({ dueDate: '2026-03-17' }), today)).toBe('soon');
+    expect(dueTone(task({ dueDate: '2026-03-18' }), today)).toBe('later');
+  });
+  it('still flags blocked and on-hold tasks, but never finished or undated ones', () => {
+    expect(dueTone(task({ status: 'blocked', dueDate: '2026-03-01' }), today)).toBe('overdue');
+    expect(dueTone(task({ status: 'done', dueDate: '2026-03-01' }), today)).toBeNull();
+    expect(dueTone(task({}), today)).toBeNull();
+  });
+});
+
+describe('task statuses and scopes', () => {
+  it('leaves on-hold tasks out of the daily progress', () => {
+    const p = dailyProgress([task({ dueDate: '2026-03-10' }), task({ status: 'onhold', dueDate: '2026-03-10' }), task({ status: 'blocked', dueDate: '2026-03-10' })], '2026-03-10');
+    expect(p.remaining).toBe(2);
+  });
+  it('migrates old data: scopes are optional and dangling or legacy fields are dropped', () => {
+    const raw = {
+      ...emptyData(),
+      scopes: [{ id: 'sc', title: 'Work', icon: 5, color: 'nope' }, { id: 'x' }],
+      tasks: [
+        { id: 'a', title: 'A', status: 'todo' },
+        { id: 'b', title: 'B', status: 'weird', scopeId: 'sc', parentId: 'a' },
+        { id: 'c', title: 'C', status: 'todo', scopeId: 'gone' },
+      ],
+    };
+    const d = normalize(raw);
+    const t = Object.fromEntries(d.tasks.map((x) => [x.id, x]));
+    expect(d.scopes).toEqual([{ id: 'sc', title: 'Work', icon: '📁', color: '#62b4ff' }]);
+    expect(t.a.scopeId).toBeNull();
+    expect(t.b.scopeId).toBe('sc');
+    expect(t.b.status).toBe('todo');
+    expect('parentId' in t.b).toBe(false);
+    expect(t.c.scopeId).toBeNull();
   });
 });

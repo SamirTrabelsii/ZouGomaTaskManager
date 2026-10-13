@@ -32,10 +32,19 @@ export const todayTasks = (tasks: Task[], today: string) =>
 export const upcomingTasks = (tasks: Task[], today: string, days = 14) =>
   tasks.filter((t) => isOpen(t) && t.dueDate && t.dueDate > today && diffDays(today, t.dueDate) <= days);
 
-/** Today's scope: open tasks due today or earlier, plus everything finished today. */
+/** How a due date relates to today – drives the colour coding of task rows. Finished tasks have no tone. */
+export type DueTone = 'overdue' | 'today' | 'soon' | 'later';
+export function dueTone(t: Task, today: string, soonDays = 7): DueTone | null {
+  if (!isOpen(t) || !t.dueDate) return null;
+  if (t.dueDate < today) return 'overdue';
+  if (t.dueDate === today) return 'today';
+  return diffDays(today, t.dueDate) <= soonDays ? 'soon' : 'later';
+}
+
+/** Today's scope: open tasks due today or earlier (minus anything parked on hold), plus everything finished today. */
 export function dailyProgress(tasks: Task[], today: string) {
   const done = tasks.filter((t) => t.completedAt && isoToDay(t.completedAt) === today).length;
-  const remaining = tasks.filter((t) => isOpen(t) && t.dueDate && t.dueDate <= today).length;
+  const remaining = tasks.filter((t) => isOpen(t) && t.status !== 'onhold' && t.dueDate && t.dueDate <= today).length;
   const total = done + remaining;
   return { done, remaining, total, ratio: total ? done / total : 0 };
 }

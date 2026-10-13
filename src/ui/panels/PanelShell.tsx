@@ -43,13 +43,13 @@ export function Section({ title, right, children }: { title: string; right?: Rea
   );
 }
 
-export function Tabs<T extends string>({ value, onChange, tabs }: { value: T; onChange: (v: T) => void; tabs: { id: T; label: string; count?: number }[] }) {
+export function Tabs<T extends string>({ value, onChange, tabs }: { value: T; onChange: (v: T) => void; tabs: { id: T; label: ReactNode; count?: number }[] }) {
   return (
-    <div role="tablist" className="flex gap-1 border-b border-cream-300">
+    <div role="tablist" className="flex flex-wrap gap-x-0.5 border-b border-cream-300">
       {tabs.map((t) => (
         <button
           key={t.id} role="tab" aria-selected={value === t.id} onClick={() => onChange(t.id)}
-          className={`-mb-px border-b-2 px-3 py-1.5 text-sm font-medium transition ${value === t.id ? 'border-moss-600 text-ink-900' : 'border-transparent text-ink-500 hover:text-ink-900'}`}
+          className={`-mb-px whitespace-nowrap border-b-2 px-2.5 py-1.5 text-[13px] font-medium transition ${value === t.id ? 'border-moss-600 text-ink-900' : 'border-transparent text-ink-500 hover:text-ink-900'}`}
         >
           {t.label}{t.count != null && <span className="ml-1 text-xs text-ink-400">{t.count}</span>}
         </button>

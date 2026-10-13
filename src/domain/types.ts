@@ -1,6 +1,6 @@
 export type ID = string;
 export type Priority = 'low' | 'medium' | 'high';
-export type TaskStatus = 'todo' | 'doing' | 'done';
+export type TaskStatus = 'todo' | 'doing' | 'blocked' | 'onhold' | 'done';
 export type ProjectStatus = 'active' | 'paused' | 'done';
 export type NoteKind = 'note' | 'idea' | 'journal' | 'reflection' | 'review' | 'lesson';
 export type SceneObjectId = 'desk' | 'bookshelf' | 'plants' | 'calendar' | 'notebook';
@@ -16,8 +16,19 @@ export interface Task {
   projectId: ID | null;
   milestoneId: ID | null;
   goalId: ID | null;
+  /** The scope (a named group / tag) this task belongs to, if any. */
+  scopeId: ID | null;
   createdAt: string; // ISO
   completedAt: string | null; // ISO
+}
+
+/** A lightweight wrapper that groups tasks. It is not a task itself – just a named, coloured label. */
+export interface Scope {
+  id: ID;
+  title: string;
+  icon: string; // an emoji
+  color: string; // #rrggbb
+  createdAt: string;
 }
 
 export interface Project {
@@ -150,6 +161,7 @@ export const DATA_VERSION = 1;
 export interface AppData {
   version: number;
   tasks: Task[];
+  scopes: Scope[];
   projects: Project[];
   milestones: Milestone[];
   goals: Goal[];

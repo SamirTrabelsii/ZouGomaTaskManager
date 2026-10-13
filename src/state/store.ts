@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import {
   type AppData, type CalEvent, type Goal, type Habit, type Milestone, type Note, type Project,
-  type Reminder, type SceneObjectId, type Task, type ViewId, type Prefs,
+  type Reminder, type SceneObjectId, type Scope, type Task, type ViewId, type Prefs,
 } from '../domain/types';
 import { showSystemNotification } from './notify';
 import { dateTimeOf, localDateTime, toLocalInput, todayStr } from '../domain/dates';
@@ -74,6 +74,10 @@ interface Actions {
   toggleTask(id: string): void;
   deleteTask(id: string): void;
   setTaskReminder(taskId: string, at: string | null): void;
+  // scopes
+  addScope(input: Partial<Scope> & { title: string }): Scope;
+  updateScope(id: string, patch: Partial<Scope>): void;
+  deleteScope(id: string): void;
   // projects
   addProject(input: Partial<Project> & { title: string }): Project;
   updateProject(id: string, patch: Partial<Project>): void;
@@ -281,7 +285,7 @@ export const useStore = create<Store>((set, get) => {
     addTask(input) {
       const t: Task = {
         id: uid(), notes: '', status: 'todo', priority: 'medium', dueDate: null,
-        projectId: null, milestoneId: null, goalId: null, createdAt: nowIso(), completedAt: null,
+        projectId: null, milestoneId: null, goalId: null, scopeId: null, createdAt: nowIso(), completedAt: null,
         ...input, title: input.title.trim(),
       };
       if (t.status === 'done' && !t.completedAt) t.completedAt = nowIso();
@@ -322,6 +326,26 @@ export const useStore = create<Store>((set, get) => {
       const t = get().data.tasks.find((x) => x.id === taskId);
       if (!t) return;
       commit((d) => upsertReminder(d, { type: 'task', id: taskId }, t.title, at));
+    },
+
+    /* ── scopes ── */
+    addScope(input) {
+      const s: Scope = { id: uid(), icon: '📁', color: '#62b4ff', createdAt: nowIso(), ...input, title: input.title.trim() };
+      commit((d) => ({ ...d, scopes: [...d.scopes, s] }));
+      return s;
+    },
+    updateScope(id, patch) {
+      commit((d) => ({ ...d, scopes: d.scopes.map((s) => (s.id === id ? { ...s, ...patch } : s)) }));
+    },
+    deleteScope(id) {
+      const s = get().data.scopes.find((x) => x.id === id);
+      // the tasks stay – they just lose the label
+      withUndo(`Deleted scope “${s?.title ?? ''}”`, () =>
+        commit((d) => ({
+          ...d,
+          scopes: d.scopes.filter((x) => x.id !== id),
+          tasks: d.tasks.map((t) => (t.scopeId === id ? { ...t, scopeId: null } : t)),
+        })));
     },
 
     /* ── projects ── */
