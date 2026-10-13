@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../../state/store';
 import { useToday } from '../../state/hooks';
-import { dailyProgress, dueTone, sortTasks } from '../../domain/services';
+import { dailyProgress, dueTone, pointsBetween, sortTasks } from '../../domain/services';
+import { startOfWeek } from '../../domain/dates';
 import type { TaskStatus } from '../../domain/types';
 import { QuickAdd, ScopeBar, TaskList, TONE, useTaskDialog } from '../common/tasks';
 import { StatusIcon, STATUS_NAME } from '../common/icons';
@@ -28,6 +29,8 @@ export function DeskPanel() {
   const [scope, setScope] = useState('all');
 
   const prog = dailyProgress(tasks, today);
+  const ptsToday = pointsBetween(tasks, today, today);
+  const ptsWeek = pointsBetween(tasks, startOfWeek(today), today);
   const lists = useMemo(() => {
     const scoped = scope === 'all' ? tasks : tasks.filter((t) => t.scopeId === scope);
     const by = (s: TaskStatus) => sortTasks(scoped.filter((t) => t.status === s), 'due');
@@ -49,6 +52,7 @@ export function DeskPanel() {
             {prog.total === 0 ? 'A clear day' : prog.remaining === 0 ? 'Everything for today is done' : `${prog.remaining} left for today`}
           </div>
           <div className="text-ink-500">{prog.done} completed today</div>
+          <div className="mt-0.5 text-xs text-ink-500" title="Story points of finished tasks">⚡ <span className="font-medium text-sky-500">{ptsToday} pts</span> today · {ptsWeek} this week</div>
         </div>
       </div>
 
