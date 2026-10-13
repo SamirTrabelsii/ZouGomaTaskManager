@@ -11,6 +11,10 @@ export const TASK_SIZES = Object.keys(SIZE_POINTS) as TaskSize[];
 /** Points a task is worth; unsized tasks count 0. */
 export const taskPoints = (t: Pick<Task, 'size'>) => (t.size ? SIZE_POINTS[t.size] ?? 0 : 0);
 export const sumPoints = (tasks: Pick<Task, 'size'>[]) => tasks.reduce((n, t) => n + taskPoints(t), 0);
+/** Points of the tasks finished between two days (inclusive). */
+export const pointsBetween = (tasks: Task[], from: string, to: string) =>
+  sumPoints(tasks.filter((t) => t.completedAt && isoToDay(t.completedAt) >= from && isoToDay(t.completedAt) <= to));
+
 /** Points collected (tasks finished) on each of the last `n` days ending at `end`. */
 export function pointsByDay(tasks: Task[], end: string, n: number) {
   return daysRange(end, n).map((day) => ({
@@ -260,6 +264,7 @@ export function weeklySummary(d: AppData, weekStart: string) {
     weekStart,
     weekEnd,
     tasksCompleted: d.tasks.filter((t) => inWeek(t.completedAt)).length,
+    pointsCompleted: pointsBetween(d.tasks, weekStart, weekEnd),
     tasksCreated: d.tasks.filter((t) => inWeek(t.createdAt)).length,
     tasksOpen: d.tasks.filter(isOpen).length,
     habitLogs: d.habitLogs.filter((l) => dayIn(l.date)).length,

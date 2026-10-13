@@ -1,8 +1,9 @@
 import { useStore } from '../../state/store';
 import { useToday } from '../../state/hooks';
 import { addDays, formatDay, startOfWeek, parseDay } from '../../domain/dates';
-import { completedByDay, consistency, goalProgress, habitRatioByDay, plantGrowth, projectProgress, streaks, weeklySummary } from '../../domain/services';
+import { completedByDay, consistency, goalProgress, habitRatioByDay, plantGrowth, pointsByDay, projectProgress, streaks, sumPoints, weeklySummary } from '../../domain/services';
 import { EmptyState, ProgressBar } from '../common/ui';
+import { ScopeBadge } from '../common/icons';
 
 function Bars({ values, labels, label, max }: { values: number[]; labels: string[]; label: string; max?: number }) {
   const m = Math.max(max ?? 0, ...values, 1);
@@ -28,6 +29,8 @@ export function InsightsView() {
   const done = completedByDay(data.tasks, today, days);
   const hab = habitRatioByDay(data.habits, data.habitLogs, today, days);
   const total14 = done.reduce((a, d) => a + d.count, 0);
+  const pts = pointsByDay(data.tasks, today, days);
+  const pts14 = pts.reduce((a, d) => a + d.points, 0);
   const ws = startOfWeek(today);
   const thisWeek = weeklySummary(data, ws);
   const lastWeek = weeklySummary(data, addDays(ws, -7));
@@ -46,8 +49,8 @@ export function InsightsView() {
       <div className="grid gap-4 md:grid-cols-2">
         <section className="card" aria-labelledby="wk">
           <h2 id="wk" className="mb-2 font-semibold">This week · {formatDay(ws)} – {formatDay(addDays(ws, 6))}</h2>
-          <dl className="grid grid-cols-2 gap-2 text-center sm:grid-cols-4">
-            {[['Tasks done', thisWeek.tasksCompleted], ['Habit check-ins', thisWeek.habitLogs], ['Milestones', thisWeek.milestonesDone], ['Notes written', thisWeek.notesWritten]].map(([k, v]) => (
+          <dl className="grid grid-cols-2 gap-2 text-center sm:grid-cols-5">
+            {[['Tasks done', thisWeek.tasksCompleted], ['Story points', thisWeek.pointsCompleted],['Habit check-ins', thisWeek.habitLogs], ['Milestones', thisWeek.milestonesDone], ['Notes written', thisWeek.notesWritten]].map(([k, v]) => (
               <div key={k as string} className="rounded-lg bg-cream-100 p-2"><dd className="text-2xl font-semibold">{v}</dd><dt className="text-[11px] text-ink-500">{k}</dt></div>
             ))}
           </dl>
@@ -61,6 +64,34 @@ export function InsightsView() {
           <p className="mb-1 text-xs text-ink-500">{total14} completed in total</p>
           <Bars values={done.map((d) => d.count)} labels={done.map((d) => lbl(d.day))} label="Tasks completed per day" />
         </section>
+
+        <section className="card" aria-labelledby="sp">
+          <h2 id="sp" className="font-semibold">Story points · last {days} days</h2>
+          <p className="mb-1 text-xs text-ink-500">{pts14} points collected{total14 ? ` across ${total14} tasks` : ''} – tasks without a size count 0</p>
+          <Bars values={pts.map((d) => d.points)} labels={pts.map((d) => lbl(d.day))} label="Story points collected per day" />
+        </section>
+
+        {data.scopes.length > 0 && (
+          <section className="card" aria-labelledby="sc">
+            <h2 id="sc" className="mb-2 font-semibold">Scopes</h2>
+            <ul className="space-y-3">
+              {data.scopes.map((s) => {
+                const ts = data.tasks.filter((t) => t.scopeId === s.id);
+                const doneTs = ts.filter((t) => t.status === 'done');
+                const total = sumPoints(ts), got = sumPoints(doneTs);
+                return (
+                  <li key={s.id}>
+                    <div className="flex items-center justify-between gap-2 text-sm">
+                      <span className="flex min-w-0 items-center gap-2"><ScopeBadge scope={s} /><span className="truncate">{s.title}</span></span>
+                      <span className="shrink-0 text-xs text-ink-500">{doneTs.length}/{ts.length} tasks · {got}/{total} pts</span>
+                    </div>
+                    <ProgressBar className="mt-1" value={total ? got / total : ts.length ? doneTs.length / ts.length : 0} label={`${s.title} progress`} />
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
 
         <section className="card" aria-labelledby="hc">
           <h2 id="hc" className="font-semibold">Daily habit completion · last {days} days</h2>

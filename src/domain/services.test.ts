@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { consistency, dailyProgress, pointsByDay, SIZE_POINTS, sumPoints, taskPoints, dueTone, goalProgress, plantGrowth, projectProgress, streaks, weeklySummary } from './services';
+import { consistency, dailyProgress, pointsBetween, pointsByDay, SIZE_POINTS, sumPoints, taskPoints, dueTone, goalProgress, plantGrowth, projectProgress, streaks, weeklySummary } from './services';
 import { emptyData, normalize } from '../data/storage';
 import type { Habit, HabitLog, Task } from './types';
 
@@ -159,5 +159,15 @@ describe('data version', () => {
   it('upgrades v1 data and refuses data from a newer app', () => {
     expect(normalize({ version: 1, tasks: [{ id: 'a', title: 'A' }] }).version).toBe(2);
     expect(() => normalize({ version: 3, tasks: [] })).toThrow(/newer LifeOS/);
+  });
+});
+
+describe('points per period', () => {
+  it('sums points finished within a date range and reports them in the weekly summary', () => {
+    const at = (d: number) => new Date(2026, 2, d, 12).toISOString();
+    const ts = [task({ size: 'M', status: 'done', completedAt: at(9) }), task({ size: 'L', status: 'done', completedAt: at(11) }), task({ size: 'XL', status: 'done', completedAt: at(20) })];
+    expect(pointsBetween(ts, '2026-03-09', '2026-03-15')).toBe(8);
+    const d = { ...emptyData(), tasks: ts };
+    expect(weeklySummary(d, '2026-03-09').pointsCompleted).toBe(8);
   });
 });
