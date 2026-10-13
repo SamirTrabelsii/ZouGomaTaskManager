@@ -24,6 +24,18 @@ export interface AppOptions {
   push?: { publicKey: string; send: Sender };
 }
 
+/** Recovery codes: 100 random bits as 5 groups of 4 chars (no 0/O/1/I/L), e.g. K7QM-2XWD-… . Shown once; only a SHA-256 is stored. */
+const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+export function newRecoveryCode(): string {
+  // 31 symbols; rejection sampling keeps the choice uniform
+  const chars: string[] = [];
+  while (chars.length < 20) for (const b of crypto.randomBytes(32)) if (b < 248 && chars.length < 20) chars.push(CODE_ALPHABET[b % 31]);
+  return chars.join('').match(/.{4}/g)!.join('-');
+}
+const normalizeCode = (c: string) => c.toUpperCase().replace(/[^A-Z0-9]/g, '');
+const hashCode = (c: string) => sha('recovery:' + normalizeCode(c));
+const safeEqual = (a: string, b: string) => a.length === b.length && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+
 const sha = (s: string) => crypto.createHash('sha256').update(s).digest('hex');
 
 function parseCookies(header: string | undefined): Record<string, string> {
@@ -73,6 +85,21 @@ export function createApp(opts: AppOptions) {
   });
 
   const loginLimiter = makeLimiter(10, 10 * 60_000);
+  const changeLimiter = makeLimiter(5, 10 * 60_000);       // per signed-in user: password change / new recovery code
+  const resetIpLimiter = makeLimiter(10, 15 * 60_000);     // recovery-code attempts per ip+email
+  const resetEmailLimiter = makeLimiter(20, 60 * 60_000);  // ...and per email, so rotating IPs doesn't help
+
+  const passwordProblem = (pw: unknown): string | null => {
+    if (typeof pw !== 'string' || pw.length < 10) return 'Use a password of at least 10 characters.';
+    if (pw.length > 200) return 'Password is too long.';
+    return null;
+  };
+  /** Stores a fresh recovery code for the user and returns it (the only time it is ever visible). */
+  const issueRecoveryCode = async (userId: number) => {
+    const code = newRecoveryCode();
+    await pool.query('UPDATE users SET recovery_hash=$2 WHERE id=$1', [userId, hashCode(code)]);
+    return code;
+  };
 
   const setSession = async (res: Response, userId: number) => {
     const token = crypto.randomBytes(32).toString('base64url');
@@ -131,8 +158,9 @@ export function createApp(opts: AppOptions) {
         if ((e as { code?: string }).code === '23505') return res.status(409).json({ error: 'That email is already registered.' });
         throw e;
       }
+      const recoveryCode = await issueRecoveryCode(userId);
       await setSession(res, userId);
-      res.status(201).json({ email: c.email });
+      res.status(201).json({ email: c.email, recoveryCode });
     } catch (e) { next(e); }
   });
 
@@ -162,8 +190,111 @@ export function createApp(opts: AppOptions) {
 
   app.get('/api/auth/me', requireAuth, async (req, res, next) => {
     try {
-      const { rows } = await pool.query('SELECT email FROM users WHERE id=$1', [(req as Authed).userId]);
-      res.json({ email: rows[0].email });
+      const { rows } = await pool.query('SELECT email, recovery_hash IS NOT NULL AS has_recovery FROM users WHERE id=$1', [(req as Authed).userId]);
+      res.json({ email: rows[0].email, hasRecoveryCode: rows[0].has_recovery });
+    } catch (e) { next(e); }
+  });
+
+  /** Change the password while signed in. Every other session is ended; this one stays. */
+  app.post('/api/auth/change-password', requireAuth, async (req, res, next) => {
+    try {
+      const userId = (req as Authed).userId;
+      const { currentPassword, newPassword } = req.body as { currentPassword?: unknown; newPassword?: unknown };
+      if (typeof currentPassword !== 'string' || typeof newPassword !== 'string') return res.status(400).json({ error: 'Enter your current and new password.' });
+      const key = `change|${userId}`;
+      if (!changeLimiter.hit(key)) return res.status(429).json({ error: 'Too many attempts. Wait a few minutes and try again.' });
+      const problem = passwordProblem(newPassword);
+      if (problem) return res.status(400).json({ error: problem });
+      const { rows } = await pool.query('SELECT password_hash FROM users WHERE id=$1', [userId]);
+      if (!rows[0] || !(await bcrypt.compare(currentPassword, rows[0].password_hash))) return res.status(403).json({ error: 'Your current password is incorrect.' });
+      if (newPassword === currentPassword) return res.status(400).json({ error: 'Choose a password different from the current one.' });
+      const hash = await bcrypt.hash(newPassword, 12);
+      const token = parseCookies(req.headers.cookie)[COOKIE];
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query('UPDATE users SET password_hash=$2 WHERE id=$1', [userId, hash]);
+        const ended = await client.query('DELETE FROM sessions WHERE user_id=$1 AND token_hash<>$2', [userId, sha(token)]);
+        await client.query('COMMIT');
+        changeLimiter.reset(key);
+        res.json({ ok: true, otherSessionsEnded: ended.rowCount ?? 0 });
+      } catch (e) { await client.query('ROLLBACK').catch(() => {}); throw e; } finally { client.release(); }
+    } catch (e) { next(e); }
+  });
+
+  /** Replace the recovery code (also how accounts created before recovery codes existed get one). Needs the password. */
+  app.post('/api/auth/recovery-code', requireAuth, async (req, res, next) => {
+    try {
+      const userId = (req as Authed).userId;
+      const { password } = req.body as { password?: unknown };
+      if (typeof password !== 'string') return res.status(400).json({ error: 'Enter your password.' });
+      const key = `change|${userId}`;
+      if (!changeLimiter.hit(key)) return res.status(429).json({ error: 'Too many attempts. Wait a few minutes and try again.' });
+      const { rows } = await pool.query('SELECT password_hash FROM users WHERE id=$1', [userId]);
+      if (!rows[0] || !(await bcrypt.compare(password, rows[0].password_hash))) return res.status(403).json({ error: 'Your password is incorrect.' });
+      changeLimiter.reset(key);
+      res.json({ recoveryCode: await issueRecoveryCode(userId) });
+    } catch (e) { next(e); }
+  });
+
+  /** Forgotten password: the recovery code proves ownership. The code is single-use (a new one is returned), all sessions end, then a fresh one starts. */
+  app.post('/api/auth/reset-password', async (req, res, next) => {
+    try {
+      const b = req.body as { email?: unknown; recoveryCode?: unknown; newPassword?: unknown };
+      const c = credentials({ email: b.email, password: 'x' });
+      if (!c || typeof b.recoveryCode !== 'string' || typeof b.newPassword !== 'string') return res.status(400).json({ error: 'Enter your email, recovery code and a new password.' });
+      const ipKey = `${req.ip}|${c.email}`;
+      const okIp = resetIpLimiter.hit(ipKey), okEmail = resetEmailLimiter.hit(c.email);
+      if (!okIp || !okEmail) return res.status(429).json({ error: 'Too many attempts. Wait a while and try again.' });
+      const problem = passwordProblem(b.newPassword);
+      if (problem) return res.status(400).json({ error: problem });
+      const { rows } = await pool.query('SELECT id, recovery_hash FROM users WHERE email=$1', [c.email]);
+      const stored: string | null = rows[0]?.recovery_hash ?? null;
+      // always compare something, so an unknown email or missing code looks the same as a wrong code
+      const ok = safeEqual(hashCode(b.recoveryCode), stored ?? sha('no-code'));
+      if (!rows[0] || !stored || !ok) return res.status(401).json({ error: 'That email and recovery code do not match.' });
+      const userId = Number(rows[0].id);
+      const hash = await bcrypt.hash(b.newPassword, 12);
+      const recoveryCode = newRecoveryCode();
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        // matching on the old recovery_hash makes the code single-use even under concurrent requests
+        const upd = await client.query('UPDATE users SET password_hash=$2, recovery_hash=$3 WHERE id=$1 AND recovery_hash=$4', [userId, hash, hashCode(recoveryCode), stored]);
+        if (upd.rowCount !== 1) { await client.query('ROLLBACK'); return res.status(401).json({ error: 'That email and recovery code do not match.' }); }
+        await client.query('DELETE FROM sessions WHERE user_id=$1', [userId]);
+        await client.query('COMMIT');
+      } catch (e) { await client.query('ROLLBACK').catch(() => {}); throw e; } finally { client.release(); }
+      resetIpLimiter.reset(ipKey); resetEmailLimiter.reset(c.email);
+      await setSession(res, userId);
+      res.json({ email: c.email, recoveryCode });
+    } catch (e) { next(e); }
+  });
+
+  /** Everything the server holds for this account, as one JSON download. Secrets (password/recovery hashes, session tokens, push keys) are left out. */
+  app.get('/api/account/export', requireAuth, async (req, res, next) => {
+    try {
+      const userId = (req as Authed).userId;
+      const [user, doc, backups, subs, sessions] = await Promise.all([
+        pool.query('SELECT email, created_at, recovery_hash IS NOT NULL AS has_recovery FROM users WHERE id=$1', [userId]),
+        pool.query('SELECT data, revision, updated_at FROM documents WHERE user_id=$1', [userId]),
+        pool.query('SELECT id, reason, revision, data, saved_at FROM document_backups WHERE user_id=$1 ORDER BY saved_at DESC', [userId]),
+        pool.query('SELECT endpoint, tz, created_at FROM push_subscriptions WHERE user_id=$1 ORDER BY id', [userId]),
+        pool.query('SELECT created_at, expires_at FROM sessions WHERE user_id=$1 AND expires_at > now() ORDER BY created_at', [userId]),
+      ]);
+      const u = user.rows[0], d = doc.rows[0];
+      const exportedAt = new Date().toISOString();
+      res.setHeader('Cache-Control', 'no-store');
+      res.setHeader('Content-Disposition', `attachment; filename="lifeos-account-${exportedAt.slice(0, 10)}.json"`);
+      res.type('application/json').send(JSON.stringify({
+        format: 'lifeos-account-export', formatVersion: 1, exportedAt,
+        account: { email: u.email, createdAt: u.created_at, hasRecoveryCode: u.has_recovery },
+        data: d ? { revision: d.revision, updatedAt: d.updated_at, data: d.data } : null,
+        backups: backups.rows.map((r) => ({ id: String(r.id), reason: r.reason, revision: r.revision, savedAt: r.saved_at, data: r.data })),
+        pushSubscriptions: subs.rows.map((r) => ({ endpoint: r.endpoint, timeZone: r.tz, createdAt: r.created_at })),
+        activeSessions: sessions.rows.map((r) => ({ createdAt: r.created_at, expiresAt: r.expires_at })),
+        notExported: 'Password and recovery-code hashes, session tokens and push encryption keys are never exported.',
+      }, null, 2));
     } catch (e) { next(e); }
   });
 

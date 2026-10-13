@@ -21,7 +21,8 @@ vi.mock('./cloud', () => ({
     health: async () => (server.health ? { ok: true, hasUser: true, registrationOpen: false } : null),
     me: async () => { if (!server.authed) throw new Api(401, 'no'); return { email: 'me@example.com' }; },
     login: async () => ({ email: 'me@example.com' }),
-    register: async () => ({ email: 'me@example.com' }),
+    register: async () => ({ email: 'me@example.com', recoveryCode: 'AAAA-BBBB-CCCC-DDDD-EEEE' }),
+    resetPassword: async () => ({ email: 'me@example.com', recoveryCode: 'FFFF-GGGG-HHHH-JJJJ-KKKK' }),
     logout: async () => ({ ok: true }),
     getData: async () => { if (!server.online) throw new Net('offline'); return { data: server.data, revision: server.revision }; },
     putData: async (data: unknown, base: number, force = false) => {
@@ -172,6 +173,22 @@ describe('cloud sync', () => {
     expect(t.cloud.status).toBe('idle');
     expect((server.data as AppData).tasks).toHaveLength(6);
     expect(JSON.parse(mem.get('lifeos.v1.sync')!).dirty).toBe(false);
+  });
+
+  it('hands back the recovery code issued at account creation, but not on a plain sign-in', async () => {
+    const created = await make().syncer.signIn('me@example.com', 'long enough password', 'register');
+    expect(created.recoveryCode).toBe('AAAA-BBBB-CCCC-DDDD-EEEE');
+    expect(created.start.kind).toBe('ready');
+    expect((await make().syncer.signIn('me@example.com', 'long enough password', 'login')).recoveryCode).toBeUndefined();
+  });
+
+  it('a password reset signs in, loads the account data and yields the replacement recovery code', async () => {
+    server.data = withTasks(2); server.revision = 4;
+    const t = make();
+    const r = await t.syncer.resetPassword('me@example.com', 'AAAA-BBBB-CCCC-DDDD-EEEE', 'a new passphrase');
+    expect(r.recoveryCode).toBe('FFFF-GGGG-HHHH-JJJJ-KKKK');
+    expect(r.start.kind === 'ready' && r.start.data.tasks).toHaveLength(2);
+    expect(t.cloud.email).toBe('me@example.com');
   });
 
   it('keeps working from the local cache when a previously synced device cannot reach the server', async () => {

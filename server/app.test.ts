@@ -17,6 +17,7 @@ describe.skipIf(!reachable)('LifeOS API', () => {
   let server: Server;
   let base: string;
   let cookie = '';
+  let recovery = '';
 
   const call = async (method: string, path: string, body?: unknown, extra: Record<string, string> = {}) => {
     const res = await fetch(base + path, {
@@ -31,6 +32,9 @@ describe.skipIf(!reachable)('LifeOS API', () => {
   };
 
   beforeAll(async () => {
+    // These tests TRUNCATE every table: refuse to run against anything that isn't a dedicated *_test database.
+    const dbName = new URL(URL_).pathname.replace(/^\//, '');
+    if (!/_test$/.test(dbName)) throw new Error(`Refusing to run destructive API tests on database "${dbName}"`);
     await migrate(pool);
     await pool.query('TRUNCATE users, sessions, documents, document_backups RESTART IDENTITY CASCADE');
     server = createApp({ pool }).listen(0);
@@ -63,7 +67,13 @@ describe.skipIf(!reachable)('LifeOS API', () => {
     expect(rows[0].password_hash).not.toContain('correct horse');
     const tok = await pool.query('SELECT token_hash FROM sessions');
     expect(cookie).not.toContain(tok.rows[0].token_hash); // only a hash of the token is stored
-    expect((await call('GET', '/api/auth/me')).body).toEqual({ email: 'me@example.com' });
+    expect((await call('GET', '/api/auth/me')).body).toEqual({ email: 'me@example.com', hasRecoveryCode: true });
+    // a recovery code is shown once at creation; only a hash is stored
+    recovery = r.body.recoveryCode;
+    expect(recovery).toMatch(/^([A-HJKMNP-Z2-9]{4}-){4}[A-HJKMNP-Z2-9]{4}$/);
+    const u = await pool.query('SELECT recovery_hash FROM users');
+    expect(u.rows[0].recovery_hash).toBeTruthy();
+    expect(u.rows[0].recovery_hash).not.toContain(recovery.replaceAll('-', ''));
   });
 
   it('refuses a second account unless registration is enabled', async () => {
@@ -127,6 +137,121 @@ describe.skipIf(!reachable)('LifeOS API', () => {
     let last = 0;
     for (let i = 0; i < 12; i++) last = (await call('POST', '/api/auth/login', { email: 'brute@example.com', password: 'guess-' + i })).status;
     expect(last).toBe(429);
+  }, 60_000);
+
+  /* ── password change, recovery code, export (each step builds on the previous state) ── */
+  const OLD_PW = 'correct horse battery';
+  const NEW_PW = 'a brand new passphrase';
+  const login = async (password: string, email = 'me@example.com') => {
+    cookie = '';
+    const r = await call('POST', '/api/auth/login', { email, password });
+    return { r, cookie };
+  };
+
+  it('changes the password, ends other sessions but keeps this one', async () => {
+    const a = (await login(OLD_PW)).cookie;
+    const b = (await login(OLD_PW)).cookie;
+    cookie = a;
+    expect((await call('POST', '/api/auth/change-password', { currentPassword: 'not it at all', newPassword: NEW_PW })).status).toBe(403);
+    expect((await call('POST', '/api/auth/change-password', { currentPassword: OLD_PW, newPassword: 'short' })).status).toBe(400);
+    expect((await call('POST', '/api/auth/change-password', { currentPassword: OLD_PW, newPassword: OLD_PW })).status).toBe(400);
+    expect((await call('POST', '/api/auth/change-password', { currentPassword: OLD_PW })).status).toBe(400);
+    const ok = await call('POST', '/api/auth/change-password', { currentPassword: OLD_PW, newPassword: NEW_PW });
+    expect(ok.status).toBe(200);
+    expect(ok.body.otherSessionsEnded).toBeGreaterThanOrEqual(1);
+    cookie = a;
+    expect((await call('GET', '/api/auth/me')).status).toBe(200); // this device stays signed in
+    cookie = b;
+    expect((await call('GET', '/api/auth/me')).status).toBe(401); // the other one is out
+    expect((await login(OLD_PW)).r.status).toBe(401);
+    expect((await login(NEW_PW)).r.status).toBe(200);
+  }, 60_000);
+
+  it('rejects a bad recovery code the same way for known and unknown emails, and rate-limits guesses', async () => {
+    cookie = '';
+    const wrong = 'AAAA-AAAA-AAAA-AAAA-AAAA';
+    const known = await call('POST', '/api/auth/reset-password', { email: 'me@example.com', recoveryCode: wrong, newPassword: 'whatever password' });
+    const unknown = await call('POST', '/api/auth/reset-password', { email: 'nobody@example.com', recoveryCode: wrong, newPassword: 'whatever password' });
+    expect(known.status).toBe(401);
+    expect(unknown.status).toBe(401);
+    expect(known.body).toEqual(unknown.body);
+    expect((await call('POST', '/api/auth/reset-password', { email: 'me@example.com', recoveryCode: recovery })).status).toBe(400);
+    expect((await call('POST', '/api/auth/reset-password', { email: 'me@example.com', recoveryCode: recovery, newPassword: 'short' })).status).toBe(400);
+    expect((await login(NEW_PW)).r.status).toBe(200); // nothing changed
+    let last = 0;
+    for (let i = 0; i < 12; i++) last = (await call('POST', '/api/auth/reset-password', { email: 'guesser@example.com', recoveryCode: wrong, newPassword: 'whatever password' })).status;
+    expect(last).toBe(429);
+  }, 60_000);
+
+  it('resets a forgotten password with the recovery code: single use, ends every session, returns a new code', async () => {
+    const before = (await login(NEW_PW)).cookie;
+    cookie = '';
+    const FORGOT = 'my reset passphrase';
+    const r = await call('POST', '/api/auth/reset-password', { email: 'ME@example.com', recoveryCode: recovery.toLowerCase().replaceAll('-', ' '), newPassword: FORGOT });
+    expect(r.status).toBe(200);
+    expect(r.body.recoveryCode).toMatch(/^([A-Z2-9]{4}-){4}[A-Z2-9]{4}$/);
+    expect(r.body.recoveryCode).not.toBe(recovery);
+    expect((await call('GET', '/api/data')).status).toBe(200); // the reset signs this device in
+    cookie = before;
+    expect((await call('GET', '/api/auth/me')).status).toBe(401); // old sessions are gone
+    expect((await login(NEW_PW)).r.status).toBe(401);
+    expect((await login(FORGOT)).r.status).toBe(200);
+    // the used code is dead
+    cookie = '';
+    expect((await call('POST', '/api/auth/reset-password', { email: 'me@example.com', recoveryCode: recovery, newPassword: 'yet another one!' })).status).toBe(401);
+    recovery = r.body.recoveryCode;
+  }, 60_000);
+
+  it('issues a replacement recovery code only with the password', async () => {
+    await login('my reset passphrase');
+    expect((await call('POST', '/api/auth/recovery-code', { password: 'nope' })).status).toBe(403);
+    const r = await call('POST', '/api/auth/recovery-code', { password: 'my reset passphrase' });
+    expect(r.status).toBe(200);
+    expect(r.body.recoveryCode).not.toBe(recovery);
+    cookie = '';
+    expect((await call('POST', '/api/auth/reset-password', { email: 'me@example.com', recoveryCode: recovery, newPassword: 'yet another one!' })).status).toBe(401); // superseded
+    recovery = r.body.recoveryCode;
+    cookie = '';
+    expect((await call('POST', '/api/auth/recovery-code', { password: 'my reset passphrase' })).status).toBe(401);
+  }, 60_000);
+
+  it('exports everything stored for the account, and nothing secret or foreign', async () => {
+    cookie = '';
+    expect((await call('GET', '/api/account/export')).status).toBe(401);
+    await login('my reset passphrase');
+    const me = (await pool.query("SELECT id, password_hash, recovery_hash FROM users WHERE email='me@example.com'")).rows[0];
+    await pool.query("INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth, tz) VALUES ($1,'https://push.example/abc','P256DH-SECRET','AUTH-SECRET','Africa/Tunis')", [me.id]);
+    // a second user's data must never leak into this export
+    const other = (await pool.query("INSERT INTO users (email, password_hash) VALUES ('other@example.com','x') RETURNING id")).rows[0];
+    await pool.query('INSERT INTO documents (user_id, data) VALUES ($1,$2)', [other.id, JSON.stringify({ version: 1, tasks: [{ id: 'z', title: 'OTHER-USERS-TASK' }] })]);
+
+    const res = await fetch(base + '/api/account/export', { headers: { cookie } });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-disposition')).toMatch(/^attachment; filename="lifeos-account-\d{4}-\d{2}-\d{2}\.json"$/);
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    const text = await res.text();
+    const out = JSON.parse(text);
+    expect(out).toMatchObject({ format: 'lifeos-account-export', formatVersion: 1, account: { email: 'me@example.com', hasRecoveryCode: true } });
+    expect(out.data.revision).toBe(3);
+    expect(out.data.data.tasks).toHaveLength(9);
+    expect(out.backups.length).toBeGreaterThanOrEqual(1);
+    expect(out.backups[0].data.version).toBe(1);
+    expect(out.pushSubscriptions).toEqual([expect.objectContaining({ endpoint: 'https://push.example/abc', timeZone: 'Africa/Tunis' })]);
+    expect(out.activeSessions.length).toBeGreaterThanOrEqual(1);
+    for (const secret of [me.password_hash, me.recovery_hash, 'P256DH-SECRET', 'AUTH-SECRET', 'OTHER-USERS-TASK', 'other@example.com']) expect(text).not.toContain(secret);
+    const tok = await pool.query('SELECT token_hash FROM sessions WHERE user_id=$1', [me.id]);
+    for (const t of tok.rows) expect(text).not.toContain(t.token_hash);
+  }, 60_000);
+
+  it('requires sign-in to change the password and rate-limits wrong current passwords', async () => {
+    cookie = '';
+    expect((await call('POST', '/api/auth/change-password', { currentPassword: 'my reset passphrase', newPassword: OLD_PW })).status).toBe(401);
+    await login('my reset passphrase');
+    let last = 0;
+    for (let i = 0; i < 7; i++) last = (await call('POST', '/api/auth/change-password', { currentPassword: 'wrong-' + i, newPassword: OLD_PW })).status;
+    expect(last).toBe(429);
+    // even the right password is refused while limited
+    expect((await call('POST', '/api/auth/change-password', { currentPassword: 'my reset passphrase', newPassword: OLD_PW })).status).toBe(429);
   }, 60_000);
 });
 

@@ -1,13 +1,76 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useStore } from '../state/store';
 import { TEMPLATES } from '../domain/templates';
 import type { Quality } from '../domain/types';
 import { showSystemNotification } from '../state/notify';
 import { currentSubscription, disablePush, enablePush, pushSupported, sendTestPush } from '../state/push';
+import { cloud as cloudApi } from '../data/cloud';
 import { ConfirmButton, Dialog, Segmented } from './common/ui';
 
 type Perm = NotificationPermission | 'unsupported';
 const perm = (): Perm => (typeof Notification === 'undefined' ? 'unsupported' : Notification.permission);
+
+/** Change password, replace the recovery code, download everything the server holds. */
+function AccountSecurity() {
+  const st = useStore.getState();
+  const [open, setOpen] = useState<'password' | 'code' | null>(null);
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const close = () => { setOpen(null); setCurrent(''); setNext(''); setError(null); };
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true); setError(null);
+    const err = open === 'password' ? await st.changePassword(current, next) : await st.newRecoveryCode(current);
+    setBusy(false);
+    if (err) { setError(err); setCurrent(''); } else close();
+  };
+  const exportAccount = async () => {
+    try {
+      const { blob, filename } = await cloudApi.exportAccount();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+      st.toast('Account data downloaded.', 'ok');
+    } catch (e) { st.toast((e as Error).message, 'error'); }
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-2">
+        <button className="btn" onClick={() => (open === 'password' ? close() : (close(), setOpen('password')))}>Change password</button>
+        <button className="btn" onClick={() => (open === 'code' ? close() : (close(), setOpen('code')))}>New recovery code</button>
+        <button className="btn" onClick={exportAccount}>⬇ Download account data</button>
+      </div>
+      {open && (
+        <form onSubmit={submit} className="space-y-2 rounded-lg border border-cream-300 p-3" aria-label={open === 'password' ? 'Change password' : 'New recovery code'}>
+          <label className="block">
+            <span className="label">{open === 'password' ? 'Current password' : 'Your password'}</span>
+            <input className="input" type="password" required autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} />
+          </label>
+          {open === 'password' && (
+            <label className="block">
+              <span className="label">New password</span>
+              <input className="input" type="password" required minLength={10} autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} aria-describedby="np-hint" />
+              <span id="np-hint" className="mt-1 block text-xs text-ink-500">At least 10 characters. Your other devices will be signed out.</span>
+            </label>
+          )}
+          {open === 'code' && <p className="text-xs text-ink-500">This replaces your current recovery code; the old one stops working.</p>}
+          {error && <p role="alert" className="rounded-lg bg-clay-500/15 px-3 py-2 text-clay-500">{error}</p>}
+          <div className="flex gap-2">
+            <button className="btn btn-primary" disabled={busy}>{busy ? 'One moment…' : open === 'password' ? 'Change password' : 'Create new code'}</button>
+            <button type="button" className="btn btn-ghost" onClick={close}>Cancel</button>
+          </div>
+        </form>
+      )}
+      <p className="text-xs text-ink-500">The download holds your studio, its server backups, the account email and your push devices. It never includes password or recovery hashes.</p>
+    </div>
+  );
+}
 
 export function Settings() {
   const data = useStore((s) => s.data);
@@ -56,6 +119,7 @@ export function Settings() {
               <div className="flex flex-wrap gap-2">
                 <ConfirmButton className="btn" confirmLabel="Sign out of this device?" onConfirm={() => void st.signOut()}>Sign out</ConfirmButton>
               </div>
+              <AccountSecurity />
               <h4 className="label mt-2">Cloud backups</h4>
               {cloudBackups.length === 0 ? <p className="text-ink-500">The server keeps an hourly backup of your studio and before any overwrite.</p> : (
                 <ul className="space-y-1">

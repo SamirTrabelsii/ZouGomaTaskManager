@@ -47,6 +47,9 @@ Browser tests: `npm run test:e2e` (Playwright, uses the Chrome installed on your
 - **No silent overwrites.** Each device remembers the server revision it last saw. If the server moved on while this device also has unsynced edits, you choose which copy to keep; the other is backed up first (`Settings → Cloud backups`).
 - **Server backups.** Hourly rotating backups (last 20) plus one before every forced overwrite. Browser backups still exist as before.
 - **Auth.** Email + password (bcrypt, cost 12). Session = random 256-bit token in an `HttpOnly`, `SameSite=Lax` cookie (set `COOKIE_SECURE=1` behind HTTPS); only a SHA-256 of it is stored. Login attempts are rate-limited. Writes require JSON and a same-origin `Origin`.
+- **Password change** (`Settings → Account & sync → Change password`) needs the current password, is rate-limited, and signs out every *other* device.
+- **Recovery code.** Creating the account shows a one-time code (100 random bits, `XXXX-XXXX-XXXX-XXXX-XXXX`); only its SHA-256 is stored, so it can't be shown again. On the sign-in screen, **Forgot your password?** takes the email, that code and a new password. Resetting is rate-limited per IP+email and per email, ends all sessions, signs this device in, and spends the code — a replacement is shown at once. Accounts created before this feature (or a lost code) can mint a new one under `Settings → New recovery code` while signed in (needs the password). If both the password and the code are lost there is no remote reset: it needs access to the database.
+- **Account download** (`Settings → Download account data`, `GET /api/account/export`): one JSON file with the email, your studio, every server backup, push devices and session dates. Password/recovery hashes, session tokens and push encryption keys are never included.
 - **Sign-out** keeps a local backup and removes the cached sync state.
 
 ### Configuration (environment)

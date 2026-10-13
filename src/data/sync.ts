@@ -96,10 +96,18 @@ export class Syncer {
     return this.loadSignedIn();
   }
 
-  async signIn(email: string, password: string, mode: 'login' | 'register'): Promise<StartResult> {
+  /** `recoveryCode` is set only when the server just issued one (account creation); it is shown once. */
+  async signIn(email: string, password: string, mode: 'login' | 'register'): Promise<{ start: StartResult; recoveryCode?: string }> {
     const r = mode === 'register' ? await cloud.register(email, password) : await cloud.login(email, password);
     this.ctx.setCloud({ email: r.email, status: 'idle' });
-    return this.loadSignedIn();
+    return { start: await this.loadSignedIn(), recoveryCode: (r as { recoveryCode?: string }).recoveryCode };
+  }
+
+  /** Forgotten password: the recovery code signs this device in under the new password and yields a replacement code. */
+  async resetPassword(email: string, recoveryCode: string, newPassword: string): Promise<{ start: StartResult; recoveryCode: string }> {
+    const r = await cloud.resetPassword(email, recoveryCode, newPassword);
+    this.ctx.setCloud({ email: r.email, status: 'idle' });
+    return { start: await this.loadSignedIn(), recoveryCode: r.recoveryCode };
   }
 
   async signOut(): Promise<void> {

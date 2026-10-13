@@ -23,6 +23,8 @@ interface UIState {
   status: 'loading' | 'ready' | 'corrupt' | 'signin';
   /** Account + sync state. `enabled` is false in local-only mode (no server). */
   cloud: CloudState;
+  /** A just-issued recovery code, shown once in a blocking dialog until the user confirms they saved it. */
+  recoveryCode: string | null;
   loadError: string | null;
   corruptRaw: string | null;
   saveError: string | null;
@@ -45,6 +47,13 @@ interface Actions {
   /** Returns an error message to show, or null on success. */
   signIn(email: string, password: string, mode: 'login' | 'register'): Promise<string | null>;
   signOut(): Promise<void>;
+  /** Forgotten password. Returns an error message, or null on success (the new recovery code is then shown). */
+  resetPassword(email: string, recoveryCode: string, newPassword: string): Promise<string | null>;
+  /** Returns an error message, or null on success. Other devices are signed out by the server. */
+  changePassword(currentPassword: string, newPassword: string): Promise<string | null>;
+  /** Replaces the recovery code (needs the password); the new one is shown once. Returns an error or null. */
+  newRecoveryCode(password: string): Promise<string | null>;
+  dismissRecoveryCode(): void;
   resolveConflict(keep: 'server' | 'mine'): Promise<void>;
   listCloudBackups(): Promise<CloudBackup[]>;
   restoreCloudBackup(id: string): Promise<void>;
@@ -125,6 +134,11 @@ export const useStore = create<Store>((set, get) => {
     set((s) => ({ toasts: [...s.toasts.slice(-3), { id, text, kind, action }] }));
     setTimeout(() => get().dismissToast(id), action ? 7000 : 3800);
   };
+  /** Enter the app after a sign-in / account creation / password reset, holding any new recovery code for display. */
+  const applyStart = (r: StartResult, recoveryCode?: string) => {
+    if (r.kind === 'ready') { lastSaved = r.data; set({ data: r.data, status: 'ready', recoveryCode: recoveryCode ?? null }); }
+    else if (r.kind === 'corrupt') set({ status: 'corrupt', loadError: r.error, corruptRaw: r.raw });
+  };
   /** Run a destructive change and offer a short window to take it back. */
   const withUndo = (label: string, fn: () => void) => {
     const snapshot = get().data;
@@ -155,6 +169,7 @@ export const useStore = create<Store>((set, get) => {
     data: emptyData(),
     status: 'loading',
     cloud: initialCloud(),
+    recoveryCode: null,
     loadError: null,
     corruptRaw: null,
     saveError: null,
@@ -188,18 +203,45 @@ export const useStore = create<Store>((set, get) => {
 
     async signIn(email, password, mode) {
       try {
-        const r: StartResult = await syncer.signIn(email, password, mode);
-        if (r.kind === 'ready') { lastSaved = r.data; set({ data: r.data, status: 'ready' }); }
-        else if (r.kind === 'corrupt') set({ status: 'corrupt', loadError: r.error, corruptRaw: r.raw });
+        const { start: r, recoveryCode } = await syncer.signIn(email, password, mode);
+        applyStart(r, recoveryCode);
         return null;
       } catch (e) {
         if (e instanceof ApiError) return e.message;
         return 'Cannot reach the LifeOS server. Check that it is running.';
       }
     },
+    async resetPassword(email, recoveryCode, newPassword) {
+      try {
+        const { start, recoveryCode: fresh } = await syncer.resetPassword(email, recoveryCode, newPassword);
+        applyStart(start, fresh);
+        return null;
+      } catch (e) {
+        if (e instanceof ApiError) return e.message;
+        return 'Cannot reach the LifeOS server. Check that it is running.';
+      }
+    },
+    async changePassword(currentPassword, newPassword) {
+      try {
+        const r = await cloudApi.changePassword(currentPassword, newPassword);
+        toast(r.otherSessionsEnded ? `Password changed. ${r.otherSessionsEnded} other device${r.otherSessionsEnded > 1 ? 's were' : ' was'} signed out.` : 'Password changed.', 'ok');
+        return null;
+      } catch (e) {
+        return e instanceof ApiError ? e.message : 'Cannot reach the LifeOS server.';
+      }
+    },
+    async newRecoveryCode(password) {
+      try {
+        set({ recoveryCode: (await cloudApi.newRecoveryCode(password)).recoveryCode });
+        return null;
+      } catch (e) {
+        return e instanceof ApiError ? e.message : 'Cannot reach the LifeOS server.';
+      }
+    },
+    dismissRecoveryCode() { set({ recoveryCode: null }); },
     async signOut() {
       await syncer.signOut();
-      set({ status: 'signin', data: emptyData(), selected: null, settingsOpen: false, inboxOpen: false });
+      set({ status: 'signin', data: emptyData(), selected: null, settingsOpen: false, inboxOpen: false, recoveryCode: null });
     },
     async resolveConflict(keep) {
       const data = await syncer.resolveConflict(keep);

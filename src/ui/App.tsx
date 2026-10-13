@@ -13,6 +13,7 @@ import { Inbox } from './Inbox';
 import { Toasts } from './Toasts';
 import { Recovery } from './Recovery';
 import { AuthGate } from './AuthGate';
+import { RecoveryCodeDialog } from './RecoveryCodeDialog';
 import { ConflictDialog, SyncChip } from './SyncStatus';
 
 const TABS: { id: ViewId; label: string; icon: string }[] = [
@@ -90,6 +91,7 @@ export default function App() {
 
       {settingsOpen && <Settings />}
       <ConflictDialog />
+      <RecoveryCodeDialog />
       <Toasts />
     </div>
   );
