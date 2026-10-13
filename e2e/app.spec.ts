@@ -7,6 +7,21 @@ const EMAIL = 'e2e@example.com';
 const PASSWORD = 'e2e-correct-horse-battery';
 const CHANGED = 'e2e-a-changed-passphrase';
 const RESET = 'e2e-after-the-reset-flow';
+/**
+ * Passwords are hashed with bcrypt (cost 12, pure JavaScript: about a second when idle). While the 3D room renders in software
+ * the CPU is shared, so steps that wait for a hash can take far longer than Playwright's default 5 s.
+ */
+const HASHING = { timeout: 45_000 };
+/**
+ * Hides WebGL from the page so the app falls back to its 2D room. The account-security tests don't need the 3D scene, and its
+ * software rendering takes so much CPU that the API's bcrypt calls (30 s instead of under 1 s) starve and the test times out.
+ */
+const without3D = (page: Page) => page.addInitScript(() => {
+  const real = HTMLCanvasElement.prototype.getContext;
+  HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, type: string, ...rest: unknown[]) {
+    return /webgl/i.test(type) ? null : (real as (...a: unknown[]) => unknown).call(this, type, ...rest);
+  } as typeof real;
+});
 /** The password currently valid for the account; the later tests change it. */
 let current = PASSWORD;
 /** The recovery code last shown to the user. */
@@ -44,7 +59,7 @@ test('first run creates the account and opens the 3D room', async ({ page }) => 
   await page.getByRole('button', { name: 'Create account' }).click();
   // the recovery code is shown once and must be acknowledged before entering the app
   const dialog = page.getByRole('dialog', { name: 'Save your recovery code' });
-  await expect(dialog).toBeVisible();
+  await expect(dialog).toBeVisible(HASHING);
   recoveryCode = (await dialog.getByTestId('recovery-code').textContent()) ?? '';
   expect(recoveryCode).toMatch(/^([A-Z2-9]{4}-){4}[A-Z2-9]{4}$/);
   await expect(dialog.getByRole('button', { name: 'Continue' })).toBeDisabled();
@@ -158,6 +173,8 @@ test('the account download holds the studio and nothing secret', async ({ page }
 });
 
 test('changing the password in Settings: wrong current password is refused, then the new one is required', async ({ page, playwright }) => {
+  test.setTimeout(150_000);
+  await without3D(page);
   // a second device signed in before the change (an API client with its own cookie jar: a second 3D page would starve the first)
   const other = await playwright.request.newContext({ baseURL: test.info().project.use.baseURL });
   expect((await other.post('/api/auth/login', { data: { email: EMAIL, password: current } })).status()).toBe(200);
@@ -170,11 +187,11 @@ test('changing the password in Settings: wrong current password is refused, then
   await form.getByLabel('Current password').fill('definitely-not-it');
   await form.getByLabel('New password').fill(CHANGED);
   await form.getByRole('button', { name: 'Change password' }).click();
-  await expect(form.getByRole('alert')).toContainText('incorrect');
+  await expect(form.getByRole('alert')).toContainText('incorrect', HASHING);
 
   await form.getByLabel('Current password').fill(current);
   await form.getByRole('button', { name: 'Change password' }).click();
-  await expect(page.getByText(/Password changed/)).toBeVisible();
+  await expect(page.getByText(/Password changed/)).toBeVisible(HASHING);
   current = CHANGED;
   await closeSettings(page);
 
@@ -187,6 +204,8 @@ test('changing the password in Settings: wrong current password is refused, then
 });
 
 test('forgot password: the recovery code resets it, shows a new code, and the used code is dead', async ({ page }) => {
+  test.setTimeout(150_000);
+  await without3D(page);
   await page.context().clearCookies();
   await page.goto('/');
   await page.getByRole('button', { name: 'Forgot your password?' }).click();
@@ -194,13 +213,13 @@ test('forgot password: the recovery code resets it, shows a new code, and the us
   await page.getByLabel('Recovery code').fill('AAAA-AAAA-AAAA-AAAA-AAAA');
   await page.getByLabel('New password').fill(RESET);
   await page.getByRole('button', { name: 'Reset password' }).click();
-  await expect(page.getByRole('alert')).toContainText('do not match');
+  await expect(page.getByRole('alert')).toContainText('do not match', HASHING);
 
   await page.getByLabel('Recovery code').fill(recoveryCode);
   await page.getByLabel('New password').fill(RESET); // the form clears the password after a failed attempt
   await page.getByRole('button', { name: 'Reset password' }).click();
   const dialog = page.getByRole('dialog', { name: 'Save your recovery code' });
-  await expect(dialog).toBeVisible();
+  await expect(dialog).toBeVisible(HASHING);
   const fresh = (await dialog.getByTestId('recovery-code').textContent()) ?? '';
   expect(fresh).toMatch(/^([A-Z2-9]{4}-){4}[A-Z2-9]{4}$/);
   expect(fresh).not.toBe(recoveryCode);
