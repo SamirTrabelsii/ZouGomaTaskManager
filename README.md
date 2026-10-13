@@ -104,7 +104,9 @@ Build the image (`docker compose build app`) and run it behind an HTTPS reverse 
 - Handled: repeating meetings (weekly, monthly, exceptions), time zones (Google's IANA names and Outlook's Windows names, across daylight-saving changes), all-day and multi-day entries, cancelled meetings and cancelled single occurrences, moved occurrences, repeated entries for one meeting, and the same meeting appearing in two connected calendars (shown once).
 - Imported meetings are **read-only** and live in their own tables, never in your synced data, so they cannot be edited, exported with your events or cause sync conflicts. If a feed can't be reached the last good copy stays visible and the error is shown in Settings. Only the next ~13 months (and the last 2) are kept.
 - **The link is a secret** (anyone holding it can read that calendar). It is stored only in your server's database and is never sent back to the browser or written to logs. The server refuses links that point at private/internal addresses, follows at most 4 redirects, and limits size (8 MB) and time (20 s). Up to 10 feeds.
-- Not included: two-way sync, editing, reminders for imported meetings, and Google sign-in (planned separately).
+- **Reminders:** *Settings → Calendar feeds → Edit* lets you pick a reminder per calendar (at the start, 5/10/15/30 minutes or 1 hour before). The server pushes it to your devices once per meeting, using the same background (Web Push) channel as your own reminders, so turn on *Background reminders* on each device. All-day entries never trigger one; a meeting that was moved gets a fresh reminder; a meeting that already started, or was cancelled, gets none.
+- The Overview's *Next event* and the room's calendar hover card also include imported meetings (timed ones; all-day entries such as holidays are skipped so they never hide a real meeting).
+- Not included: two-way sync, editing, and Google sign-in (planned separately).
 
 ## Not included yet
 

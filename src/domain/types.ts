@@ -126,6 +126,8 @@ export interface CalendarFeed {
   lastError: string | null;
   warnings: string[];
   eventCount: number;
+  /** Minutes before a timed meeting to push a reminder; null = no reminders. */
+  remindBefore: number | null;
 }
 
 /**

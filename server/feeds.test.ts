@@ -4,7 +4,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from './app';
 import { createPool, migrate } from './db';
 import { FeedError, type FeedFetcher } from './feedFetch';
-import { dedupeAcrossFeeds, MAX_FEEDS, runDueFeeds, SYNC_EVERY_MS, syncFeed } from './feeds';
+import { dedupeAcrossFeeds, MAX_FEEDS, runDueFeedReminders, runDueFeeds, SYNC_EVERY_MS, syncFeed } from './feeds';
+import type { PushPayload, Sender } from './push';
+import { zonedToInstant } from './time';
 
 const URL_ = process.env.TEST_DATABASE_URL ?? 'postgres://lifeos:lifeos-dev-password@localhost:5433/lifeos_test';
 const pool = createPool(URL_);
@@ -290,6 +292,135 @@ describe.skipIf(!reachable)('calendar feeds API', () => {
       const bad = await me('POST', `/api/feeds/${id}/refresh`, {});
       expect(bad.status).toBe(502);
       expect(bad.body.feed.lastError).toBeTruthy();
+    });
+  });
+
+
+  describe('meeting reminders', () => {
+    const MIN = 60_000;
+    const isoDay = (offset: number) => day(offset).replace(/(\d{4})(\d\d)(\d\d)/, '$1-$2-$3');
+    const startOf = (offset: number, hour = '09') => Date.parse(`${isoDay(offset)}T${hour}:00:00Z`);
+    let pushes: { endpoint: string; payload: PushPayload }[];
+    let outcome: 'ok' | 'gone' | 'error';
+    const send: Sender = async (sub, payload) => { pushes.push({ endpoint: sub.endpoint, payload }); return outcome; };
+    const userId = async (email = 'me@example.com') => Number((await pool.query('SELECT id FROM users WHERE email=$1', [email])).rows[0].id);
+    const subscribe = async (endpoint: string, tz = 'Europe/Paris', email?: string) =>
+      pool.query('INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth, tz) VALUES ($1,$2,$3,$4,$5)', [await userId(email), endpoint, 'p', 'a', tz]);
+    const feedWith = async (events: string[], remind: number | null = 15, url = GOOGLE) => {
+      remote.set(url, ics(...events));
+      const id = (await add('Work', url)).body.feed.id as string;
+      if (remind !== null) expect((await me('PATCH', `/api/feeds/${id}`, { remindBefore: remind })).status).toBe(200);
+      return id;
+    };
+    beforeEach(() => { pushes = []; outcome = 'ok'; });
+
+    it('is off by default and the setting only accepts the offered choices', async () => {
+      const id = await feedWith([vevent('a', 'Planning', 2)], null);
+      await subscribe('https://push.example/a');
+      expect((await me('GET', '/api/feeds')).body.feeds[0].remindBefore).toBeNull();
+      expect((await runDueFeedReminders(pool, send, startOf(2) - 5 * MIN)).sent).toBe(0);
+      for (const bad of [7, -1, '15', 1000, true]) expect((await me('PATCH', `/api/feeds/${id}`, { remindBefore: bad })).status, String(bad)).toBe(400);
+      expect((await me('PATCH', `/api/feeds/${id}`, { remindBefore: 30 })).body.feed.remindBefore).toBe(30);
+      expect((await me('PATCH', `/api/feeds/${id}`, { remindBefore: null })).body.feed.remindBefore).toBeNull();
+      await me('PATCH', `/api/feeds/${id}`, { remindBefore: 10 });
+      expect((await me('PATCH', `/api/feeds/${id}`, { name: 'Renamed' })).body.feed.remindBefore).toBe(10); // other edits leave it alone
+    });
+
+    it('pushes once, only inside the window before the start, with the meeting details', async () => {
+      await feedWith([vevent('a', 'Planning', 2, '09', 'LOCATION:Room 4\r\n')], 15);
+      await subscribe('https://push.example/a', 'Europe/Paris');
+      const t = startOf(2);
+      expect((await runDueFeedReminders(pool, send, t - 16 * MIN)).sent).toBe(0); // too early
+      expect((await runDueFeedReminders(pool, send, t - 14 * MIN)).sent).toBe(1);
+      expect((await runDueFeedReminders(pool, send, t - 13 * MIN)).sent).toBe(0); // never twice
+      expect((await runDueFeedReminders(pool, send, t - 1 * MIN)).sent).toBe(0);
+      expect(pushes).toHaveLength(1);
+      const local = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(t));
+      expect(pushes[0].payload).toMatchObject({ title: 'Planning', body: `Starts at ${local} · Room 4 · Work`, url: '/' });
+    });
+
+    it('with "at the time" it fires only at the start and not after it', async () => {
+      await feedWith([vevent('a', 'Planning', 2)], 0);
+      await subscribe('https://push.example/a');
+      const t = startOf(2);
+      expect((await runDueFeedReminders(pool, send, t - 1 * MIN)).sent).toBe(0);
+      expect((await runDueFeedReminders(pool, send, t)).sent).toBe(1);
+    });
+
+    it('skips meetings that already started, for example after the server was down', async () => {
+      await feedWith([vevent('a', 'Planning', 2)], 15);
+      await subscribe('https://push.example/a');
+      expect((await runDueFeedReminders(pool, send, startOf(2) + 1 * MIN)).sent).toBe(0);
+      expect(pushes).toEqual([]);
+    });
+
+    it('never reminds for all-day entries', async () => {
+      const allDay = `BEGIN:VEVENT\r\nUID:h\r\nDTSTART;VALUE=DATE:${day(2)}\r\nDTEND;VALUE=DATE:${day(3)}\r\nSUMMARY:Holiday\r\nEND:VEVENT\r\n`;
+      await feedWith([allDay], 60);
+      await subscribe('https://push.example/a');
+      for (const dt of [-61, -30, 0, 30, 600]) expect((await runDueFeedReminders(pool, send, startOf(2, '00') + dt * MIN)).sent).toBe(0);
+    });
+
+    it('reads a zone-less meeting time in the device\'s zone', async () => {
+      const floating = `BEGIN:VEVENT\r\nUID:f\r\nDTSTART:${day(2)}T090000\r\nDTEND:${day(2)}T093000\r\nSUMMARY:Floating\r\nEND:VEVENT\r\n`;
+      await feedWith([floating], 15);
+      await subscribe('https://push.example/a', 'America/New_York');
+      const nineInNewYork = zonedToInstant(`${isoDay(2)}T09:00`, 'America/New_York')!;
+      expect(nineInNewYork).not.toBe(startOf(2)); // so the zone really matters in this test
+      expect((await runDueFeedReminders(pool, send, startOf(2) - 10 * MIN)).sent).toBe(0); // 09:00 UTC is not 09:00 in New York
+      expect((await runDueFeedReminders(pool, send, nineInNewYork - 10 * MIN)).sent).toBe(1);
+    });
+
+    it('re-arms for a meeting that was moved, and never fires for the old time', async () => {
+      const id = await feedWith([vevent('a', 'Planning', 2, '09')], 15);
+      await subscribe('https://push.example/a');
+      expect((await runDueFeedReminders(pool, send, startOf(2, '09') - 10 * MIN)).sent).toBe(1);
+      remote.set(GOOGLE, ics(vevent('a', 'Planning', 2, '15', 'SEQUENCE:1\r\n')));
+      await syncFeed(pool, { id, url: GOOGLE }, fetchFeed);
+      expect((await runDueFeedReminders(pool, send, startOf(2, '09') - 5 * MIN)).sent).toBe(0); // the old slot is gone
+      expect((await runDueFeedReminders(pool, send, startOf(2, '15') - 10 * MIN)).sent).toBe(1); // the new slot reminds again
+    });
+
+    it('does not remind for a meeting that was cancelled', async () => {
+      const id = await feedWith([vevent('a', 'Planning', 2)], 15);
+      await subscribe('https://push.example/a');
+      remote.set(GOOGLE, ics(vevent('a', 'Planning', 2, '09', 'STATUS:CANCELLED\r\n')));
+      await syncFeed(pool, { id, url: GOOGLE }, fetchFeed);
+      expect((await runDueFeedReminders(pool, send, startOf(2) - 10 * MIN)).sent).toBe(0);
+    });
+
+    it('needs a subscribed device, and keeps the reminder for when one appears', async () => {
+      await feedWith([vevent('a', 'Planning', 2)], 15);
+      const t = startOf(2);
+      expect((await runDueFeedReminders(pool, send, t - 10 * MIN)).sent).toBe(0);
+      expect((await pool.query('SELECT count(*)::int AS n FROM feed_reminders_sent')).rows[0].n).toBe(0); // nothing was consumed
+      await subscribe('https://push.example/late');
+      expect((await runDueFeedReminders(pool, send, t - 5 * MIN)).sent).toBe(1);
+    });
+
+    it('notifies every device of the owner, drops dead ones, and nobody else', async () => {
+      await feedWith([vevent('a', 'Planning', 2)], 15);
+      const other = client();
+      await other('POST', '/api/auth/register', { email: 'other@example.com', password: 'another long password' });
+      await subscribe('https://push.example/a'); await subscribe('https://push.example/b');
+      await subscribe('https://push.example/stranger', 'UTC', 'other@example.com');
+      expect((await runDueFeedReminders(pool, send, startOf(2) - 10 * MIN)).sent).toBe(2);
+      expect(pushes.map((p) => p.endpoint).sort()).toEqual(['https://push.example/a', 'https://push.example/b']);
+
+      pushes = []; outcome = 'gone';
+      await feedWith([vevent('b', 'Review', 3)], 15, OUTLOOK);
+      await runDueFeedReminders(pool, send, startOf(3) - 10 * MIN);
+      const left = (await pool.query('SELECT endpoint FROM push_subscriptions ORDER BY endpoint')).rows.map((r) => r.endpoint);
+      expect(left).toEqual(['https://push.example/stranger']); // the owner's expired devices were removed
+    });
+
+    it('forgets what it sent when the calendar is removed', async () => {
+      const id = await feedWith([vevent('a', 'Planning', 2)], 15);
+      await subscribe('https://push.example/a');
+      await runDueFeedReminders(pool, send, startOf(2) - 10 * MIN);
+      expect((await pool.query('SELECT count(*)::int AS n FROM feed_reminders_sent')).rows[0].n).toBe(1);
+      await me('DELETE', `/api/feeds/${id}`, {});
+      expect((await pool.query('SELECT count(*)::int AS n FROM feed_reminders_sent')).rows[0].n).toBe(0);
     });
   });
 

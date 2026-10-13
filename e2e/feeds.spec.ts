@@ -1,10 +1,23 @@
+import bcrypt from 'bcryptjs';
+import pg from 'pg';
 import { expect, test, type Page } from '@playwright/test';
+import { assertTestDatabase, TEST_DATABASE_URL } from './testdb';
 
-// Runs after app.spec.ts (alphabetical order, one shared database): the account created there is reused.
+// This file owns its account (created straight in the test database), so it does not depend on what the
+// account tests in app.spec.ts did to theirs (they change its password). Tests below build on each other.
 test.describe.configure({ mode: 'serial' });
 
-const EMAIL = 'e2e@example.com';
-const PASSWORD = 'e2e-correct-horse-battery';
+const EMAIL = 'feeds@example.com';
+const PASSWORD = 'feeds-correct-horse-battery';
+
+test.beforeAll(async () => {
+  assertTestDatabase(TEST_DATABASE_URL);
+  const pool = new pg.Pool({ connectionString: TEST_DATABASE_URL, max: 1 });
+  try {
+    await pool.query('INSERT INTO users (email, password_hash) VALUES ($1,$2) ON CONFLICT (email) DO NOTHING', [EMAIL, await bcrypt.hash(PASSWORD, 4)]);
+  } finally { await pool.end(); }
+});
+
 const GOOGLE = 'https://feeds.test/google.ics';
 const OUTLOOK = 'webcal://feeds.test/outlook.ics';
 
@@ -115,8 +128,12 @@ test('renaming and removing a calendar', async ({ page }) => {
   const row = feeds.getByRole('listitem').filter({ hasText: 'Office (Outlook)' });
   await row.getByRole('button', { name: 'Edit' }).click();
   await row.getByLabel('Name').fill('Office');
+  await row.getByLabel('Remind me about meetings').selectOption('15');
   await row.getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(feeds.getByRole('listitem').filter({ hasText: 'Office' }).first()).toBeVisible();
+  const renamedRow = feeds.getByRole('listitem').filter({ hasText: /^Office/ });
+  await expect(renamedRow).toContainText('🔔 15 min before');
+  const listed = (await (await page.request.get('/api/feeds')).json()) as { feeds: { name: string; remindBefore: number | null }[] };
+  expect(listed.feeds.find((f) => f.name === 'Office')?.remindBefore).toBe(15); // saved on the server
 
   const renamed = feeds.getByRole('listitem').filter({ hasText: /^Office/ }); // the row no longer matches its old name
   await renamed.getByRole('button', { name: 'Remove' }).click();
@@ -128,4 +145,30 @@ test('renaming and removing a calendar', async ({ page }) => {
   await expect(today).toContainText('Team sync');
   await expect(today).not.toContainText('Budget review');
   await expect(today).toContainText('Shared lunch'); // still in the Google calendar
+});
+
+test('the overview\'s next event includes imported meetings, with their colour', async ({ page }) => {
+  await signIn(page);
+  // start from a clean slate: no own events, no other calendars
+  const mine = (await docData(page)).data?.events ?? [];
+  expect(mine.length).toBeLessThanOrEqual(1);
+  if (mine.length) {
+    await openMonth(page);
+    await page.getByRole('complementary', { name: 'Selected day' }).getByRole('button', { name: /My own event/ }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Delete event?' }).click();
+    await expect.poll(async () => (await docData(page)).data?.events.length).toBe(0);
+  }
+  const listed = (await (await page.request.get('/api/feeds')).json()) as { feeds: { id: string }[] };
+  for (const f of listed.feeds) expect((await page.request.delete(`/api/feeds/${f.id}`, { data: {} })).status()).toBe(200);
+  expect((await page.request.post('/api/feeds', { data: { name: 'Soon', color: '#c06c46', url: 'https://feeds.test/soon.ics' } })).status()).toBe(201);
+
+  await page.reload();
+  await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible();
+  const overview = page.getByRole('region', { name: 'Daily overview' });
+  await overview.getByRole('button').first().click();
+  const next = overview.getByRole('button', { name: /Soon meeting/ });
+  await expect(next).toBeVisible();
+  await expect(next).toContainText(/Today|Tomorrow/);
+  await expect(next.locator('span[style*="background"]')).toHaveCount(1); // the calendar's colour dot
 });

@@ -68,7 +68,7 @@ export const cloud = {
   feedEvents: () => api<{ events: ExternalEvent[] }>('/feeds/events'),
   /** Fetches the link once right away, so a wrong link is reported immediately (allow for a slow calendar server). */
   addFeed: (input: { name: string; color: string; url: string }) => api<{ feed: CalendarFeed }>('/feeds', { method: 'POST', body: input, timeoutMs: 40_000 }),
-  updateFeed: (id: string, patch: { name?: string; color?: string }) => api<{ feed: CalendarFeed }>(`/feeds/${encodeURIComponent(id)}`, { method: 'PATCH', body: patch }),
+  updateFeed: (id: string, patch: { name?: string; color?: string; remindBefore?: number | null }) => api<{ feed: CalendarFeed }>(`/feeds/${encodeURIComponent(id)}`, { method: 'PATCH', body: patch }),
   removeFeed: (id: string) => api<{ ok: true }>(`/feeds/${encodeURIComponent(id)}`, { method: 'DELETE', body: {} }),
   refreshFeed: (id: string) => api<{ feed: CalendarFeed }>(`/feeds/${encodeURIComponent(id)}/refresh`, { method: 'POST', body: {}, timeoutMs: 40_000 }),
   getBackup: (id: string) => api<{ data: unknown }>(`/data/backups/${encodeURIComponent(id)}`),

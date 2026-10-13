@@ -159,6 +159,8 @@ export interface AgendaItem {
   /** Imported (read-only) meetings carry their calendar's colour and name. */
   color?: string;
   feedName?: string;
+  /** End of an imported single-day timed meeting (HH:mm). */
+  endTime?: string | null;
 }
 
 /** Everything that lands on a date: events, deadlines, scheduled tasks, milestones, reminders – plus any imported meetings passed in. */
@@ -185,6 +187,26 @@ export function nextEvent(events: CalEvent[], now = new Date()): CalEvent | null
     .filter((e) => dateTimeOf(e.date, e.endTime ?? e.time ?? '23:59').getTime() >= now.getTime())
     .sort((a, b) => dateTimeOf(a.date, a.time).getTime() - dateTimeOf(b.date, b.time).getTime());
   return upcoming[0] ?? null;
+}
+
+export interface NextUp { title: string; date: string; time: string | null; color?: string }
+
+/**
+ * The next thing on the calendar: your own events plus imported meetings (a meeting in progress still counts).
+ * Imported all-day entries (holidays, "out of office" markers) are left out so they never hide a real meeting.
+ */
+export function nextUp(events: CalEvent[], imported: AgendaItem[], now = new Date()): NextUp | null {
+  const cands: (NextUp & { at: number })[] = [];
+  const own = nextEvent(events, now);
+  if (own) cands.push({ title: own.title, date: own.date, time: own.time, at: dateTimeOf(own.date, own.time).getTime() });
+  for (const i of imported) {
+    if (i.kind !== 'external' || !i.time) continue;
+    if (dateTimeOf(i.date, i.endTime ?? i.time).getTime() < now.getTime()) continue;
+    cands.push({ title: i.title, date: i.date, time: i.time, color: i.color, at: dateTimeOf(i.date, i.time).getTime() });
+  }
+  cands.sort((a, b) => a.at - b.at);
+  const first = cands[0];
+  return first ? { title: first.title, date: first.date, time: first.time, color: first.color } : null;
 }
 
 /* ───────── Insights ───────── */

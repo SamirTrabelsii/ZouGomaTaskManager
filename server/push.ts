@@ -1,6 +1,7 @@
 import webpush from 'web-push';
 import type pg from 'pg';
 import { zonedToInstant } from './time';
+import { runDueFeedReminders } from './feeds';
 
 /** Reminders missed by more than this are not pushed (they show in the app instead). Mirrors the in-app rule. */
 export const MAX_LATE_MS = 6 * 3600_000;
@@ -124,7 +125,8 @@ export function startScheduler(pool: pg.Pool, send: Sender, everyMs = 30_000) {
   const tick = async () => {
     if (running) return;
     running = true;
-    try { await runDueReminders(pool, send); } catch (e) { console.error('push scheduler:', e); } finally { running = false; }
+    try { await runDueReminders(pool, send); } catch (e) { console.error('push scheduler:', e); }
+    try { await runDueFeedReminders(pool, send); } catch (e) { console.error('feed reminders:', (e as Error).message); } finally { running = false; }
   };
   const id = setInterval(tick, everyMs);
   void tick();
