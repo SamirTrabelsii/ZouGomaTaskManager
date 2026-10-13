@@ -143,3 +143,40 @@ export function drawMonitorTexture(tex: THREE.CanvasTexture | null, done: number
   if (tex) { tex.needsUpdate = true; return tex; }
   return finish(cv);
 }
+
+/** The framed picture above the desk: a little sheep on a hill (0.7 × 0.9 plane, so 560 × 720). */
+export function makeSheepArtTexture() {
+  const W = 560, H = 720;
+  const { c, g } = canvas(W, H);
+  const dot = (x: number, y: number, r: number) => { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); };
+  const sky = g.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, '#b9d8ec'); sky.addColorStop(0.7, '#efe6cf');
+  g.fillStyle = sky; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#f6d57a'; dot(430, 150, 50);
+  g.fillStyle = 'rgba(255,255,255,.85)';
+  [[110, 130, 26], [140, 120, 34], [175, 132, 24], [330, 220, 20], [358, 212, 28], [388, 224, 18]].forEach(([x, y, r]) => dot(x, y, r));
+  // two rolling hills
+  g.fillStyle = '#9dbb74';
+  g.beginPath(); g.moveTo(0, 500); g.quadraticCurveTo(170, 420, 340, 490); g.quadraticCurveTo(460, 535, W, 470); g.lineTo(W, H); g.lineTo(0, H); g.fill();
+  g.fillStyle = '#6f9a58';
+  g.beginPath(); g.moveTo(0, 590); g.quadraticCurveTo(210, 530, 400, 600); g.quadraticCurveTo(500, 635, W, 590); g.lineTo(W, H); g.lineTo(0, H); g.fill();
+  // flowers
+  [[90, 640, '#f4a3b5'], [150, 668, '#f7e08a'], [450, 650, '#f4a3b5'], [500, 680, '#f7e08a'], [60, 690, '#f7e08a']].forEach(([x, y, col]) => {
+    g.fillStyle = col as string; dot(x as number, y as number, 7);
+    g.fillStyle = '#d98a3a'; dot(x as number, y as number, 2.5);
+  });
+  // the sheep: shadow, legs, fluffy wool, head
+  g.fillStyle = 'rgba(40,70,30,.28)'; g.beginPath(); g.ellipse(280, 612, 120, 15, 0, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#3a3340';
+  [210, 244, 322, 356].forEach((x) => { g.beginPath(); g.roundRect(x, 520, 20, 88, 8); g.fill(); });
+  const wool: [number, number, number][] = [[205, 472, 58], [262, 436, 70], [330, 468, 62], [236, 508, 54], [304, 512, 54], [190, 420, 38], [300, 420, 46]];
+  g.fillStyle = '#d9d0bd'; wool.forEach(([x, y, r]) => dot(x, y, r + 5)); // outline
+  g.fillStyle = '#fbf8f0'; wool.forEach(([x, y, r]) => dot(x, y, r));
+  g.fillStyle = '#3a3340'; g.beginPath(); g.ellipse(392, 452, 34, 42, 0.15, 0, Math.PI * 2); g.fill();
+  g.beginPath(); g.ellipse(352, 432, 24, 11, 0.5, 0, Math.PI * 2); g.fill(); // ear
+  g.fillStyle = '#fbf8f0'; dot(384, 408, 24); // fringe of wool on the head
+  g.fillStyle = '#fff'; dot(403, 446, 8); g.fillStyle = '#1b1722'; dot(405, 447, 4);
+  g.fillStyle = '#5a4f66'; g.beginPath(); g.ellipse(410, 480, 15, 10, 0, 0, Math.PI * 2); g.fill(); // muzzle
+  g.strokeStyle = '#e1d7c3'; g.lineWidth = 6; g.strokeRect(14, 14, W - 28, H - 28);
+  return finish(c);
+}

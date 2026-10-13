@@ -3,7 +3,7 @@ import { Environment, Lightformer, Sparkles } from '@react-three/drei';
 import { useStore } from '../state/store';
 import { useToday } from '../state/hooks';
 import { liveliness } from '../domain/services';
-import { makeFloorTexture, makeNightSkyTexture, makeRugTexture, makeWallTexture } from './textures';
+import { makeFloorTexture, makeNightSkyTexture, makeRugTexture, makeSheepArtTexture, makeWallTexture } from './textures';
 
 const WALL_H = 3.6;
 
@@ -51,6 +51,7 @@ export function RoomShell({ evening }: { evening: boolean }) {
   const wallTexL = useMemo(() => makeWallTexture(evening ? '#4d6896' : '#e8ddc8'), [evening]);
   const rugTex = useMemo(() => makeRugTexture(), []);
   const skyTex = useMemo(() => makeNightSkyTexture(), []);
+  const sheepTex = useMemo(() => makeSheepArtTexture(), []);
   const sky = '#cfe6f5';
   return (
     <group>
@@ -123,9 +124,7 @@ export function RoomShell({ evening }: { evening: boolean }) {
       {/* wall art above the desk */}
       <group position={[-0.7, 2.35, -3.48]}>
         <mesh castShadow><boxGeometry args={[0.8, 1.0, 0.04]} /><meshStandardMaterial color={'#6e4b30'} roughness={0.6} /></mesh>
-        <mesh position={[0, 0, 0.022]}><planeGeometry args={[0.7, 0.9]} /><meshStandardMaterial color="#e6dcc6" roughness={1} /></mesh>
-        <mesh position={[0, -0.12, 0.025]}><circleGeometry args={[0.2, 32]} /><meshStandardMaterial color="#c06c46" roughness={1} /></mesh>
-        <mesh position={[0, 0.2, 0.025]}><circleGeometry args={[0.12, 32]} /><meshStandardMaterial color="#628a52" roughness={1} /></mesh>
+        <mesh position={[0, 0, 0.022]}><planeGeometry args={[0.7, 0.9]} /><meshStandardMaterial map={sheepTex} roughness={1} /></mesh>
       </group>
       <group position={[0.35, 2.55, -3.48]}>
         <mesh castShadow><boxGeometry args={[0.6, 0.45, 0.04]} /><meshStandardMaterial color="#2a2520" roughness={0.5} /></mesh>
