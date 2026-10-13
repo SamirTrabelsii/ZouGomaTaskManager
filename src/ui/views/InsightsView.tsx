@@ -1,6 +1,6 @@
 import { useStore } from '../../state/store';
 import { useToday } from '../../state/hooks';
-import { addDays, formatDay, startOfWeek, parseDay } from '../../domain/dates';
+import { addDays, formatDay, LOCALE, startOfWeek, parseDay } from '../../domain/dates';
 import { completedByDay, consistency, goalProgress, habitRatioByDay, plantGrowth, pointsByDay, projectProgress, streaks, sumPoints, weeklySummary } from '../../domain/services';
 import { EmptyState, ProgressBar } from '../common/ui';
 import { ScopeBadge } from '../common/icons';
@@ -35,7 +35,7 @@ export function InsightsView() {
   const thisWeek = weeklySummary(data, ws);
   const lastWeek = weeklySummary(data, addDays(ws, -7));
   const habits = data.habits.filter((h) => !h.archived);
-  const lbl = (d: string) => parseDay(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const lbl = (d: string) => parseDay(d).toLocaleDateString(LOCALE, { month: 'short', day: 'numeric' });
   const empty = !data.tasks.length && !data.habits.length && !data.projects.length && !data.goals.length;
 
   const delta = (a: number, b: number) => (a === b ? 'same as last week' : a > b ? `${a - b} more than last week` : `${b - a} fewer than last week`);

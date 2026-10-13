@@ -51,18 +51,22 @@ export function toLocalInput(d: Date): string {
   return `${toDay(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+/** Day and month names are always English, so they never mix with the app's English labels ("Tomorrow", "Yesterday"). */
+export const LOCALE = 'en-GB';
+
 export function formatDay(s: string, long = false): string {
-  return parseDay(s).toLocaleDateString(undefined, long
+  return parseDay(s).toLocaleDateString(LOCALE, long
     ? { weekday: 'long', month: 'long', day: 'numeric' }
     : { weekday: 'short', month: 'short', day: 'numeric' });
 }
-export function relativeDay(s: string, today: string): string {
+/** `shortDay` abbreviates the weekday to three letters ("Thu") for narrow places like the side panel. */
+export function relativeDay(s: string, today: string, shortDay = false): string {
   const d = diffDays(today, s);
   if (d === 0) return 'Today';
   if (d === 1) return 'Tomorrow';
   if (d === -1) return 'Yesterday';
   if (d < 0) return `${-d} days overdue`;
-  if (d < 7) return parseDay(s).toLocaleDateString(undefined, { weekday: 'long' });
+  if (d < 7) return parseDay(s).toLocaleDateString(LOCALE, { weekday: shortDay ? 'short' : 'long' });
   return formatDay(s);
 }
 export function formatTime(t: string | null): string {

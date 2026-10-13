@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../../state/store';
 import { useToday } from '../../state/hooks';
-import { addDays, daysRange, formatDay, parseDay, startOfWeek } from '../../domain/dates';
+import { addDays, daysRange, formatDay, LOCALE, parseDay, startOfWeek } from '../../domain/dates';
 import { consistency, habitDoneOn, habitSatisfied, plantGrowth, streaks, weekCount } from '../../domain/services';
 import { TEMPLATES } from '../../domain/templates';
 import type { Habit } from '../../domain/types';
@@ -68,7 +68,7 @@ export function PlantsPanel() {
                         aria-label={`${formatDay(d)}: ${on ? 'logged' : 'not logged'}`} title={formatDay(d)}
                         className={`flex h-7 flex-1 flex-col items-center justify-center rounded-md text-[10px] leading-none transition ${on ? 'bg-moss-500 text-white' : 'bg-cream-200 text-ink-500 hover:bg-cream-300'}`}
                       >
-                        <span>{parseDay(d).toLocaleDateString(undefined, { weekday: 'narrow' })}</span>
+                        <span>{parseDay(d).toLocaleDateString(LOCALE, { weekday: 'narrow' })}</span>
                         <span>{on ? '●' : '○'}</span>
                       </button>
                     );
