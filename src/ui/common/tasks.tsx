@@ -235,6 +235,22 @@ export function ScopeBar({ value, onChange }: { value: string; onChange: (v: str
   );
 }
 
+/** The status icon as a one-click control: a native select laid invisibly over the icon (accessible, never clipped by the panel). */
+function StatusPicker({ task }: { task: Task }) {
+  const update = useStore((s) => s.updateTask);
+  return (
+    <label className="relative mt-0.5 flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md hover:bg-cream-200 focus-within:ring-2 focus-within:ring-moss-500" title={`Status: ${STATUS_NAME[task.status]} – click to change`}>
+      <StatusIcon status={task.status} size={16} />
+      <select
+        className="absolute inset-0 h-full w-full cursor-pointer opacity-0" value={task.status}
+        aria-label={`Status of ${task.title}`} onChange={(e) => update(task.id, { status: e.target.value as TaskStatus })}
+      >
+        {Object.entries(STATUS_NAME).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+      </select>
+    </label>
+  );
+}
+
 /* ───────── Row ───────── */
 
 /** Due-date colours: red overdue, amber today, blue within a week, plain beyond. */
@@ -271,9 +287,6 @@ export function TaskRow({ task, onEdit, compact }: { task: Task; onEdit: (id: st
                 {t ? <t.Icon /> : <CalendarIcon />}{relativeDay(task.dueDate, today)}
               </span>
             )}
-            {task.status !== 'todo' && task.status !== 'done' && (
-              <span className="chip"><StatusIcon status={task.status} size={13} />{STATUS_NAME[task.status]}</span>
-            )}
             {task.priority !== 'medium' && (
               <span className="chip" title={`${PRIORITY_NAME[task.priority]} priority`}><PriorityIcon priority={task.priority} size={12} />{PRIORITY_NAME[task.priority]}</span>
             )}
@@ -287,6 +300,7 @@ export function TaskRow({ task, onEdit, compact }: { task: Task; onEdit: (id: st
           </div>
         )}
       </button>
+      <StatusPicker task={task} />
       {compact && task.priority === 'high' && !done && <span title="High priority" className="mt-0.5"><PriorityIcon priority="high" size={15} /></span>}
     </li>
   );
