@@ -3,7 +3,7 @@ import type { Priority, Task, TaskStatus } from '../../domain/types';
 import { useStore } from '../../state/store';
 import { useToday } from '../../state/hooks';
 import { relativeDay } from '../../domain/dates';
-import { sortTasks } from '../../domain/services';
+import { dueTone, sortTasks, subtaskProgress, type DueTone } from '../../domain/services';
 import { resolveTemplates } from '../../domain/templates';
 import { ConfirmButton, Dialog, EmptyState, Field, PRIORITY_LABEL, STATUS_LABEL } from './ui';
 
@@ -23,6 +23,8 @@ export function TaskDialog({ taskId, defaults, onClose }: { taskId?: string; def
   const projMs = milestones.filter((m) => m.projectId === f.projectId);
   const showProject = cfg.taskFields.has('project') || !!f.projectId;
   const showGoal = cfg.taskFields.has('goal') || !!f.goalId;
+  const hasSubtasks = !!taskId && tasks.some((t) => t.parentId === taskId);
+  const parentChoices = tasks.filter((t) => !t.parentId && t.id !== taskId && (t.status !== 'done' || t.id === f.parentId));
 
   const save = (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,6 +66,15 @@ export function TaskDialog({ taskId, defaults, onClose }: { taskId?: string; def
             <input type="datetime-local" className="input" value={remindAt} onChange={(e) => setRemindAt(e.target.value)} />
           </Field>
         </div>
+        {!hasSubtasks && parentChoices.length > 0 && (
+          <Field label="Parent task">
+            <select className="input" value={f.parentId ?? ''} onChange={(e) => set('parentId', e.target.value || null)}>
+              <option value="">None – a top-level task</option>
+              {parentChoices.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
+            </select>
+          </Field>
+        )}
+        {existing && !f.parentId && <Subtasks parentId={existing.id} />}
         {(showProject || showGoal) && (
           <div className="grid grid-cols-2 gap-3">
             {showProject && (
@@ -104,16 +115,62 @@ export function TaskDialog({ taskId, defaults, onClose }: { taskId?: string; def
   );
 }
 
+/** Subtask checklist inside the edit dialog of a parent task. */
+function Subtasks({ parentId }: { parentId: string }) {
+  const tasks = useStore((s) => s.data.tasks);
+  const { addTask, toggleTask, deleteTask } = useStore.getState();
+  const [title, setTitle] = useState('');
+  const subs = tasks.filter((t) => t.parentId === parentId);
+  const p = subtaskProgress(tasks, parentId);
+  const add = () => { if (title.trim()) { addTask({ title, parentId }); setTitle(''); } };
+  return (
+    <div>
+      <div className="mb-1 text-xs font-medium text-ink-500">Subtasks{p.total > 0 && ` · ${p.done}/${p.total} done`}</div>
+      {subs.length > 0 && (
+        <ul className="mb-2 space-y-0.5">
+          {subs.map((t) => (
+            <li key={t.id} className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={t.status === 'done'} onChange={() => toggleTask(t.id)} aria-label={`Complete subtask: ${t.title}`} />
+              <span className={`min-w-0 flex-1 truncate ${t.status === 'done' ? 'text-ink-400 line-through' : ''}`}>{t.title}</span>
+              {t.status !== 'todo' && t.status !== 'done' && <span className="chip">{STATUS_LABEL[t.status]}</span>}
+              <button type="button" className="btn btn-ghost px-1.5 py-0 text-xs" onClick={() => deleteTask(t.id)} aria-label={`Delete subtask: ${t.title}`}>✕</button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="flex gap-2">
+        <input
+          className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Add a subtask and press Enter…" aria-label="New subtask"
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
+        />
+        <button type="button" className="btn" onClick={add} disabled={!title.trim()}>Add</button>
+      </div>
+    </div>
+  );
+}
+
 /* ───────── Row ───────── */
+
+/** Due-date colours: red overdue, amber today, blue within a week, plain beyond. */
+export const TONE: Record<DueTone, { bar: string; chip: string; icon: string; label: string }> = {
+  overdue: { bar: 'border-l-clay-500', chip: 'border-clay-500 text-clay-600', icon: '⚠', label: 'Overdue' },
+  today: { bar: 'border-l-moss-500', chip: 'border-moss-500 text-moss-400', icon: '📅', label: 'Today' },
+  soon: { bar: 'border-l-sky-500', chip: 'border-sky-500 text-sky-500', icon: '📅', label: 'This week' },
+  later: { bar: 'border-l-cream-300', chip: '', icon: '📅', label: 'Later' },
+};
 
 export function TaskRow({ task, onEdit, compact }: { task: Task; onEdit: (id: string) => void; compact?: boolean }) {
   const today = useToday();
   const toggle = useStore((s) => s.toggleTask);
   const project = useStore((s) => s.data.projects.find((p) => p.id === task.projectId));
+  const parent = useStore((s) => (task.parentId ? s.data.tasks.find((t) => t.id === task.parentId) : undefined));
+  const subDone = useStore((s) => s.data.tasks.filter((t) => t.parentId === task.id && t.status === 'done').length);
+  const subTotal = useStore((s) => s.data.tasks.filter((t) => t.parentId === task.id).length);
   const done = task.status === 'done';
-  const overdue = !done && task.dueDate && task.dueDate < today;
+  const tone = dueTone(task, today);
+  const t = tone ? TONE[tone] : null;
   return (
-    <li className="group flex items-start gap-2.5 rounded-lg px-2 py-2 hover:bg-cream-100">
+    <li className={`group flex items-start gap-2.5 rounded-lg border-l-2 px-2 py-2 hover:bg-cream-100 ${t ? t.bar : 'border-l-transparent'}`}>
       <button
         role="checkbox" aria-checked={done} aria-label={`${done ? 'Mark not done' : 'Complete'}: ${task.title}`}
         onClick={() => toggle(task.id)}
@@ -126,11 +183,13 @@ export function TaskRow({ task, onEdit, compact }: { task: Task; onEdit: (id: st
         {!compact && (
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
             {task.dueDate && (
-              <span className={`chip ${overdue ? 'border-clay-500 text-clay-600' : ''}`}>
-                {overdue ? '⚠ ' : '📅 '}{relativeDay(task.dueDate, today)}
+              <span className={`chip ${t?.chip ?? ''}`}>
+                {t ? `${t.icon} ` : '📅 '}{relativeDay(task.dueDate, today)}
               </span>
             )}
-            {task.status === 'doing' && <span className="chip">◐ In progress</span>}
+            {(task.status === 'doing' || task.status === 'blocked' || task.status === 'onhold') && <span className="chip">{STATUS_LABEL[task.status]}</span>}
+            {parent && <span className="chip" title={`Subtask of ${parent.title}`}>↳ {parent.title}</span>}
+            {subTotal > 0 && <span className="chip" title="Subtasks done">☑ {subDone}/{subTotal}</span>}
             {task.priority !== 'medium' && <span className="chip">{PRIORITY_LABEL[task.priority]}</span>}
             {project && <span className="chip">📘 {project.title}</span>}
           </div>
@@ -166,7 +225,7 @@ export function FilterBar({ f, setF }: { f: TaskFilters; setF: (f: TaskFilters) 
     <div className="flex flex-wrap gap-2" role="search" aria-label="Filter tasks">
       <input className="input min-w-[8rem] flex-1" type="search" placeholder="Search tasks…" value={f.q} onChange={(e) => up('q', e.target.value)} aria-label="Search tasks" />
       <select className="input w-auto" aria-label="Status" value={f.status} onChange={(e) => up('status', e.target.value as TaskFilters['status'])}>
-        <option value="open">Open</option><option value="all">All</option><option value="todo">To do</option><option value="doing">In progress</option><option value="done">Done</option>
+        <option value="open">Open</option><option value="all">All</option><option value="todo">To do</option><option value="doing">In progress</option><option value="blocked">Blocked</option><option value="onhold">On hold</option><option value="done">Done</option>
       </select>
       <select className="input w-auto" aria-label="Priority" value={f.priority} onChange={(e) => up('priority', e.target.value as TaskFilters['priority'])}>
         <option value="all">Any priority</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option>

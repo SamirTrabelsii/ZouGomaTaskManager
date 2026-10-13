@@ -23,6 +23,21 @@ export function emptyData(): AppData {
 
 const arr = (v: unknown): any[] => (Array.isArray(v) ? v.filter((x) => x && typeof x === 'object' && typeof (x as any).id === 'string') : []);
 
+const TASK_STATUSES = new Set(['todo', 'doing', 'blocked', 'onhold', 'done']);
+
+/** Older data has no `parentId`; anything pointing at a missing, self or nested parent becomes a plain top-level task. */
+function normalizeTasks(tasks: any[]): any[] {
+  const byId = new Map(tasks.map((t) => [t.id, t]));
+  return tasks.map((t) => {
+    const p = typeof t.parentId === 'string' ? byId.get(t.parentId) : undefined;
+    return {
+      ...t,
+      status: TASK_STATUSES.has(t.status) ? t.status : 'todo',
+      parentId: p && p.id !== t.id && !p.parentId ? p.id : null,
+    };
+  });
+}
+
 /** Validates + migrates arbitrary JSON into AppData. Throws on anything that is clearly not LifeOS data. */
 export function normalize(raw: unknown): AppData {
   if (!raw || typeof raw !== 'object') throw new Error('Not a LifeOS data file.');
@@ -33,7 +48,7 @@ export function normalize(raw: unknown): AppData {
   const prefs = (r.prefs ?? {}) as Partial<Prefs>;
   const d: AppData = {
     ...base,
-    tasks: arr(r.tasks).filter((t) => typeof t.title === 'string'),
+    tasks: normalizeTasks(arr(r.tasks).filter((t) => typeof t.title === 'string')),
     projects: arr(r.projects).filter((t) => typeof t.title === 'string'),
     milestones: arr(r.milestones),
     goals: arr(r.goals),

@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../../state/store';
 import { useToday } from '../../state/hooks';
-import { dailyProgress, overdueTasks, sortTasks, todayTasks, upcomingTasks } from '../../domain/services';
-import { relativeDay } from '../../domain/dates';
-import { applyFilters, defaultFilters, FilterBar, QuickAdd, TaskList, useTaskDialog } from '../common/tasks';
+import { dailyProgress, dueTone, sortTasks } from '../../domain/services';
+import type { TaskStatus } from '../../domain/types';
+import { QuickAdd, TaskList, TONE, useTaskDialog } from '../common/tasks';
 import { Ring } from '../common/ui';
 import { PanelShell, Section, Tabs } from './PanelShell';
 
@@ -13,16 +13,15 @@ export function DeskPanel() {
   const setView = useStore((s) => s.setView);
   const today = useToday();
   const dlg = useTaskDialog();
-  const [tab, setTab] = useState<'today' | 'overdue' | 'upcoming' | 'all'>('today');
-  const [filters, setFilters] = useState(defaultFilters);
+  const [tab, setTab] = useState<TaskStatus>('todo');
 
   const prog = dailyProgress(tasks, today);
-  const lists = useMemo(() => ({
-    today: sortTasks(todayTasks(tasks, today), 'priority'),
-    overdue: sortTasks(overdueTasks(tasks, today), 'due'),
-    upcoming: sortTasks(upcomingTasks(tasks, today), 'due'),
-    all: applyFilters(tasks, filters),
-  }), [tasks, today, filters]);
+  const lists = useMemo(() => {
+    const by = (s: TaskStatus) => sortTasks(tasks.filter((t) => t.status === s), 'due');
+    const recentlyDone = tasks.filter((t) => t.status === 'done').sort((a, b) => (b.completedAt ?? '').localeCompare(a.completedAt ?? '')).slice(0, 30);
+    return { todo: by('todo'), doing: by('doing'), blocked: by('blocked'), onhold: by('onhold'), done: recentlyDone };
+  }, [tasks]);
+  const overdueCount = tasks.filter((t) => dueTone(t, today) === 'overdue').length;
   const priorities = sortTasks(tasks.filter((t) => t.status !== 'done' && t.priority === 'high'), 'due').slice(0, 3);
   const pendingReminders = reminders
     .filter((r) => r.at.slice(0, 10) <= today && !r.ackedAt && r.deliveredAt)
@@ -68,27 +67,33 @@ export function DeskPanel() {
         <Tabs
           value={tab} onChange={setTab}
           tabs={[
-            { id: 'today', label: 'Today', count: lists.today.length },
-            { id: 'overdue', label: 'Overdue', count: lists.overdue.length },
-            { id: 'upcoming', label: 'Upcoming', count: lists.upcoming.length },
-            { id: 'all', label: 'All' },
+            { id: 'todo', label: 'To do', count: lists.todo.length },
+            { id: 'doing', label: 'In progress', count: lists.doing.length },
+            { id: 'blocked', label: 'Blocked', count: lists.blocked.length },
+            { id: 'onhold', label: 'On hold', count: lists.onhold.length },
+            { id: 'done', label: 'Done' },
           ]}
         />
+        <ul className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-500" aria-label="Due date colours">
+          {(['overdue', 'today', 'soon'] as const).map((k) => (
+            <li key={k} className="flex items-center gap-1">
+              <span aria-hidden className={`inline-block h-3 w-0 border-l-2 ${TONE[k].bar}`} />
+              {TONE[k].label}{k === 'overdue' && overdueCount > 0 && <span className="text-clay-600"> ({overdueCount})</span>}
+            </li>
+          ))}
+        </ul>
         <div className="mt-2">
-          {tab === 'all' && <div className="mb-2"><FilterBar f={filters} setF={setFilters} /></div>}
           <TaskList
             tasks={lists[tab]} onEdit={(id) => dlg.open(id)}
             empty={{
-              today: { title: 'Nothing due today', hint: 'Add a task above, or enjoy the calm.' },
-              overdue: { title: 'Nothing overdue', hint: 'You are all caught up.' },
-              upcoming: { title: 'No upcoming tasks', hint: 'Tasks due in the next two weeks appear here.' },
-              all: { title: 'No tasks match', hint: 'Try changing the filters.' },
+              todo: { title: 'Nothing to do', hint: 'Add a task above, or enjoy the calm.' },
+              doing: { title: 'Nothing in progress', hint: 'Start a task and it shows up here.' },
+              blocked: { title: 'Nothing is blocked', hint: 'Tasks waiting on something or someone appear here.' },
+              onhold: { title: 'Nothing on hold', hint: 'Park tasks you are deliberately not working on.' },
+              done: { title: 'Nothing finished yet', hint: 'Completed tasks appear here.' },
             }[tab]}
           />
         </div>
-        {tab === 'upcoming' && lists.upcoming[0]?.dueDate && (
-          <p className="mt-2 text-xs text-ink-500">Next: {relativeDay(lists.upcoming[0].dueDate, today)}</p>
-        )}
       </Section>
       <button className="btn w-full" onClick={() => dlg.open(undefined, { dueDate: today })}>＋ New task with details</button>
       {dlg.node}

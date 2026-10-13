@@ -281,9 +281,16 @@ export const useStore = create<Store>((set, get) => {
     addTask(input) {
       const t: Task = {
         id: uid(), notes: '', status: 'todo', priority: 'medium', dueDate: null,
-        projectId: null, milestoneId: null, goalId: null, createdAt: nowIso(), completedAt: null,
+        projectId: null, milestoneId: null, goalId: null, parentId: null, createdAt: nowIso(), completedAt: null,
         ...input, title: input.title.trim(),
       };
+      const parent = t.parentId ? get().data.tasks.find((x) => x.id === t.parentId) : undefined;
+      if (parent && !parent.parentId) {
+        // a subtask belongs to the same project / milestone / goal as its parent unless told otherwise
+        t.projectId = input.projectId ?? parent.projectId;
+        t.milestoneId = input.milestoneId ?? parent.milestoneId;
+        t.goalId = input.goalId ?? parent.goalId;
+      } else t.parentId = null;
       if (t.status === 'done' && !t.completedAt) t.completedAt = nowIso();
       commit((d) => ({ ...d, tasks: [t, ...d.tasks] }));
       pulse('desk');
@@ -293,6 +300,12 @@ export const useStore = create<Store>((set, get) => {
       const before = get().data.tasks.find((t) => t.id === id);
       if (!before) return;
       const next: Task = { ...before, ...patch };
+      if (patch.parentId) {
+        // one level only: the parent must be a top-level task, and a task that has subtasks cannot become one
+        const { tasks } = get().data;
+        const parent = tasks.find((t) => t.id === patch.parentId);
+        if (!parent || parent.parentId || parent.id === id || tasks.some((t) => t.parentId === id)) next.parentId = before.parentId;
+      }
       if (patch.status && patch.status !== before.status) {
         next.completedAt = patch.status === 'done' ? nowIso() : null;
       }
@@ -311,11 +324,13 @@ export const useStore = create<Store>((set, get) => {
     },
     deleteTask(id) {
       const t = get().data.tasks.find((x) => x.id === id);
-      withUndo(`Deleted “${t?.title ?? 'task'}”`, () =>
+      // deleting a parent takes its subtasks with it (Undo brings them all back)
+      const gone = new Set([id, ...get().data.tasks.filter((x) => x.parentId === id).map((x) => x.id)]);
+      withUndo(gone.size > 1 ? `Deleted “${t?.title ?? 'task'}” and ${gone.size - 1} subtask${gone.size > 2 ? 's' : ''}` : `Deleted “${t?.title ?? 'task'}”`, () =>
         commit((d) => ({
           ...d,
-          tasks: d.tasks.filter((x) => x.id !== id),
-          reminders: d.reminders.filter((r) => !(r.link?.type === 'task' && r.link.id === id)),
+          tasks: d.tasks.filter((x) => !gone.has(x.id)),
+          reminders: d.reminders.filter((r) => !(r.link?.type === 'task' && gone.has(r.link.id))),
         })));
     },
     setTaskReminder(taskId, at) {

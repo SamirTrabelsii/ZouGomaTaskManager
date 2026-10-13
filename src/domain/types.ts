@@ -1,6 +1,6 @@
 export type ID = string;
 export type Priority = 'low' | 'medium' | 'high';
-export type TaskStatus = 'todo' | 'doing' | 'done';
+export type TaskStatus = 'todo' | 'doing' | 'blocked' | 'onhold' | 'done';
 export type ProjectStatus = 'active' | 'paused' | 'done';
 export type NoteKind = 'note' | 'idea' | 'journal' | 'reflection' | 'review' | 'lesson';
 export type SceneObjectId = 'desk' | 'bookshelf' | 'plants' | 'calendar' | 'notebook';
@@ -16,6 +16,8 @@ export interface Task {
   projectId: ID | null;
   milestoneId: ID | null;
   goalId: ID | null;
+  /** Set on a subtask: the id of its parent task. Only one level deep – a parent is never itself a subtask. */
+  parentId: ID | null;
   createdAt: string; // ISO
   completedAt: string | null; // ISO
 }

@@ -2,12 +2,14 @@ import { useState } from 'react';
 import { useStore } from '../../state/store';
 import { useToday } from '../../state/hooks';
 import { relativeDay } from '../../domain/dates';
+import { dueTone } from '../../domain/services';
 import type { Task, TaskStatus } from '../../domain/types';
-import { applyFilters, defaultFilters, FilterBar, QuickAdd, TaskList, useTaskDialog } from '../common/tasks';
+import { applyFilters, defaultFilters, FilterBar, QuickAdd, TaskList, TONE, useTaskDialog } from '../common/tasks';
 import { PRIORITY_LABEL, STATUS_LABEL, Segmented } from '../common/ui';
 
 const COLUMNS: { id: TaskStatus; title: string }[] = [
-  { id: 'todo', title: 'To do' }, { id: 'doing', title: 'In progress' }, { id: 'done', title: 'Done' },
+  { id: 'todo', title: 'To do' }, { id: 'doing', title: 'In progress' }, { id: 'blocked', title: 'Blocked' },
+  { id: 'onhold', title: 'On hold' }, { id: 'done', title: 'Done' },
 ];
 
 export function TasksView() {
@@ -45,7 +47,7 @@ function Board({ tasks, onEdit }: { tasks: Task[]; onEdit: (id: string) => void 
   const today = useToday();
   const [over, setOver] = useState<TaskStatus | null>(null);
   return (
-    <div className="grid gap-3 md:grid-cols-3">
+    <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5">
       {COLUMNS.map((c) => {
         const list = tasks.filter((t) => t.status === c.id);
         return (
@@ -61,7 +63,8 @@ function Board({ tasks, onEdit }: { tasks: Task[]; onEdit: (id: string) => void 
                 <li key={t.id} draggable onDragStart={(e) => e.dataTransfer.setData('text/plain', t.id)} className="card cursor-grab p-2.5 active:cursor-grabbing">
                   <button className="block w-full text-left text-sm font-medium" onClick={() => onEdit(t.id)}>{t.title}</button>
                   <div className="mt-1 flex flex-wrap gap-1">
-                    {t.dueDate && <span className={`chip ${t.status !== 'done' && t.dueDate < today ? 'border-clay-500 text-clay-600' : ''}`}>📅 {relativeDay(t.dueDate, today)}</span>}
+                    {t.dueDate && <span className={`chip ${dueTone(t, today) ? TONE[dueTone(t, today)!].chip : ''}`}>📅 {relativeDay(t.dueDate, today)}</span>}
+                    {t.parentId && <span className="chip">↳ {tasks.find((p) => p.id === t.parentId)?.title ?? 'subtask'}</span>}
                     <span className="chip">{PRIORITY_LABEL[t.priority]}</span>
                   </div>
                   <select className="input mt-2 py-1 text-xs" aria-label={`Move “${t.title}” to`} value={t.status} onChange={(e) => update(t.id, { status: e.target.value as TaskStatus })}>
