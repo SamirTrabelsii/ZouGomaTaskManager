@@ -16,7 +16,7 @@ export function defaultPrefs(): Prefs {
 export function emptyData(): AppData {
   return {
     version: DATA_VERSION,
-    tasks: [], projects: [], milestones: [], goals: [], habits: [], habitLogs: [],
+    tasks: [], scopes: [], projects: [], milestones: [], goals: [], habits: [], habitLogs: [],
     events: [], reminders: [], notes: [], prefs: defaultPrefs(),
   };
 }
@@ -25,17 +25,14 @@ const arr = (v: unknown): any[] => (Array.isArray(v) ? v.filter((x) => x && type
 
 const TASK_STATUSES = new Set(['todo', 'doing', 'blocked', 'onhold', 'done']);
 
-/** Older data has no `parentId`; anything pointing at a missing, self or nested parent becomes a plain top-level task. */
-function normalizeTasks(tasks: any[]): any[] {
-  const byId = new Map(tasks.map((t) => [t.id, t]));
-  return tasks.map((t) => {
-    const p = typeof t.parentId === 'string' ? byId.get(t.parentId) : undefined;
-    return {
-      ...t,
-      status: TASK_STATUSES.has(t.status) ? t.status : 'todo',
-      parentId: p && p.id !== t.id && !p.parentId ? p.id : null,
-    };
-  });
+/** Older data has no `scopeId`; a task pointing at a scope that no longer exists simply becomes unscoped. */
+function normalizeTasks(tasks: any[], scopes: any[]): any[] {
+  const ids = new Set(scopes.map((s) => s.id));
+  return tasks.map(({ parentId: _legacy, ...t }) => ({
+    ...t,
+    status: TASK_STATUSES.has(t.status) ? t.status : 'todo',
+    scopeId: typeof t.scopeId === 'string' && ids.has(t.scopeId) ? t.scopeId : null,
+  }));
 }
 
 /** Validates + migrates arbitrary JSON into AppData. Throws on anything that is clearly not LifeOS data. */
@@ -46,9 +43,13 @@ export function normalize(raw: unknown): AppData {
   if (r.version > DATA_VERSION) throw new Error(`This data was made by a newer LifeOS (v${r.version}).`);
   const base = emptyData();
   const prefs = (r.prefs ?? {}) as Partial<Prefs>;
+  const scopes = arr(r.scopes).filter((s) => typeof s.title === 'string').map((s) => ({
+    ...s, icon: typeof s.icon === 'string' ? s.icon : '📁', color: /^#[0-9a-f]{6}$/i.test(s.color) ? s.color : '#62b4ff',
+  }));
   const d: AppData = {
     ...base,
-    tasks: normalizeTasks(arr(r.tasks).filter((t) => typeof t.title === 'string')),
+    scopes,
+    tasks: normalizeTasks(arr(r.tasks).filter((t) => typeof t.title === 'string'), scopes),
     projects: arr(r.projects).filter((t) => typeof t.title === 'string'),
     milestones: arr(r.milestones),
     goals: arr(r.goals),

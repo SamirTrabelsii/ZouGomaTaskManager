@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import {
   type AppData, type CalEvent, type Goal, type Habit, type Milestone, type Note, type Project,
-  type Reminder, type SceneObjectId, type Task, type ViewId, type Prefs,
+  type Reminder, type SceneObjectId, type Scope, type Task, type ViewId, type Prefs,
 } from '../domain/types';
 import { showSystemNotification } from './notify';
 import { dateTimeOf, localDateTime, toLocalInput, todayStr } from '../domain/dates';
@@ -74,6 +74,10 @@ interface Actions {
   toggleTask(id: string): void;
   deleteTask(id: string): void;
   setTaskReminder(taskId: string, at: string | null): void;
+  // scopes
+  addScope(input: Partial<Scope> & { title: string }): Scope;
+  updateScope(id: string, patch: Partial<Scope>): void;
+  deleteScope(id: string): void;
   // projects
   addProject(input: Partial<Project> & { title: string }): Project;
   updateProject(id: string, patch: Partial<Project>): void;
@@ -281,16 +285,9 @@ export const useStore = create<Store>((set, get) => {
     addTask(input) {
       const t: Task = {
         id: uid(), notes: '', status: 'todo', priority: 'medium', dueDate: null,
-        projectId: null, milestoneId: null, goalId: null, parentId: null, createdAt: nowIso(), completedAt: null,
+        projectId: null, milestoneId: null, goalId: null, scopeId: null, createdAt: nowIso(), completedAt: null,
         ...input, title: input.title.trim(),
       };
-      const parent = t.parentId ? get().data.tasks.find((x) => x.id === t.parentId) : undefined;
-      if (parent && !parent.parentId) {
-        // a subtask belongs to the same project / milestone / goal as its parent unless told otherwise
-        t.projectId = input.projectId ?? parent.projectId;
-        t.milestoneId = input.milestoneId ?? parent.milestoneId;
-        t.goalId = input.goalId ?? parent.goalId;
-      } else t.parentId = null;
       if (t.status === 'done' && !t.completedAt) t.completedAt = nowIso();
       commit((d) => ({ ...d, tasks: [t, ...d.tasks] }));
       pulse('desk');
@@ -300,12 +297,6 @@ export const useStore = create<Store>((set, get) => {
       const before = get().data.tasks.find((t) => t.id === id);
       if (!before) return;
       const next: Task = { ...before, ...patch };
-      if (patch.parentId) {
-        // one level only: the parent must be a top-level task, and a task that has subtasks cannot become one
-        const { tasks } = get().data;
-        const parent = tasks.find((t) => t.id === patch.parentId);
-        if (!parent || parent.parentId || parent.id === id || tasks.some((t) => t.parentId === id)) next.parentId = before.parentId;
-      }
       if (patch.status && patch.status !== before.status) {
         next.completedAt = patch.status === 'done' ? nowIso() : null;
       }
@@ -324,19 +315,37 @@ export const useStore = create<Store>((set, get) => {
     },
     deleteTask(id) {
       const t = get().data.tasks.find((x) => x.id === id);
-      // deleting a parent takes its subtasks with it (Undo brings them all back)
-      const gone = new Set([id, ...get().data.tasks.filter((x) => x.parentId === id).map((x) => x.id)]);
-      withUndo(gone.size > 1 ? `Deleted “${t?.title ?? 'task'}” and ${gone.size - 1} subtask${gone.size > 2 ? 's' : ''}` : `Deleted “${t?.title ?? 'task'}”`, () =>
+      withUndo(`Deleted “${t?.title ?? 'task'}”`, () =>
         commit((d) => ({
           ...d,
-          tasks: d.tasks.filter((x) => !gone.has(x.id)),
-          reminders: d.reminders.filter((r) => !(r.link?.type === 'task' && gone.has(r.link.id))),
+          tasks: d.tasks.filter((x) => x.id !== id),
+          reminders: d.reminders.filter((r) => !(r.link?.type === 'task' && r.link.id === id)),
         })));
     },
     setTaskReminder(taskId, at) {
       const t = get().data.tasks.find((x) => x.id === taskId);
       if (!t) return;
       commit((d) => upsertReminder(d, { type: 'task', id: taskId }, t.title, at));
+    },
+
+    /* ── scopes ── */
+    addScope(input) {
+      const s: Scope = { id: uid(), icon: '📁', color: '#62b4ff', createdAt: nowIso(), ...input, title: input.title.trim() };
+      commit((d) => ({ ...d, scopes: [...d.scopes, s] }));
+      return s;
+    },
+    updateScope(id, patch) {
+      commit((d) => ({ ...d, scopes: d.scopes.map((s) => (s.id === id ? { ...s, ...patch } : s)) }));
+    },
+    deleteScope(id) {
+      const s = get().data.scopes.find((x) => x.id === id);
+      // the tasks stay – they just lose the label
+      withUndo(`Deleted scope “${s?.title ?? ''}”`, () =>
+        commit((d) => ({
+          ...d,
+          scopes: d.scopes.filter((x) => x.id !== id),
+          tasks: d.tasks.map((t) => (t.scopeId === id ? { ...t, scopeId: null } : t)),
+        })));
     },
 
     /* ── projects ── */

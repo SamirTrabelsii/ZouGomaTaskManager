@@ -16,10 +16,19 @@ export interface Task {
   projectId: ID | null;
   milestoneId: ID | null;
   goalId: ID | null;
-  /** Set on a subtask: the id of its parent task. Only one level deep – a parent is never itself a subtask. */
-  parentId: ID | null;
+  /** The scope (a named group / tag) this task belongs to, if any. */
+  scopeId: ID | null;
   createdAt: string; // ISO
   completedAt: string | null; // ISO
+}
+
+/** A lightweight wrapper that groups tasks. It is not a task itself – just a named, coloured label. */
+export interface Scope {
+  id: ID;
+  title: string;
+  icon: string; // an emoji
+  color: string; // #rrggbb
+  createdAt: string;
 }
 
 export interface Project {
@@ -152,6 +161,7 @@ export const DATA_VERSION = 1;
 export interface AppData {
   version: number;
   tasks: Task[];
+  scopes: Scope[];
   projects: Project[];
   milestones: Milestone[];
   goals: Goal[];

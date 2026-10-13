@@ -4,8 +4,9 @@ import { useToday } from '../../state/hooks';
 import { relativeDay } from '../../domain/dates';
 import { dueTone } from '../../domain/services';
 import type { Task, TaskStatus } from '../../domain/types';
-import { applyFilters, defaultFilters, FilterBar, QuickAdd, TaskList, TONE, useTaskDialog } from '../common/tasks';
-import { PRIORITY_LABEL, STATUS_LABEL, Segmented } from '../common/ui';
+import { applyFilters, defaultFilters, FilterBar, QuickAdd, ScopeBar, TaskList, TONE, useTaskDialog } from '../common/tasks';
+import { Segmented } from '../common/ui';
+import { CalendarIcon, PriorityIcon, PRIORITY_NAME, STATUS_COLOR, STATUS_NAME, StatusIcon } from '../common/icons';
 
 const COLUMNS: { id: TaskStatus; title: string }[] = [
   { id: 'todo', title: 'To do' }, { id: 'doing', title: 'In progress' }, { id: 'blocked', title: 'Blocked' },
@@ -28,8 +29,9 @@ export function TasksView() {
           <button className="btn btn-primary" onClick={() => dlg.open()}>＋ New task</button>
         </div>
       </div>
-      <FilterBar f={mode === 'board' ? { ...f } : f} setF={setF} />
-      {mode === 'list' && <QuickAdd />}
+      <ScopeBar value={f.scope} onChange={(scope) => setF({ ...f, scope })} />
+      <FilterBar f={f} setF={setF} />
+      {mode === 'list' && <QuickAdd defaults={f.scope === 'all' ? undefined : { scopeId: f.scope }} />}
       <div className="scroll-thin min-h-0 flex-1 overflow-y-auto">
         {mode === 'list' ? (
           <div className="card"><TaskList tasks={shown} onEdit={(id) => dlg.open(id)} empty={{ title: tasks.length ? 'No tasks match these filters' : 'No tasks yet', hint: tasks.length ? 'Clear the search or change a filter.' : 'Add your first task above — it will also appear on your desk.' }} /></div>
@@ -40,6 +42,18 @@ export function TasksView() {
       {dlg.node}
     </div>
   );
+}
+
+function DueChip({ task, today }: { task: Task; today: string }) {
+  const tone = dueTone(task, today);
+  const T = tone ? TONE[tone] : null;
+  return <span className={`chip ${T?.chip ?? ''}`}>{T ? <T.Icon /> : <CalendarIcon />}{relativeDay(task.dueDate!, today)}</span>;
+}
+
+function ScopeChip({ scopeId }: { scopeId: string | null }) {
+  const scope = useStore((s) => (scopeId ? s.data.scopes.find((x) => x.id === scopeId) : undefined));
+  if (!scope) return null;
+  return <span className="chip" style={{ borderColor: `${scope.color}99`, background: `${scope.color}1f` }}><span aria-hidden>{scope.icon}</span>{scope.title}</span>;
 }
 
 function Board({ tasks, onEdit }: { tasks: Task[]; onEdit: (id: string) => void }) {
@@ -57,18 +71,20 @@ function Board({ tasks, onEdit }: { tasks: Task[]; onEdit: (id: string) => void 
             onDrop={(e) => { e.preventDefault(); setOver(null); const id = e.dataTransfer.getData('text/plain'); if (id) update(id, { status: c.id }); }}
             className={`rounded-xl border p-2 transition ${over === c.id ? 'border-moss-500 bg-moss-400/10' : 'border-cream-300 bg-cream-50/60'}`}
           >
-            <h2 className="mb-2 flex justify-between px-1 text-sm font-semibold">{c.title}<span className="text-ink-400">{list.length}</span></h2>
+            <h2 className="mb-2 flex items-center gap-1.5 px-1 text-sm font-semibold">
+              <StatusIcon status={c.id} /><span className={c.id === 'todo' ? '' : STATUS_COLOR[c.id]}>{c.title}</span><span className="ml-auto text-ink-400">{list.length}</span>
+            </h2>
             <ul className="space-y-2">
               {list.map((t) => (
                 <li key={t.id} draggable onDragStart={(e) => e.dataTransfer.setData('text/plain', t.id)} className="card cursor-grab p-2.5 active:cursor-grabbing">
                   <button className="block w-full text-left text-sm font-medium" onClick={() => onEdit(t.id)}>{t.title}</button>
                   <div className="mt-1 flex flex-wrap gap-1">
-                    {t.dueDate && <span className={`chip ${dueTone(t, today) ? TONE[dueTone(t, today)!].chip : ''}`}>📅 {relativeDay(t.dueDate, today)}</span>}
-                    {t.parentId && <span className="chip">↳ {tasks.find((p) => p.id === t.parentId)?.title ?? 'subtask'}</span>}
-                    <span className="chip">{PRIORITY_LABEL[t.priority]}</span>
+                    {t.dueDate && <DueChip task={t} today={today} />}
+                    <span className="chip"><PriorityIcon priority={t.priority} size={12} />{PRIORITY_NAME[t.priority]}</span>
+                    <ScopeChip scopeId={t.scopeId} />
                   </div>
                   <select className="input mt-2 py-1 text-xs" aria-label={`Move “${t.title}” to`} value={t.status} onChange={(e) => update(t.id, { status: e.target.value as TaskStatus })}>
-                    {Object.entries(STATUS_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                    {Object.entries(STATUS_NAME).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                   </select>
                 </li>
               ))}

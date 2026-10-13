@@ -41,13 +41,6 @@ export function dueTone(t: Task, today: string, soonDays = 7): DueTone | null {
   return diffDays(today, t.dueDate) <= soonDays ? 'soon' : 'later';
 }
 
-/** Subtasks of a parent task, and how many of them are done. */
-export const subtasksOf = (tasks: Task[], parentId: string) => tasks.filter((t) => t.parentId === parentId);
-export function subtaskProgress(tasks: Task[], parentId: string) {
-  const subs = subtasksOf(tasks, parentId);
-  return { done: subs.filter((t) => t.status === 'done').length, total: subs.length };
-}
-
 /** Today's scope: open tasks due today or earlier (minus anything parked on hold), plus everything finished today. */
 export function dailyProgress(tasks: Task[], today: string) {
   const done = tasks.filter((t) => t.completedAt && isoToDay(t.completedAt) === today).length;

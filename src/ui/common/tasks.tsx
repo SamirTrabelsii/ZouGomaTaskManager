@@ -1,11 +1,14 @@
 import { useMemo, useState } from 'react';
-import type { Priority, Task, TaskStatus } from '../../domain/types';
+import type { Priority, Scope, Task, TaskStatus } from '../../domain/types';
 import { useStore } from '../../state/store';
 import { useToday } from '../../state/hooks';
 import { relativeDay } from '../../domain/dates';
-import { dueTone, sortTasks, subtaskProgress, type DueTone } from '../../domain/services';
+import { dueTone, sortTasks, type DueTone } from '../../domain/services';
 import { resolveTemplates } from '../../domain/templates';
-import { ConfirmButton, Dialog, EmptyState, Field, PRIORITY_LABEL, STATUS_LABEL } from './ui';
+import { ConfirmButton, Dialog, EmptyState, Field } from './ui';
+import {
+  AlertIcon, CalendarIcon, ClockIcon, PencilIcon, PlusIcon, PRIORITY_NAME, PriorityIcon, SCOPE_COLORS, SCOPE_ICONS, ScopeBadge, STATUS_NAME, StatusIcon,
+} from './icons';
 
 /* ───────── Edit / create dialog ───────── */
 
@@ -23,8 +26,6 @@ export function TaskDialog({ taskId, defaults, onClose }: { taskId?: string; def
   const projMs = milestones.filter((m) => m.projectId === f.projectId);
   const showProject = cfg.taskFields.has('project') || !!f.projectId;
   const showGoal = cfg.taskFields.has('goal') || !!f.goalId;
-  const hasSubtasks = !!taskId && tasks.some((t) => t.parentId === taskId);
-  const parentChoices = tasks.filter((t) => !t.parentId && t.id !== taskId && (t.status !== 'done' || t.id === f.parentId));
 
   const save = (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,12 +52,12 @@ export function TaskDialog({ taskId, defaults, onClose }: { taskId?: string; def
         <div className="grid grid-cols-2 gap-3">
           <Field label="Status">
             <select className="input" value={f.status} onChange={(e) => set('status', e.target.value as TaskStatus)}>
-              {Object.entries(STATUS_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              {Object.entries(STATUS_NAME).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
           </Field>
           <Field label="Priority">
             <select className="input" value={f.priority} onChange={(e) => set('priority', e.target.value as Priority)}>
-              {Object.entries(PRIORITY_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              {Object.entries(PRIORITY_NAME).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
           </Field>
           <Field label="Due date">
@@ -66,15 +67,7 @@ export function TaskDialog({ taskId, defaults, onClose }: { taskId?: string; def
             <input type="datetime-local" className="input" value={remindAt} onChange={(e) => setRemindAt(e.target.value)} />
           </Field>
         </div>
-        {!hasSubtasks && parentChoices.length > 0 && (
-          <Field label="Parent task">
-            <select className="input" value={f.parentId ?? ''} onChange={(e) => set('parentId', e.target.value || null)}>
-              <option value="">None – a top-level task</option>
-              {parentChoices.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
-            </select>
-          </Field>
-        )}
-        {existing && !f.parentId && <Subtasks parentId={existing.id} />}
+        <ScopeField value={f.scopeId ?? null} onChange={(id) => set('scopeId', id)} />
         {(showProject || showGoal) && (
           <div className="grid grid-cols-2 gap-3">
             {showProject && (
@@ -115,36 +108,121 @@ export function TaskDialog({ taskId, defaults, onClose }: { taskId?: string; def
   );
 }
 
-/** Subtask checklist inside the edit dialog of a parent task. */
-function Subtasks({ parentId }: { parentId: string }) {
-  const tasks = useStore((s) => s.data.tasks);
-  const { addTask, toggleTask, deleteTask } = useStore.getState();
-  const [title, setTitle] = useState('');
-  const subs = tasks.filter((t) => t.parentId === parentId);
-  const p = subtaskProgress(tasks, parentId);
-  const add = () => { if (title.trim()) { addTask({ title, parentId }); setTitle(''); } };
+/* ───────── Scopes ───────── */
+
+/** Create or edit a scope: a name, an emoji and a colour. */
+function ScopeDialog({ scopeId, onClose, onCreated }: { scopeId?: string; onClose: () => void; onCreated?: (s: Scope) => void }) {
+  const existing = useStore((s) => s.data.scopes.find((x) => x.id === scopeId));
+  const { addScope, updateScope, deleteScope } = useStore.getState();
+  const [title, setTitle] = useState(existing?.title ?? '');
+  const [icon, setIcon] = useState(existing?.icon ?? SCOPE_ICONS[0]);
+  const [color, setColor] = useState(existing?.color ?? SCOPE_COLORS[0]);
+  const save = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim()) return;
+    if (existing) updateScope(existing.id, { title: title.trim(), icon, color });
+    else onCreated?.(addScope({ title, icon, color }));
+    onClose();
+  };
   return (
-    <div>
-      <div className="mb-1 text-xs font-medium text-ink-500">Subtasks{p.total > 0 && ` · ${p.done}/${p.total} done`}</div>
-      {subs.length > 0 && (
-        <ul className="mb-2 space-y-0.5">
-          {subs.map((t) => (
-            <li key={t.id} className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={t.status === 'done'} onChange={() => toggleTask(t.id)} aria-label={`Complete subtask: ${t.title}`} />
-              <span className={`min-w-0 flex-1 truncate ${t.status === 'done' ? 'text-ink-400 line-through' : ''}`}>{t.title}</span>
-              {t.status !== 'todo' && t.status !== 'done' && <span className="chip">{STATUS_LABEL[t.status]}</span>}
-              <button type="button" className="btn btn-ghost px-1.5 py-0 text-xs" onClick={() => deleteTask(t.id)} aria-label={`Delete subtask: ${t.title}`}>✕</button>
-            </li>
-          ))}
-        </ul>
+    <Dialog title={existing ? 'Edit scope' : 'New scope'} onClose={onClose}>
+      <form onSubmit={save} className="space-y-3">
+        <p className="text-xs text-ink-500">A scope groups related tasks under one label, like a folder or tag. It is not a task itself.</p>
+        <Field label="Name">
+          <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Website launch" autoFocus />
+        </Field>
+        <Field label="Icon">
+          <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Icon">
+            {SCOPE_ICONS.map((i) => (
+              <button
+                key={i} type="button" role="radio" aria-checked={icon === i} aria-label={i} onClick={() => setIcon(i)}
+                className={`flex h-8 w-8 items-center justify-center rounded-lg border text-base transition ${icon === i ? 'border-moss-500 bg-moss-400/15' : 'border-cream-300 hover:bg-cream-200'}`}
+              >{i}</button>
+            ))}
+          </div>
+        </Field>
+        <Field label="Colour">
+          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Colour">
+            {SCOPE_COLORS.map((c) => (
+              <button
+                key={c} type="button" role="radio" aria-checked={color === c} aria-label={c} onClick={() => setColor(c)}
+                className={`h-7 w-7 rounded-full border-2 transition ${color === c ? 'scale-110 border-ink-900' : 'border-transparent'}`} style={{ background: c }}
+              />
+            ))}
+          </div>
+        </Field>
+        <div className="flex items-center justify-between pt-2">
+          {existing ? <ConfirmButton onConfirm={() => { deleteScope(existing.id); onClose(); }} confirmLabel="Delete scope?">Delete</ConfirmButton> : <span />}
+          <div className="flex gap-2">
+            <button type="button" className="btn" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={!title.trim()}>{existing ? 'Save' : 'Create scope'}</button>
+          </div>
+        </div>
+        {existing && <p className="text-xs text-ink-400">Deleting a scope keeps its tasks – they just lose the label.</p>}
+      </form>
+    </Dialog>
+  );
+}
+
+/** Scope picker for the task dialog, with a one-line way to create a scope on the spot (icon and colour can be edited later). */
+function ScopeField({ value, onChange }: { value: string | null; onChange: (id: string | null) => void }) {
+  const scopes = useStore((s) => s.data.scopes);
+  const [name, setName] = useState<string | null>(null);
+  const create = () => {
+    if (!name?.trim()) return;
+    const made = useStore.getState().addScope({ title: name, icon: SCOPE_ICONS[scopes.length % SCOPE_ICONS.length], color: SCOPE_COLORS[scopes.length % SCOPE_COLORS.length] });
+    onChange(made.id);
+    setName(null);
+  };
+  return (
+    <Field label="Scope">
+      {name === null ? (
+        <div className="flex gap-2">
+          <select className="input" value={value ?? ''} onChange={(e) => onChange(e.target.value || null)}>
+            <option value="">No scope</option>
+            {scopes.map((s) => <option key={s.id} value={s.id}>{s.icon} {s.title}</option>)}
+          </select>
+          <button type="button" className="btn" onClick={() => setName('')} aria-label="Create a new scope" title="New scope"><PlusIcon /></button>
+        </div>
+      ) : (
+        <div className="flex gap-2">
+          <input
+            className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="New scope name" aria-label="New scope name" autoFocus
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); create(); } }}
+          />
+          <button type="button" className="btn btn-primary" onClick={create} disabled={!name.trim()}>Create</button>
+          <button type="button" className="btn" onClick={() => setName(null)}>Cancel</button>
+        </div>
       )}
-      <div className="flex gap-2">
-        <input
-          className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Add a subtask and press Enter…" aria-label="New subtask"
-          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
-        />
-        <button type="button" className="btn" onClick={add} disabled={!title.trim()}>Add</button>
-      </div>
+    </Field>
+  );
+}
+
+/** Filter chips: all tasks or one scope. Also where scopes are created and edited. */
+export function ScopeBar({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const scopes = useStore((s) => s.data.scopes);
+  const tasks = useStore((s) => s.data.tasks);
+  const [dlg, setDlg] = useState<{ id?: string } | null>(null);
+  const open = (id: string) => tasks.filter((t) => t.scopeId === id && t.status !== 'done').length;
+  const chip = (on: boolean) =>
+    `inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition ${on ? 'border-moss-500 bg-moss-400/15 text-ink-900' : 'border-cream-300 text-ink-500 hover:bg-cream-200 hover:text-ink-900'}`;
+  const current = scopes.find((s) => s.id === value);
+  return (
+    <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Scope">
+      <button className={chip(value === 'all')} aria-pressed={value === 'all'} onClick={() => onChange('all')}>All</button>
+      {scopes.map((s) => (
+        <button
+          key={s.id} className={chip(value === s.id)} aria-pressed={value === s.id} onClick={() => onChange(s.id)}
+          style={value === s.id ? { borderColor: s.color, background: `${s.color}22` } : undefined}
+        >
+          <ScopeBadge scope={s} size={16} />{s.title}<span className="text-ink-400">{open(s.id)}</span>
+        </button>
+      ))}
+      <button className={chip(false)} onClick={() => setDlg({})}><PlusIcon />Scope</button>
+      {current && (
+        <button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => setDlg({ id: current.id })} aria-label={`Edit scope ${current.title}`}><PencilIcon /></button>
+      )}
+      {dlg && <ScopeDialog scopeId={dlg.id} onClose={() => { if (dlg.id && !useStore.getState().data.scopes.some((s) => s.id === dlg.id)) onChange('all'); setDlg(null); }} onCreated={(s) => onChange(s.id)} />}
     </div>
   );
 }
@@ -152,20 +230,18 @@ function Subtasks({ parentId }: { parentId: string }) {
 /* ───────── Row ───────── */
 
 /** Due-date colours: red overdue, amber today, blue within a week, plain beyond. */
-export const TONE: Record<DueTone, { bar: string; chip: string; icon: string; label: string }> = {
-  overdue: { bar: 'border-l-clay-500', chip: 'border-clay-500 text-clay-600', icon: '⚠', label: 'Overdue' },
-  today: { bar: 'border-l-moss-500', chip: 'border-moss-500 text-moss-400', icon: '📅', label: 'Today' },
-  soon: { bar: 'border-l-sky-500', chip: 'border-sky-500 text-sky-500', icon: '📅', label: 'This week' },
-  later: { bar: 'border-l-cream-300', chip: '', icon: '📅', label: 'Later' },
+export const TONE: Record<DueTone, { bar: string; chip: string; label: string; Icon: typeof CalendarIcon }> = {
+  overdue: { bar: 'border-l-clay-500', chip: 'border-clay-500 text-clay-600', label: 'Overdue', Icon: AlertIcon },
+  today: { bar: 'border-l-moss-500', chip: 'border-moss-500 text-moss-400', label: 'Today', Icon: ClockIcon },
+  soon: { bar: 'border-l-sky-500', chip: 'border-sky-500 text-sky-500', label: 'This week', Icon: CalendarIcon },
+  later: { bar: 'border-l-cream-300', chip: '', label: 'Later', Icon: CalendarIcon },
 };
 
 export function TaskRow({ task, onEdit, compact }: { task: Task; onEdit: (id: string) => void; compact?: boolean }) {
   const today = useToday();
   const toggle = useStore((s) => s.toggleTask);
   const project = useStore((s) => s.data.projects.find((p) => p.id === task.projectId));
-  const parent = useStore((s) => (task.parentId ? s.data.tasks.find((t) => t.id === task.parentId) : undefined));
-  const subDone = useStore((s) => s.data.tasks.filter((t) => t.parentId === task.id && t.status === 'done').length);
-  const subTotal = useStore((s) => s.data.tasks.filter((t) => t.parentId === task.id).length);
+  const scope = useStore((s) => (task.scopeId ? s.data.scopes.find((x) => x.id === task.scopeId) : undefined));
   const done = task.status === 'done';
   const tone = dueTone(task, today);
   const t = tone ? TONE[tone] : null;
@@ -184,26 +260,33 @@ export function TaskRow({ task, onEdit, compact }: { task: Task; onEdit: (id: st
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
             {task.dueDate && (
               <span className={`chip ${t?.chip ?? ''}`}>
-                {t ? `${t.icon} ` : '📅 '}{relativeDay(task.dueDate, today)}
+                {t ? <t.Icon /> : <CalendarIcon />}{relativeDay(task.dueDate, today)}
               </span>
             )}
-            {(task.status === 'doing' || task.status === 'blocked' || task.status === 'onhold') && <span className="chip">{STATUS_LABEL[task.status]}</span>}
-            {parent && <span className="chip" title={`Subtask of ${parent.title}`}>↳ {parent.title}</span>}
-            {subTotal > 0 && <span className="chip" title="Subtasks done">☑ {subDone}/{subTotal}</span>}
-            {task.priority !== 'medium' && <span className="chip">{PRIORITY_LABEL[task.priority]}</span>}
+            {task.status !== 'todo' && task.status !== 'done' && (
+              <span className="chip"><StatusIcon status={task.status} size={13} />{STATUS_NAME[task.status]}</span>
+            )}
+            {task.priority !== 'medium' && (
+              <span className="chip" title={`${PRIORITY_NAME[task.priority]} priority`}><PriorityIcon priority={task.priority} size={12} />{PRIORITY_NAME[task.priority]}</span>
+            )}
+            {scope && (
+              <span className="chip" style={{ borderColor: `${scope.color}99`, background: `${scope.color}1f` }} title={`Scope: ${scope.title}`}>
+                <span aria-hidden>{scope.icon}</span>{scope.title}
+              </span>
+            )}
             {project && <span className="chip">📘 {project.title}</span>}
           </div>
         )}
       </button>
-      {compact && task.priority === 'high' && !done && <span className="chip" title="High priority">▲▲▲</span>}
+      {compact && task.priority === 'high' && !done && <span title="High priority" className="mt-0.5"><PriorityIcon priority="high" size={15} /></span>}
     </li>
   );
 }
 
 /* ───────── Filtered list ───────── */
 
-export interface TaskFilters { q: string; status: 'all' | 'open' | TaskStatus; priority: 'all' | Priority; project: string; sort: 'due' | 'priority' | 'created' | 'title' }
-export const defaultFilters: TaskFilters = { q: '', status: 'open', priority: 'all', project: 'all', sort: 'due' };
+export interface TaskFilters { q: string; scope: string; status: 'all' | 'open' | TaskStatus; priority: 'all' | Priority; project: string; sort: 'due' | 'priority' | 'created' | 'title' }
+export const defaultFilters: TaskFilters = { q: '', scope: 'all', status: 'open', priority: 'all', project: 'all', sort: 'due' };
 
 export function applyFilters(tasks: Task[], f: TaskFilters): Task[] {
   const q = f.q.trim().toLowerCase();
@@ -211,6 +294,7 @@ export function applyFilters(tasks: Task[], f: TaskFilters): Task[] {
     tasks.filter((t) =>
       (!q || t.title.toLowerCase().includes(q) || t.notes.toLowerCase().includes(q)) &&
       (f.status === 'all' || (f.status === 'open' ? t.status !== 'done' : t.status === f.status)) &&
+      (f.scope === 'all' || t.scopeId === f.scope) &&
       (f.priority === 'all' || t.priority === f.priority) &&
       (f.project === 'all' || (f.project === 'none' ? !t.projectId : t.projectId === f.project)),
     ),
