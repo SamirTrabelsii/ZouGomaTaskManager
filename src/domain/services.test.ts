@@ -154,3 +154,10 @@ describe('story points', () => {
     expect(d.tasks.map((t) => t.size)).toEqual(['XXL', null, null]);
   });
 });
+
+describe('data version', () => {
+  it('upgrades v1 data and refuses data from a newer app', () => {
+    expect(normalize({ version: 1, tasks: [{ id: 'a', title: 'A' }] }).version).toBe(2);
+    expect(() => normalize({ version: 3, tasks: [] })).toThrow(/newer LifeOS/);
+  });
+});

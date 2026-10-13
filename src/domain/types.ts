@@ -160,7 +160,8 @@ export interface ExternalEvent {
   end: string;
 }
 
-export const DATA_VERSION = 1;
+/** 2: tasks gained scopes + sizes. Older app copies refuse v2 data instead of silently stripping the new fields on their next save. */
+export const DATA_VERSION = 2;
 
 export interface AppData {
   version: number;
