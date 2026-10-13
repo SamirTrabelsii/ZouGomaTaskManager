@@ -1,16 +1,46 @@
 import { useState } from 'react';
 import { useStore } from '../../state/store';
 import { useToday } from '../../state/hooks';
-import { formatTime, nowLocalInput, relativeDay } from '../../domain/dates';
+import { formatDay, formatTime, nowLocalInput, relativeDay } from '../../domain/dates';
+import { describeWhen } from '../../domain/external';
+import { useFeeds } from '../../state/feeds';
 import type { AgendaItem } from '../../domain/services';
 import { ConfirmButton, Dialog, Field } from './ui';
 
 export const KIND_ICON: Record<AgendaItem['kind'], string> = {
-  event: '●', deadline: '■', task: '☑', milestone: '◆', project: '📘', reminder: '🔔',
+  event: '●', deadline: '■', task: '☑', milestone: '◆', project: '📘', reminder: '🔔', external: '◉',
 };
 export const KIND_LABEL: Record<AgendaItem['kind'], string> = {
-  event: 'Event', deadline: 'Deadline', task: 'Task due', milestone: 'Milestone', project: 'Project deadline', reminder: 'Reminder',
+  event: 'Event', deadline: 'Deadline', task: 'Task due', milestone: 'Milestone', project: 'Project deadline', reminder: 'Reminder', external: 'Imported (read-only)',
 };
+
+/** The little marker in front of an agenda row: a kind icon, or the calendar's own colour for imported meetings. */
+export function KindMark({ item }: { item: Pick<AgendaItem, 'kind' | 'color'> }) {
+  if (item.kind === 'external') return <span aria-hidden className="mx-auto inline-block h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-black/10" style={{ background: item.color }} />;
+  return <span aria-hidden>{KIND_ICON[item.kind]}</span>;
+}
+
+/** Read-only view of a meeting imported from a calendar feed. There is nothing to edit or delete here by design. */
+export function ExternalEventDialog({ eventId, onClose }: { eventId: string; onClose: () => void }) {
+  const ev = useFeeds((s) => s.events.find((e) => e.id === eventId));
+  const feed = useFeeds((s) => s.feeds.find((f) => f.id === ev?.feedId));
+  if (!ev) return null;
+  return (
+    <Dialog title={ev.title} onClose={onClose}>
+      <div className="space-y-3 text-sm">
+        <p className="flex items-center gap-2 text-ink-500">
+          <span aria-hidden className="inline-block h-3 w-3 rounded-full ring-1 ring-black/10" style={{ background: feed?.color }} />
+          <span>{feed?.name ?? 'Imported calendar'} · read-only</span>
+        </p>
+        <p className="font-medium">{describeWhen(ev, (d) => formatDay(d, true), formatTime)}</p>
+        {ev.location && <p><span className="label">Where</span>{ev.location}</p>}
+        {ev.description && <p className="whitespace-pre-wrap break-words text-ink-600"><span className="label">Details</span>{ev.description}</p>}
+        <p className="text-xs text-ink-500">This meeting comes from your connected calendar. Change it there and it will update here within about 15 minutes.</p>
+        <div className="flex justify-end"><button className="btn btn-primary" onClick={onClose}>Close</button></div>
+      </div>
+    </Dialog>
+  );
+}
 
 export function EventDialog({ eventId, date, onClose }: { eventId?: string; date?: string; onClose: () => void }) {
   const events = useStore((s) => s.data.events);
@@ -93,9 +123,9 @@ export function Agenda({ items, onOpen, empty }: { items: AgendaItem[]; onOpen: 
             {list.map((i) => (
               <li key={i.key}>
                 <button onClick={() => onOpen(i)} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-cream-100">
-                  <span className="w-5 text-center" aria-hidden>{KIND_ICON[i.kind]}</span>
+                  <span className="w-5 text-center"><KindMark item={i} /></span>
                   <span className={`min-w-0 flex-1 truncate text-sm ${i.done ? 'text-ink-400 line-through' : ''}`}>{i.title}</span>
-                  <span className="shrink-0 text-xs text-ink-500">{i.time ? formatTime(i.time) : KIND_LABEL[i.kind]}</span>
+                  <span className="shrink-0 text-xs text-ink-500">{i.time ? formatTime(i.time) : i.kind === 'external' ? `All day · ${i.feedName}` : KIND_LABEL[i.kind]}</span>
                 </button>
               </li>
             ))}

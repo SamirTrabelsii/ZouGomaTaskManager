@@ -116,6 +116,33 @@ export interface Prefs {
   };
 }
 
+/** A read-only iCal subscription. Lives on the server, never in {@link AppData}. */
+export interface CalendarFeed {
+  id: string;
+  name: string;
+  color: string; // #rrggbb
+  host: string;
+  lastSyncAt: string | null;
+  lastError: string | null;
+  warnings: string[];
+  eventCount: number;
+}
+
+/**
+ * A meeting imported from a feed, as the server sends it. `start`/`end` are either a date ("2026-06-10", end exclusive),
+ * an instant ("…Z", shown in this device's time zone), or a floating wall-clock time ("2026-06-10T09:30:00").
+ */
+export interface ExternalEvent {
+  id: string;
+  feedId: string;
+  title: string;
+  location: string;
+  description: string;
+  allDay: boolean;
+  start: string;
+  end: string;
+}
+
 export const DATA_VERSION = 1;
 
 export interface AppData {

@@ -1,5 +1,6 @@
 import pg from 'pg';
 import { PUSH_SCHEMA } from './push';
+import { FEEDS_SCHEMA } from './feeds';
 
 const DEV_URL = 'postgres://lifeos:lifeos-dev-password@localhost:5433/lifeos';
 
@@ -44,4 +45,5 @@ CREATE INDEX IF NOT EXISTS document_backups_user_idx ON document_backups(user_id
 export async function migrate(pool: pg.Pool) {
   await pool.query(SCHEMA);
   await pool.query(PUSH_SCHEMA);
+  await pool.query(FEEDS_SCHEMA);
 }

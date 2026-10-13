@@ -29,6 +29,8 @@ async function api<T>(path: string, init: { method?: string; body?: unknown; tim
   return body as T;
 }
 
+import type { CalendarFeed, ExternalEvent } from '../domain/types';
+
 export interface Health { ok: true; hasUser: boolean; registrationOpen: boolean }
 export interface CloudBackup { id: string; reason: string; revision: number; savedAt: string }
 
@@ -49,5 +51,12 @@ export const cloud = {
   pushSubscribe: (subscription: unknown, tz: string) => api<{ ok: true }>('/push/subscribe', { method: 'POST', body: { subscription, tz } }),
   pushUnsubscribe: (endpoint: string) => api<{ ok: true }>('/push/unsubscribe', { method: 'POST', body: { endpoint } }),
   pushTest: () => api<{ delivered: number; devices: number }>('/push/test', { method: 'POST', body: {} }),
+  listFeeds: () => api<{ feeds: CalendarFeed[] }>('/feeds'),
+  feedEvents: () => api<{ events: ExternalEvent[] }>('/feeds/events'),
+  /** Fetches the link once right away, so a wrong link is reported immediately (allow for a slow calendar server). */
+  addFeed: (input: { name: string; color: string; url: string }) => api<{ feed: CalendarFeed }>('/feeds', { method: 'POST', body: input, timeoutMs: 40_000 }),
+  updateFeed: (id: string, patch: { name?: string; color?: string }) => api<{ feed: CalendarFeed }>(`/feeds/${encodeURIComponent(id)}`, { method: 'PATCH', body: patch }),
+  removeFeed: (id: string) => api<{ ok: true }>(`/feeds/${encodeURIComponent(id)}`, { method: 'DELETE', body: {} }),
+  refreshFeed: (id: string) => api<{ feed: CalendarFeed }>(`/feeds/${encodeURIComponent(id)}/refresh`, { method: 'POST', body: {}, timeoutMs: 40_000 }),
   getBackup: (id: string) => api<{ data: unknown }>(`/data/backups/${encodeURIComponent(id)}`),
 };

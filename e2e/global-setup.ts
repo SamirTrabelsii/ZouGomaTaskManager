@@ -8,7 +8,7 @@ export default async function globalSetup() {
   const pool = new pg.Pool({ connectionString: TEST_DATABASE_URL, max: 1 });
   try {
     await migrate(pool);
-    await pool.query('TRUNCATE users, sessions, documents, document_backups RESTART IDENTITY CASCADE');
+    await pool.query('TRUNCATE users, sessions, documents, document_backups, calendar_feeds, feed_events RESTART IDENTITY CASCADE');
   } catch (e) {
     throw new Error(`Cannot reach lifeos_test on localhost:5433 — run "npm run db:up" first. (${(e as Error).message})`);
   } finally {

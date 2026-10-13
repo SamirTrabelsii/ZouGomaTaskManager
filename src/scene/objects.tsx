@@ -4,7 +4,8 @@ import { useFrame } from '@react-three/fiber';
 import { RoundedBox } from '@react-three/drei';
 import { useStore } from '../state/store';
 import { useToday } from '../state/hooks';
-import { agendaItems, dailyProgress, goalProgress, plantGrowth, projectProgress, isOpen } from '../domain/services';
+import { useAgenda } from '../state/feeds';
+import { dailyProgress, goalProgress, plantGrowth, projectProgress, isOpen } from '../domain/services';
 import { drawCalendarTexture, drawMonitorTexture } from './textures';
 import { Interactive } from './Interactive';
 
@@ -353,13 +354,12 @@ export function Plants({ reduceMotion }: { reduceMotion: boolean }) {
 /* ───────────────────────── Wall calendar ───────────────────────── */
 
 export function WallCalendar({ reduceMotion }: { reduceMotion: boolean }) {
-  const data = useStore((s) => s.data);
   const today = useToday();
   const texRef = useRef<THREE.CanvasTexture | null>(null);
   const matRef = useRef<THREE.MeshBasicMaterial>(null);
-  const items = useMemo(() => agendaItems(data), [data]);
+  const items = useAgenda();
   useEffect(() => {
-    texRef.current = drawCalendarTexture(texRef.current, data, today);
+    texRef.current = drawCalendarTexture(texRef.current, items, today);
     if (matRef.current) { matRef.current.map = texRef.current; matRef.current.needsUpdate = true; }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, today]);
