@@ -12,7 +12,8 @@ export default defineConfig({
   testDir: './e2e',
   testMatch: '**/*.spec.ts',
   globalSetup: './e2e/global-setup.ts',
-  timeout: 60_000, // software WebGL makes the 3D scene slow to re-render
+  expect: { timeout: 15_000 }, // the same slowness applies to what a page needs to show up (default is 5 s)
+  timeout: 120_000, // software WebGL makes the 3D scene slow to re-render (35-45 s on an idle machine for the slowest test)
   workers: 1, // one shared test database
   fullyParallel: false,
   retries: process.env.CI ? 1 : 0,
