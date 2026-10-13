@@ -284,7 +284,7 @@ export const useStore = create<Store>((set, get) => {
     /* ── tasks ── */
     addTask(input) {
       const t: Task = {
-        id: uid(), notes: '', status: 'todo', priority: 'medium', dueDate: null,
+        id: uid(), notes: '', status: 'todo', priority: 'medium', size: null, dueDate: null,
         projectId: null, milestoneId: null, goalId: null, scopeId: null, createdAt: nowIso(), completedAt: null,
         ...input, title: input.title.trim(),
       };

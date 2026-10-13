@@ -1,8 +1,11 @@
 import type { ReactNode } from 'react';
-import type { Priority, Scope, TaskStatus } from '../../domain/types';
+import type { Priority, Scope, TaskSize, TaskStatus } from '../../domain/types';
+import { SIZE_POINTS } from '../../domain/services';
 
 /** Plain-text names (for <option>s and aria labels). */
 export const STATUS_NAME: Record<TaskStatus, string> = { todo: 'To do', doing: 'In progress', blocked: 'Blocked', onhold: 'On hold', done: 'Done' };
+/** Dropdown / chip text for a size, e.g. "M · 3 pts". */
+export const sizeLabel = (s: TaskSize) => `${s} · ${SIZE_POINTS[s]} pt${SIZE_POINTS[s] > 1 ? 's' : ''}`;
 export const PRIORITY_NAME: Record<Priority, string> = { high: 'High', medium: 'Medium', low: 'Low' };
 
 /** One colour per status, used by the icon, the board column header and the chips. */
@@ -60,6 +63,15 @@ export function PriorityIcon({ priority, size = 14 }: { priority: Priority; size
 
 export function PriorityLabel({ priority }: { priority: Priority }) {
   return <span className="inline-flex items-center gap-1.5"><PriorityIcon priority={priority} />{PRIORITY_NAME[priority]}</span>;
+}
+
+/** A small tag showing a task's size and its points. */
+export function SizeChip({ size }: { size: TaskSize }) {
+  return (
+    <span className="chip font-semibold" title={`Size ${size} – ${SIZE_POINTS[size]} story points`}>
+      <span className="rounded bg-sky-500/20 px-1 text-[10px] leading-4 text-sky-500">{size}</span>{SIZE_POINTS[size]}
+    </span>
+  );
 }
 
 export function CalendarIcon({ size = 12 }: { size?: number }) {

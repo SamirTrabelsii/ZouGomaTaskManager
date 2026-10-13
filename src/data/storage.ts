@@ -23,6 +23,7 @@ export function emptyData(): AppData {
 
 const arr = (v: unknown): any[] => (Array.isArray(v) ? v.filter((x) => x && typeof x === 'object' && typeof (x as any).id === 'string') : []);
 
+const TASK_SIZES = new Set(['XS', 'S', 'M', 'L', 'XL', 'XXL', 'HUGE']);
 const TASK_STATUSES = new Set(['todo', 'doing', 'blocked', 'onhold', 'done']);
 
 /** Older data has no `scopeId`; a task pointing at a scope that no longer exists simply becomes unscoped. */
@@ -31,6 +32,7 @@ function normalizeTasks(tasks: any[], scopes: any[]): any[] {
   return tasks.map(({ parentId: _legacy, ...t }) => ({
     ...t,
     status: TASK_STATUSES.has(t.status) ? t.status : 'todo',
+    size: TASK_SIZES.has(t.size) ? t.size : null,
     scopeId: typeof t.scopeId === 'string' && ids.has(t.scopeId) ? t.scopeId : null,
   }));
 }
