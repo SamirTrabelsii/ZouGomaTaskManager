@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react';
-import type { Priority, Scope, Task, TaskStatus } from '../../domain/types';
+import type { Priority, Scope, Task, TaskSize, TaskStatus } from '../../domain/types';
 import { useStore } from '../../state/store';
 import { useToday } from '../../state/hooks';
 import { relativeDay } from '../../domain/dates';
-import { dueTone, sortTasks, type DueTone } from '../../domain/services';
+import { dueTone, sortTasks, TASK_SIZES, type DueTone } from '../../domain/services';
 import { resolveTemplates } from '../../domain/templates';
 import { ConfirmButton, Dialog, EmptyState, Field } from './ui';
 import {
-  AlertIcon, CalendarIcon, ClockIcon, PencilIcon, PlusIcon, PRIORITY_NAME, PriorityIcon, SCOPE_COLORS, SCOPE_ICONS, ScopeBadge, STATUS_NAME, StatusIcon,
+  AlertIcon, CalendarIcon, ClockIcon, PencilIcon, PlusIcon, PRIORITY_NAME, PriorityIcon, SCOPE_COLORS, SCOPE_ICONS, ScopeBadge, SizeChip, sizeLabel, STATUS_NAME, StatusIcon,
 } from './icons';
 
 /* ───────── Edit / create dialog ───────── */
@@ -60,12 +60,20 @@ export function TaskDialog({ taskId, defaults, onClose }: { taskId?: string; def
               {Object.entries(PRIORITY_NAME).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
           </Field>
+          <Field label="Size (story points)">
+            <select className="input" value={f.size ?? ''} onChange={(e) => set('size', (e.target.value || null) as TaskSize | null)}>
+              <option value="">Not sized</option>
+              {TASK_SIZES.map((s) => <option key={s} value={s}>{sizeLabel(s)}</option>)}
+            </select>
+          </Field>
           <Field label="Due date">
             <input type="date" className="input" value={f.dueDate ?? ''} onChange={(e) => set('dueDate', e.target.value || null)} />
           </Field>
-          <Field label="Remind me at">
-            <input type="datetime-local" className="input" value={remindAt} onChange={(e) => setRemindAt(e.target.value)} />
-          </Field>
+          <div className="col-span-2">
+            <Field label="Remind me at">
+              <input type="datetime-local" className="input" value={remindAt} onChange={(e) => setRemindAt(e.target.value)} />
+            </Field>
+          </div>
         </div>
         <ScopeField value={f.scopeId ?? null} onChange={(id) => set('scopeId', id)} />
         {(showProject || showGoal) && (
@@ -269,6 +277,7 @@ export function TaskRow({ task, onEdit, compact }: { task: Task; onEdit: (id: st
             {task.priority !== 'medium' && (
               <span className="chip" title={`${PRIORITY_NAME[task.priority]} priority`}><PriorityIcon priority={task.priority} size={12} />{PRIORITY_NAME[task.priority]}</span>
             )}
+            {task.size && <SizeChip size={task.size} />}
             {scope && (
               <span className="chip" style={{ borderColor: `${scope.color}99`, background: `${scope.color}1f` }} title={`Scope: ${scope.title}`}>
                 <span aria-hidden>{scope.icon}</span>{scope.title}

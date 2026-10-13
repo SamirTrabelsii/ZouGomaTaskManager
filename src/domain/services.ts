@@ -1,9 +1,23 @@
-import type { AppData, CalEvent, Goal, Habit, HabitLog, Milestone, Project, Task } from './types';
+import type { AppData, CalEvent, Goal, Habit, HabitLog, Milestone, Project, Task, TaskSize } from './types';
 import { addDays, dateTimeOf, daysRange, diffDays, isoToDay, startOfWeek } from './dates';
 
 /* ───────── Tasks ───────── */
 
 export const isOpen = (t: Task) => t.status !== 'done';
+
+/** Story points behind each task size. */
+export const SIZE_POINTS: Record<TaskSize, number> = { XS: 1, S: 2, M: 3, L: 5, XL: 8, XXL: 13, HUGE: 21 };
+export const TASK_SIZES = Object.keys(SIZE_POINTS) as TaskSize[];
+/** Points a task is worth; unsized tasks count 0. */
+export const taskPoints = (t: Pick<Task, 'size'>) => (t.size ? SIZE_POINTS[t.size] ?? 0 : 0);
+export const sumPoints = (tasks: Pick<Task, 'size'>[]) => tasks.reduce((n, t) => n + taskPoints(t), 0);
+/** Points collected (tasks finished) on each of the last `n` days ending at `end`. */
+export function pointsByDay(tasks: Task[], end: string, n: number) {
+  return daysRange(end, n).map((day) => ({
+    day,
+    points: sumPoints(tasks.filter((t) => t.completedAt && isoToDay(t.completedAt) === day)),
+  }));
+}
 const prioRank = { high: 0, medium: 1, low: 2 } as const;
 
 export function sortTasks(tasks: Task[], by: 'due' | 'priority' | 'created' | 'title' = 'due'): Task[] {

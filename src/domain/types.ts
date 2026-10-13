@@ -1,6 +1,8 @@
 export type ID = string;
 export type Priority = 'low' | 'medium' | 'high';
 export type TaskStatus = 'todo' | 'doing' | 'blocked' | 'onhold' | 'done';
+/** T-shirt size of a task; each size is worth a fixed number of story points (see SIZE_POINTS). */
+export type TaskSize = 'XS' | 'S' | 'M' | 'L' | 'XL' | 'XXL' | 'HUGE';
 export type ProjectStatus = 'active' | 'paused' | 'done';
 export type NoteKind = 'note' | 'idea' | 'journal' | 'reflection' | 'review' | 'lesson';
 export type SceneObjectId = 'desk' | 'bookshelf' | 'plants' | 'calendar' | 'notebook';
@@ -12,6 +14,8 @@ export interface Task {
   notes: string;
   status: TaskStatus;
   priority: Priority;
+  /** Effort estimate; null = not sized yet (worth 0 points). */
+  size: TaskSize | null;
   dueDate: string | null; // YYYY-MM-DD
   projectId: ID | null;
   milestoneId: ID | null;
