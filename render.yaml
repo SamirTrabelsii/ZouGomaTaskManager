@@ -1,0 +1,24 @@
+# Render blueprint: the LifeOS app as one Docker web service. The database lives on Neon (see DEPLOY.md).
+services:
+  - type: web
+    name: lifeos
+    runtime: docker
+    plan: free
+    region: frankfurt          # keep identical to the Neon region
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL      # Neon pooled connection string, ending in ?sslmode=require
+        sync: false
+      - key: COOKIE_SECURE
+        value: "1"
+      - key: TRUST_PROXY
+        value: "1"
+      - key: ALLOW_REGISTRATION
+        value: "0"
+      - key: VAPID_SUBJECT
+        value: mailto:you@example.com
+      - key: VAPID_PUBLIC_KEY  # optional: omit both to let the app generate and store keys in the DB
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false

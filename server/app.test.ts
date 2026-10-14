@@ -49,6 +49,7 @@ describe.skipIf(!reachable)('LifeOS API', () => {
   });
 
   it('reports that registration is open on a fresh server', async () => {
+    expect((await fetch(`${base}/healthz`)).status).toBe(200);
     expect((await call('GET', '/api/health')).body).toMatchObject({ ok: true, hasUser: false, registrationOpen: true });
   });
 

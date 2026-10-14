@@ -26,6 +26,8 @@ export interface AppOptions {
   push?: { publicKey: string; send: Sender };
   /** How calendar feeds are downloaded. Defaults to the SSRF-safe fetcher; tests inject their own. */
   fetchFeed?: FeedFetcher;
+  /** Number of reverse-proxy hops to trust for req.ip (rate limiting). Set to 1 behind Render/Fly/etc. */
+  trustProxy?: number;
 }
 
 /** Recovery codes: 100 random bits as 5 groups of 4 chars (no 0/O/1/I/L), e.g. K7QM-2XWD-… . Shown once; only a SHA-256 is stored. */
@@ -72,6 +74,9 @@ export function createApp(opts: AppOptions) {
   const { pool } = opts;
   const app = express();
   app.disable('x-powered-by');
+  if (opts.trustProxy) app.set('trust proxy', opts.trustProxy);
+  // Liveness probe for uptime pingers: no database access, so it keeps the host awake without waking a scale-to-zero DB.
+  app.get('/healthz', (_req, res) => { res.type('text/plain').send('ok'); });
   app.use(express.json({ limit: '8mb' }));
 
   // CSRF defence in depth: cookies are SameSite=Lax; additionally require JSON on writes and a same-origin Origin header.
