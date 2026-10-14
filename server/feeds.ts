@@ -47,7 +47,8 @@ CREATE TABLE IF NOT EXISTS feed_reminders_sent (
 /** Choices offered for "remind me before a meeting", in minutes. */
 export const REMIND_CHOICES = [0, 5, 10, 15, 30, 60] as const;
 
-export const SYNC_EVERY_MS = 15 * 60_000;
+/** How often each calendar is re-downloaded. Hosted setups with a scale-to-zero database raise this (FEED_SYNC_MINUTES). */
+export const SYNC_EVERY_MS = (Number(process.env.FEED_SYNC_MINUTES) > 0 ? Number(process.env.FEED_SYNC_MINUTES) : 15) * 60_000;
 export const MAX_FEEDS = 10;
 const MANUAL_REFRESH_MIN_MS = 30_000;
 const PAST_DAYS = 60;
@@ -118,16 +119,37 @@ export async function runDueFeeds(pool: pg.Pool, fetchText: FeedFetcher, now = D
   return n;
 }
 
-export function startFeedScheduler(pool: pg.Pool, fetchText: FeedFetcher = safeFetchText, checkEveryMs = 60_000) {
-  let running = false;
-  const tick = async () => {
-    if (running) return;
-    running = true;
-    try { await runDueFeeds(pool, fetchText); } catch (e) { console.error('feed scheduler:', (e as Error).message); } finally { running = false; }
-  };
-  const id = setInterval(tick, checkEveryMs);
-  void tick();
-  return () => clearInterval(id);
+/** When the next feed sync is due (an unsynced feed is due now); null when there are no feeds. */
+export async function nextFeedSyncAt(pool: pg.Pool, everyMs = SYNC_EVERY_MS): Promise<number | null> {
+  const { rows } = await pool.query<{ n: string; oldest: Date | null }>('SELECT count(*) AS n, min(coalesce(last_attempt_at, to_timestamp(0))) AS oldest FROM calendar_feeds');
+  if (!Number(rows[0].n) || !rows[0].oldest) return null;
+  return rows[0].oldest.getTime() + everyMs;
+}
+
+/** The earliest moment after `now` at which a meeting reminder becomes due (meeting start minus lead), looking `horizonMs` ahead. */
+export async function nextFeedReminderAt(pool: pg.Pool, now = Date.now(), horizonMs = 24 * 3600_000): Promise<number | null> {
+  const { rows: feeds } = await pool.query<{ id: string; user_id: string; remind_before: number }>(
+    'SELECT id, user_id, remind_before FROM calendar_feeds WHERE remind_before IS NOT NULL');
+  if (!feeds.length) return null;
+  const { rows: subs } = await pool.query<PushSubscriptionRow>(
+    'SELECT id, user_id, endpoint, p256dh, auth, tz FROM push_subscriptions WHERE user_id = ANY($1::bigint[])', [[...new Set(feeds.map((f) => f.user_id))]]);
+  let next: number | null = null;
+  for (const feed of feeds) {
+    const userSubs = subs.filter((s) => String(s.user_id) === String(feed.user_id));
+    if (!userSubs.length) continue;
+    const tz = userSubs[0].tz;
+    const lead = feed.remind_before * 60_000;
+    const lo = new Date(now - 86400_000).toISOString().slice(0, 19), hi = new Date(now + horizonMs + lead + 86400_000).toISOString().slice(0, 19);
+    const { rows } = await pool.query<{ starts: string }>(
+      'SELECT starts FROM feed_events WHERE feed_id=$1 AND NOT all_day AND substr(starts,1,19) BETWEEN $2 AND $3', [feed.id, lo, hi]);
+    for (const e of rows) {
+      const start = e.starts.endsWith('Z') ? Date.parse(e.starts) : zonedToInstant(e.starts, tz);
+      if (start === null || Number.isNaN(start)) continue;
+      const due = start - lead;
+      if (due > now && (next === null || due < next)) next = due;
+    }
+  }
+  return next;
 }
 
 /**

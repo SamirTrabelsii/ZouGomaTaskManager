@@ -1,7 +1,6 @@
 import webpush from 'web-push';
 import type pg from 'pg';
 import { zonedToInstant } from './time';
-import { runDueFeedReminders } from './feeds';
 
 /** Reminders missed by more than this are not pushed (they show in the app instead). Mirrors the in-app rule. */
 export const MAX_LATE_MS = 6 * 3600_000;
@@ -120,15 +119,21 @@ export async function runDueReminders(pool: pg.Pool, send: Sender, now = Date.no
   return { sent };
 }
 
-export function startScheduler(pool: pg.Pool, send: Sender, everyMs = 30_000) {
-  let running = false;
-  const tick = async () => {
-    if (running) return;
-    running = true;
-    try { await runDueReminders(pool, send); } catch (e) { console.error('push scheduler:', e); }
-    try { await runDueFeedReminders(pool, send); } catch (e) { console.error('feed reminders:', (e as Error).message); } finally { running = false; }
-  };
-  const id = setInterval(tick, everyMs);
-  void tick();
-  return () => clearInterval(id);
+/** The earliest moment after `now` at which a not-yet-handled reminder becomes due; null when there is none. */
+export async function nextReminderAt(pool: pg.Pool, now = Date.now()): Promise<number | null> {
+  const { rows: subs } = await pool.query<PushSubscriptionRow>('SELECT id, user_id, endpoint, p256dh, auth, tz FROM push_subscriptions');
+  if (!subs.length) return null;
+  const tzByUser = new Map<number, string>();
+  for (const s of subs) if (!tzByUser.has(Number(s.user_id))) tzByUser.set(Number(s.user_id), s.tz); // same pick as runDueReminders
+  let next: number | null = null;
+  for (const [userId, tz] of tzByUser) {
+    const doc = await pool.query('SELECT data FROM documents WHERE user_id=$1', [userId]);
+    const reminders: StoredReminder[] = Array.isArray(doc.rows[0]?.data?.reminders) ? doc.rows[0].data.reminders : [];
+    for (const r of reminders) {
+      if (typeof r.id !== 'string' || typeof r.at !== 'string' || r.deliveredAt || r.ackedAt) continue;
+      const due = zonedToInstant(r.at, tz);
+      if (due !== null && due > now && (next === null || due < next)) next = due;
+    }
+  }
+  return next;
 }
