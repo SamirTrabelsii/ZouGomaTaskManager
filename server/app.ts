@@ -28,6 +28,8 @@ export interface AppOptions {
   fetchFeed?: FeedFetcher;
   /** Number of reverse-proxy hops to trust for req.ip (rate limiting). Set to 1 behind Render/Fly/etc. */
   trustProxy?: number;
+  /** Called after any successful write to data, push subscriptions or feeds, so a sleeping scheduler can re-plan. */
+  onChange?: () => void;
 }
 
 /** Recovery codes: 100 random bits as 5 groups of 4 chars (no 0/O/1/I/L), e.g. K7QM-2XWD-… . Shown once; only a SHA-256 is stored. */
@@ -92,6 +94,14 @@ export function createApp(opts: AppOptions) {
     }
     next();
   });
+
+  if (opts.onChange) {
+    const notify = opts.onChange;
+    app.use(['/api/data', '/api/push', '/api/feeds'], (req, res, next) => {
+      if (req.method !== 'GET' && req.method !== 'HEAD') res.on('finish', () => { if (res.statusCode < 400) notify(); });
+      next();
+    });
+  }
 
   const loginLimiter = makeLimiter(10, 10 * 60_000);
   const changeLimiter = makeLimiter(5, 10 * 60_000);       // per signed-in user: password change / new recovery code
