@@ -7,7 +7,13 @@ const DEV_URL = 'postgres://lifeos:lifeos-dev-password@localhost:5433/lifeos';
 /** In development the docker-compose database is the default; production must set DATABASE_URL. */
 export function createPool(url = process.env.DATABASE_URL ?? (process.env.NODE_ENV === 'production' ? undefined : DEV_URL)) {
   if (!url) throw new Error('DATABASE_URL is not set');
-  return new pg.Pool({ connectionString: url, max: 5 });
+  return new pg.Pool({
+    connectionString: url,
+    max: 5,
+    // a scale-to-zero host (Neon) needs a moment to wake on the first query
+    connectionTimeoutMillis: 30_000,
+    keepAlive: true,
+  });
 }
 
 /** Idempotent schema. One row of app data per user, plus rotating server-side backups. */

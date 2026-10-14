@@ -17,6 +17,7 @@ const app = createApp({
   pool,
   staticDir: fs.existsSync(dist) && process.env.SERVE_STATIC !== '0' ? dist : undefined,
   secureCookies: process.env.COOKIE_SECURE === '1',
+  trustProxy: Number(process.env.TRUST_PROXY ?? 0),
   allowRegistration: process.env.ALLOW_REGISTRATION === '1',
   push: { publicKey: vapid.publicKey, send },
 });
