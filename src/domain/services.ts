@@ -44,7 +44,8 @@ export function sortTasks(tasks: Task[], by: 'due' | 'priority' | 'created' | 't
       case 'title':
         return a.title.localeCompare(b.title);
       default:
-        return (a.dueDate ?? '9999').localeCompare(b.dueDate ?? '9999') || prioRank[a.priority] - prioRank[b.priority];
+        // Closest due date first; tasks without one follow, oldest created first.
+        return (a.dueDate ?? '9999').localeCompare(b.dueDate ?? '9999') || prioRank[a.priority] - prioRank[b.priority] || (a.dueDate ? 0 : a.createdAt.localeCompare(b.createdAt));
     }
   });
   return arr;
