@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../../state/store';
 import { useToday } from '../../state/hooks';
-import { goalProgress, projectProgress, sortTasks } from '../../domain/services';
+import { goalProgress, projectProgress, sortMilestones, sortTasks } from '../../domain/services';
 import { relativeDay } from '../../domain/dates';
 import type { Goal, Project, ProjectStatus } from '../../domain/types';
 import { resolveTemplates } from '../../domain/templates';
@@ -132,7 +132,7 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const [msDue, setMsDue] = useState('');
   const p = data.projects.find((x) => x.id === id)!;
   const pr = projectProgress(p, data.tasks, data.milestones);
-  const milestones = data.milestones.filter((m) => m.projectId === id);
+  const milestones = sortMilestones(data.milestones.filter((m) => m.projectId === id));
   const tasks = sortTasks(data.tasks.filter((t) => t.projectId === id));
   return (
     <PanelShell title={p.title} icon="📘" subtitle={`${STATUS[p.status]}${p.deadline ? ` · due ${relativeDay(p.deadline, today)}` : ''}`}
