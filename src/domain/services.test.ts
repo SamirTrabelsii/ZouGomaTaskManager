@@ -189,6 +189,15 @@ describe('parked and blocked tasks', () => {
     ];
     expect(readyToResume(ts, '2026-03-10').map((t) => t.id).sort()).toEqual(['due', 'past']);
   });
+  it('sorts by due date, then undated tasks by creation date (oldest first)', () => {
+    const ts = [
+      task({ id: 'new-undated', createdAt: '2026-03-05T10:00:00' }),
+      task({ id: 'dated', dueDate: '2026-03-20' }),
+      task({ id: 'old-undated', createdAt: '2026-03-01T10:00:00' }),
+      task({ id: 'soon', dueDate: '2026-03-12' }),
+    ];
+    expect(sortTasks(ts, 'due').map((t) => t.id)).toEqual(['soon', 'dated', 'old-undated', 'new-undated']);
+  });
   it('sorts by size, largest first, unsized last', () => {
     const ts = [task({ id: 'n' }), task({ id: 's', size: 'S' }), task({ id: 'x', size: 'XL' })];
     expect(sortTasks(ts, 'size').map((t) => t.id)).toEqual(['x', 's', 'n']);
