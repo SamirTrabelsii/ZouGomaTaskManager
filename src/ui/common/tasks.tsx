@@ -222,11 +222,28 @@ function ScopeField({ value, onChange }: { value: string | null; onChange: (id: 
 }
 
 /** Filter chips: all tasks or one scope. Also where scopes are created and edited. */
-export function ScopeBar({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+export function ScopeBar({ value, onChange, compact = false }: { value: string; onChange: (v: string) => void; compact?: boolean }) {
   const scopes = useStore((s) => s.data.scopes);
   const tasks = useStore((s) => s.data.tasks);
   const [dlg, setDlg] = useState<{ id?: string } | null>(null);
   const open = (id: string) => tasks.filter((t) => t.scopeId === id && t.status !== 'done').length;
+  const dialog = dlg && <ScopeDialog scopeId={dlg.id} onClose={() => { if (dlg.id && !useStore.getState().data.scopes.some((s) => s.id === dlg.id)) onChange('all'); setDlg(null); }} onCreated={(s) => onChange(s.id)} />;
+  if (compact) {
+    // One row however many scopes exist: a select instead of a wrapping chip per scope.
+    return (
+      <div className="flex items-center gap-1.5" role="group" aria-label="Scope">
+        <select className="input min-w-0 flex-1 py-1 text-xs" aria-label="Filter by scope" value={scopes.some((s) => s.id === value) ? value : 'all'} onChange={(e) => onChange(e.target.value)}>
+          <option value="all">All scopes</option>
+          {scopes.map((s) => <option key={s.id} value={s.id}>{s.icon} {s.title} ({open(s.id)})</option>)}
+        </select>
+        {scopes.some((s) => s.id === value) && (
+          <button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => setDlg({ id: value })} aria-label={`Edit scope ${scopes.find((s) => s.id === value)?.title}`}><PencilIcon /></button>
+        )}
+        <button className="btn px-2 py-1 text-xs" onClick={() => setDlg({})} aria-label="New scope" title="New scope"><PlusIcon /></button>
+        {dialog}
+      </div>
+    );
+  }
   const chip = (on: boolean) =>
     `inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition ${on ? 'border-moss-500 bg-moss-400/15 text-ink-900' : 'border-cream-300 text-ink-500 hover:bg-cream-200 hover:text-ink-900'}`;
   const current = scopes.find((s) => s.id === value);
@@ -245,7 +262,7 @@ export function ScopeBar({ value, onChange }: { value: string; onChange: (v: str
       {current && (
         <button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => setDlg({ id: current.id })} aria-label={`Edit scope ${current.title}`}><PencilIcon /></button>
       )}
-      {dlg && <ScopeDialog scopeId={dlg.id} onClose={() => { if (dlg.id && !useStore.getState().data.scopes.some((s) => s.id === dlg.id)) onChange('all'); setDlg(null); }} onCreated={(s) => onChange(s.id)} />}
+      {dialog}
     </div>
   );
 }
