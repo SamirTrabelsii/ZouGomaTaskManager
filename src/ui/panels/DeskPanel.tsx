@@ -96,7 +96,7 @@ export function DeskPanel() {
         title="Tasks"
         right={<button className="text-xs text-sky-500 underline" onClick={() => setView('tasks')}>Open board &amp; list →</button>}
       >
-        <div className="mb-2"><ScopeBar value={scope} onChange={setScope} /></div>
+        <div className="mb-2"><ScopeBar compact value={scope} onChange={setScope} /></div>
         <Tabs
           value={tab} onChange={setTab}
           tabs={[
