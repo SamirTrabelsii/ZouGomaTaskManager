@@ -50,7 +50,12 @@ export function sortTasks(tasks: Task[], by: 'due' | 'priority' | 'created' | 't
   return arr;
 }
 
-export const overdueTasks = (tasks: Task[], today: string) =>
+/** Milestones by due date, closest first; undated ones go last in the order they were added. */
+export function sortMilestones(milestones: Milestone[]): Milestone[] {
+  return [...milestones].sort((a, b) => (a.dueDate ?? '9999').localeCompare(b.dueDate ?? '9999'));
+}
+
+export const overdueTasks =(tasks: Task[], today: string) =>
   tasks.filter((t) => isOpen(t) && t.dueDate && t.dueDate < today);
 export const todayTasks = (tasks: Task[], today: string) =>
   tasks.filter((t) => isOpen(t) && t.dueDate === today);

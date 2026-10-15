@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { consistency, dailyProgress, isActive, pointsBetween, readyToResume, sortTasks, pointsByDay, SIZE_POINTS, sumPoints, taskPoints, dueTone, goalProgress, plantGrowth, projectProgress, streaks, weeklySummary } from './services';
+import { consistency, dailyProgress, isActive, pointsBetween, readyToResume, sortTasks, pointsByDay, SIZE_POINTS, sumPoints, taskPoints, dueTone, goalProgress, plantGrowth, projectProgress, sortMilestones, streaks, weeklySummary } from './services';
 import { emptyData, normalize } from '../data/storage';
 import type { Habit, HabitLog, Task } from './types';
 
@@ -192,6 +192,11 @@ describe('parked and blocked tasks', () => {
   it('sorts by size, largest first, unsized last', () => {
     const ts = [task({ id: 'n' }), task({ id: 's', size: 'S' }), task({ id: 'x', size: 'XL' })];
     expect(sortTasks(ts, 'size').map((t) => t.id)).toEqual(['x', 's', 'n']);
+  });
+  it('sorts milestones by due date, undated last in insertion order', () => {
+    const m = (id: string, dueDate: string | null) => ({ id, projectId: 'p', title: id, dueDate, done: false, completedAt: null });
+    const ms = [m('next-month', '2026-04-10'), m('none-a', null), m('next-week', '2026-03-17'), m('none-b', null)];
+    expect(sortMilestones(ms).map((x) => x.id)).toEqual(['next-week', 'next-month', 'none-a', 'none-b']);
   });
   it('keeps the blocked note and resume date only for their own status when loading', () => {
     const d = normalize({
