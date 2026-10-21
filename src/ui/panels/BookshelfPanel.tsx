@@ -6,7 +6,7 @@ import { formatDay, relativeDay } from '../../domain/dates';
 import type { Goal, GoalTier, Project, ProjectStatus } from '../../domain/types';
 import {
   economyStart, formatBerries, goalKey, goalReward, GOAL_TIER_IDS, GOAL_TIERS, MILESTONE_REWARD, paidAmount, projectKey,
-  projectReward,
+  projectReward, PROJECTS_PER_WEEK,
 } from '../../domain/economy';
 import { resolveTemplates } from '../../domain/templates';
 import { ConfirmButton, Dialog, EmptyState, Field, ProgressBar, Segmented } from '../common/ui';
@@ -23,14 +23,17 @@ function RewardLine({ children }: { children: ReactNode }) {
 
 function ProjectReward({ id }: { id: string }) {
   const data = useStore((s) => s.data);
+  const today = useToday();
   const paid = paidAmount(data.ledger, projectKey(id));
   if (paid != null) return <RewardLine>Earned {formatBerries(paid)}</RewardLine>;
-  const r = projectReward({ id }, data.tasks);
+  const r = projectReward({ id }, data.tasks, data.ledger, today);
   return (
     <RewardLine>
       {r.amount
         ? <>Worth {formatBerries(r.amount)} when complete</>
-        : <>Finish one of its tasks to earn Berries when complete</>}
+        : r.capped
+          ? <>This week's {PROJECTS_PER_WEEK} project rewards are used; it pays from Monday</>
+          : <>Finish one of its tasks to earn Berries when complete</>}
     </RewardLine>
   );
 }

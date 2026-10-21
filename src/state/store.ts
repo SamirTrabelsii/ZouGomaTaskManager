@@ -11,7 +11,7 @@ import { Syncer, initialCloud, type CloudState, type StartResult } from '../data
 import { cloud as cloudApi, ApiError, type CloudBackup } from '../data/cloud';
 import {
   bountyEntry, economyStart, formatBerries, goalEntry, goalReward, milestoneEntry, milestoneReward, pendingBounties,
-  projectEntry, projectReward, welcomeEntry, WELCOME_GIFT,
+  projectEntry, projectReward, PROJECTS_PER_WEEK, welcomeEntry, WELCOME_GIFT,
 } from '../domain/economy';
 import { openSealed, openSealedMany, purchase, sellCards, type OpenedPack } from '../domain/shop';
 
@@ -424,8 +424,9 @@ export const useStore = create<Store>((set, get) => {
       if (before && patch.status === 'done' && before.status !== 'done') {
         pulse('bookshelf', true);
         const project = { ...before, ...patch };
-        const r = projectReward(project, get().data.tasks);
+        const r = projectReward(project, get().data.tasks, get().data.ledger, todayStr());
         if (earn(projectEntry(uid(), nowIso(), project, r))) toast(`Project complete! +${formatBerries(r.amount)}`);
+        else if (r.capped) toast(`Project complete. This week's ${PROJECTS_PER_WEEK} project rewards are used: finish it again from Monday to earn Berries.`, 'info');
         else if (!r.amount && economyStart(get().data.ledger)) toast('Project complete. Projects with a finished task earn Berries.');
         else toast('Project complete — nicely done.');
       } else pulse('bookshelf');
@@ -455,7 +456,7 @@ export const useStore = create<Store>((set, get) => {
       commit((d) => ({ ...d, milestones: d.milestones.map((x) => (x.id === id ? { ...x, done, completedAt: done ? nowIso() : null } : x)) }));
       pulse('bookshelf', done);
       if (!done) return;
-      const amount = milestoneReward(m, get().data.tasks);
+      const amount = milestoneReward(m, get().data.tasks, get().data.ledger, todayStr());
       toast(earn(milestoneEntry(uid(), nowIso(), m, amount)) ? `Milestone reached: ${m.title} · +${formatBerries(amount)}` : `Milestone reached: ${m.title}`);
     },
     deleteMilestone(id) {

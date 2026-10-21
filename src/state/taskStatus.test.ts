@@ -81,6 +81,18 @@ describe('completion rewards', () => {
     expect(ledger().map((e) => e.amount)).toEqual([200]);
   });
 
+  it('only 3 projects pay per week, and the toast says why', () => {
+    open();
+    const { addProject, addTask, updateProject } = useStore.getState();
+    for (const title of ['A', 'B', 'C', 'D']) {
+      const p = addProject({ title });
+      addTask({ title: 'x', projectId: p.id, size: 'XS', status: 'done' });
+      updateProject(p.id, { status: 'done' });
+    }
+    expect(ledger().map((e) => e.amount)).toEqual([200, 200, 200]);
+    expect(useStore.getState().toasts.at(-1)?.text).toContain('rewards are used');
+  });
+
   it('a milestone with finished work pays when ticked', () => {
     open();
     const { addProject, addMilestone, addTask, toggleMilestone } = useStore.getState();

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   balance, bountyEntry, chestCoins, currentWeek, posterBounty, economyStart, goalReward, lifetimeEarned, milestoneReward, pendingBounties,
-  habitsKept, projectReward, streakMultiplier, weekBounty, welcomeEntry, WELCOME_GIFT,
+  habitsKept, milestoneEntry, projectEntry, projectReward, streakMultiplier, weekBounty, welcomeEntry, WELCOME_GIFT,
 } from './economy';
 import { emptyData, normalize } from '../data/storage';
 import type { AppData, LedgerEntry, Task, TaskSize } from './types';
@@ -14,6 +14,17 @@ const task = (completedDay: string, size: TaskSize): Task => ({
 /** Mondays: 2026-10-05, 10-12, 10-19, 10-26. */
 const opened = (on = '2026-10-05'): LedgerEntry => welcomeEntry('w', new Date(`${on}T09:00:00`).toISOString());
 const data = (o: Partial<AppData>): AppData => ({ ...emptyData(), ...o });
+
+describe('bounty memo', () => {
+  it('a new copy of the data is computed afresh, never served stale', () => {
+    const d = data({ ledger: [opened()], tasks: [task('2026-10-06', 'XXL')] });
+    expect(pendingBounties(d, '2026-10-13')[0].points).toBe(32);
+    const more = { ...d, tasks: [...d.tasks, task('2026-10-07', 'S')] };
+    expect(pendingBounties(more, '2026-10-13')[0].points).toBe(34);
+    expect(pendingBounties(d, '2026-10-13')[0].points).toBe(32);
+    expect(pendingBounties(d, '2026-10-20').map((w) => w.start)).toEqual(['2026-10-05', '2026-10-12']);
+  });
+});
 
 describe('weekly bounty', () => {
   it('pays nothing below 30 points', () => {
@@ -116,13 +127,22 @@ describe('ledger', () => {
 });
 
 describe('project reward', () => {
+  const today = '2026-10-21';
   it('pays a flat 200 once one of its tasks is finished, whatever the points', () => {
     const tasks = [{ ...task('2026-10-06', 'S'), projectId: 'p' }, task('2026-10-07', 'XXL')];
-    expect(projectReward({ id: 'p' }, tasks)).toEqual({ points: 2, amount: 200 });
+    expect(projectReward({ id: 'p' }, tasks, [], today)).toEqual({ points: 2, amount: 200, capped: false });
   });
   it('pays nothing without a finished task', () => {
     const tasks = [{ ...task('2026-10-06', 'XL'), projectId: 'p', status: 'todo' as const }];
-    expect(projectReward({ id: 'p' }, tasks).amount).toBe(0);
+    expect(projectReward({ id: 'p' }, tasks, [], today)).toMatchObject({ amount: 0, capped: false });
+  });
+  it('only 3 projects pay per week (Mon–Sun); the next week starts fresh', () => {
+    const tasks = [{ ...task('2026-10-20', 'S'), projectId: 'p' }];
+    const paid = (id: string, day: string) => projectEntry(id, new Date(`${day}T12:00:00`).toISOString(), { id, title: id }, { points: 2, amount: 200 });
+    const ledger = [paid('a', '2026-10-19'), paid('b', '2026-10-20'), paid('c', '2026-10-21')];
+    expect(projectReward({ id: 'p' }, tasks, ledger, today)).toMatchObject({ amount: 0, capped: true });
+    expect(projectReward({ id: 'p' }, tasks, ledger.slice(1), today).amount).toBe(200);
+    expect(projectReward({ id: 'p' }, tasks, ledger, '2026-10-26').amount).toBe(200);
   });
 });
 
@@ -159,9 +179,16 @@ describe('habits kept all week', () => {
 
 describe('milestone reward', () => {
   it('pays 50 only when a finished task is linked to it', () => {
-    expect(milestoneReward({ id: 'm' }, [{ ...task('2026-10-06', 'XS'), milestoneId: 'm' }])).toBe(50);
-    expect(milestoneReward({ id: 'm' }, [{ ...task('2026-10-06', 'XS'), milestoneId: 'm', status: 'doing' }])).toBe(0);
-    expect(milestoneReward({ id: 'm' }, [])).toBe(0);
+    expect(milestoneReward({ id: 'm' }, [{ ...task('2026-10-06', 'XS'), milestoneId: 'm' }], [], '2026-10-21')).toBe(50);
+    expect(milestoneReward({ id: 'm' }, [{ ...task('2026-10-06', 'XS'), milestoneId: 'm', status: 'doing' }], [], '2026-10-21')).toBe(0);
+    expect(milestoneReward({ id: 'm' }, [], [], '2026-10-21')).toBe(0);
+  });
+  it('only 5 milestones pay per week', () => {
+    const at = new Date('2026-10-20T12:00:00').toISOString();
+    const ledger = Array.from({ length: 5 }, (_, i) => milestoneEntry(`m${i}`, at, { id: `m${i}`, title: 'x' }, 50));
+    const done = [{ ...task('2026-10-20', 'XS'), milestoneId: 'm' }];
+    expect(milestoneReward({ id: 'm' }, done, ledger, '2026-10-21')).toBe(0);
+    expect(milestoneReward({ id: 'm' }, done, ledger, '2026-10-26')).toBe(50);
   });
 });
 
