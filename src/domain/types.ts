@@ -177,13 +177,28 @@ export interface ExternalEvent {
 export interface LedgerEntry {
   id: ID;
   key: string;
-  kind: 'welcome' | 'weekly' | 'project' | 'milestone' | 'goal';
+  kind: 'welcome' | 'weekly' | 'project' | 'milestone' | 'goal' | 'purchase';
   /** Positive = earned, negative = spent. May be 0 (a week closed below the minimum is still recorded). */
   amount: number;
   label: string;
   at: string; // ISO
   /** Weekly bounties only: what the payout was computed from, frozen at claim time. */
   week?: { start: string; points: number; streak: number; multiplier: number; bonus: number };
+}
+
+/** A booster bought but not opened yet. Its cards are rolled at purchase, so reloading the app can't reroll them. */
+export interface SealedPack {
+  id: ID;
+  setId: string;
+  boughtAt: string; // ISO
+  /** Card print ids, in reveal order (best last). */
+  cards: string[];
+}
+
+export interface CardCollection {
+  sealed: SealedPack[];
+  /** Copies owned per card print id. */
+  owned: Record<string, number>;
 }
 
 /**
@@ -205,5 +220,6 @@ export interface AppData {
   reminders: Reminder[];
   notes: Note[];
   ledger: LedgerEntry[];
+  cards: CardCollection;
   prefs: Prefs;
 }

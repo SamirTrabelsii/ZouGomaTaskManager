@@ -7,7 +7,8 @@ import {
   MAX_MULTIPLIER, MILESTONE_REWARD, OVERACHIEVER_BONUS, OVERACHIEVER_MIN, pendingBounties, PROJECT_BASE, PROJECT_MIN_POINTS,
   PROJECT_PER_POINT, STREAK_STEP, WEEKLY_MIN, WELCOME_GIFT,
 } from '../domain/economy';
-import { Dialog, ProgressBar } from './common/ui';
+import { Dialog, ProgressBar, Segmented } from './common/ui';
+import { ShopTab } from './cards/Shop';
 
 /** Header button showing the Berries balance; a dot means a finished week's bounty is waiting. */
 export function WalletChip() {
@@ -34,14 +35,16 @@ function Rules() {
       <li>🏆 {OVERACHIEVER_MIN}+ points in a week adds a <b>{formatBerries(OVERACHIEVER_BONUS)}</b> bonus.</li>
       <li>📘 A finished project pays <b>{formatBerries(PROJECT_BASE)} + {PROJECT_PER_POINT} ฿ per point</b> of its finished tasks (needs {PROJECT_MIN_POINTS}+ pts). A milestone with finished work pays <b>{formatBerries(MILESTONE_REWARD)}</b>.</li>
       <li>🏺 A reached goal pays its tier, picked when you create it: {GOAL_TIER_IDS.map((t) => `${GOAL_TIERS[t].label} ${formatBerries(GOAL_TIERS[t].amount)}`).join(' · ')}. Bigger tiers pay in full only after {GOAL_TIER_IDS.filter((t) => GOAL_TIERS[t].minDays).map((t) => `${GOAL_TIERS[t].minDays}`).join(' / ')} days.</li>
-      <li>📦 Collect each bounty once the week is over. Berries will buy One Piece card packs in the store (coming soon).</li>
+      <li>📦 Collect each bounty once the week is over, then spend Berries on One Piece card packs in the Shop.</li>
     </ul>
   );
 }
 
 export function Treasury() {
   const open = useStore((s) => s.treasuryOpen);
-  if (!open) return null;
+  // steps aside while a pack is revealed, then comes back on the same tab
+  const revealing = useStore((s) => !!s.packReveal);
+  if (!open || revealing) return null;
   return <TreasuryDialog />;
 }
 
@@ -53,6 +56,8 @@ function TreasuryDialog() {
   const started = !!economyStart(data.ledger);
   const pending = useMemo(() => pendingBounties(data, today), [data, today]);
   const week = useMemo(() => currentWeek(data, today), [data, today]);
+  const tab = useStore((s) => s.treasuryTab);
+  const setTab = st.setTreasuryTab;
 
   if (!started) {
     return (
@@ -74,6 +79,9 @@ function TreasuryDialog() {
 
   return (
     <Dialog title="Treasury" onClose={close}>
+      <Segmented label="Treasury section" value={tab} onChange={setTab}
+        options={[{ value: 'wallet', label: '🪙 Wallet' }, { value: 'shop', label: `🃏 Card shop${data.cards.sealed.length ? ` · ${data.cards.sealed.length} sealed` : ''}` }]} />
+      <div className="mt-4">{tab === 'shop' ? <ShopTab /> : (
       <div className="space-y-4">
         <div className="flex items-end justify-between">
           <div>
@@ -135,6 +143,7 @@ function TreasuryDialog() {
           </ul>
         </section>
       </div>
+      )}</div>
     </Dialog>
   );
 }
