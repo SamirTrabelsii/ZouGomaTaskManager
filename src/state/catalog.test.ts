@@ -30,11 +30,11 @@ describe('live catalog', () => {
     registerCatalog([]);
     expect(cardSets()).toEqual(BUNDLED_SETS);
   });
-  it('sells boosters of every main set, newest first; Extra Boosters wait for their own odds', () => {
+  it('sells every set, newest first, priced and boxed by product type', () => {
     registerCatalog(fromWire(wire));
-    expect(shopSets().map((s) => s.id)).toEqual(['OP-17', 'OP-01']);
+    expect(shopSets().map((s) => s.id)).toEqual(['OP-17', 'EB-03', 'OP-01']);
     expect(productById('OP-17:box')).toMatchObject({ setId: 'OP-17', packs: 24 });
-    expect(productById('EB-03:pack')).toBeNull();
+    expect(productById('EB-03:pack')).toMatchObject({ label: 'Extra booster pack', price: 150 });
     expect(productById('nope')).toBeNull();
   });
 });
