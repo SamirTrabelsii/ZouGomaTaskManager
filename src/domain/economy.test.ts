@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  balance, bountyEntry, currentWeek, economyStart, lifetimeEarned, pendingBounties, streakMultiplier, weekBounty,
-  welcomeEntry, WELCOME_GIFT,
+  balance, bountyEntry, currentWeek, economyStart, goalReward, lifetimeEarned, milestoneReward, pendingBounties,
+  projectReward, streakMultiplier, weekBounty, welcomeEntry, WELCOME_GIFT,
 } from './economy';
 import { emptyData, normalize } from '../data/storage';
 import type { AppData, LedgerEntry, Task, TaskSize } from './types';
@@ -109,5 +109,45 @@ describe('ledger', () => {
   });
   it('older data starts with an empty ledger', () => {
     expect(normalize({ version: 2, tasks: [] }).ledger).toEqual([]);
+  });
+});
+
+describe('project reward', () => {
+  it('pays 200 + 5 per point of its finished tasks', () => {
+    const tasks = [{ ...task('2026-10-06', 'L'), projectId: 'p' }, { ...task('2026-10-07', 'M'), projectId: 'p' }, task('2026-10-07', 'XXL')];
+    expect(projectReward({ id: 'p' }, tasks)).toEqual({ points: 12, amount: 260 });
+  });
+  it('ignores unfinished tasks, and pays nothing below 10 points', () => {
+    const tasks = [{ ...task('2026-10-06', 'L'), projectId: 'p' }, { ...task('2026-10-06', 'XL'), projectId: 'p', status: 'todo' as const }];
+    expect(projectReward({ id: 'p' }, tasks)).toEqual({ points: 8, amount: 0 });
+  });
+});
+
+describe('milestone reward', () => {
+  it('pays 50 only when a finished task is linked to it', () => {
+    expect(milestoneReward({ id: 'm' }, [{ ...task('2026-10-06', 'XS'), milestoneId: 'm' }])).toBe(50);
+    expect(milestoneReward({ id: 'm' }, [{ ...task('2026-10-06', 'XS'), milestoneId: 'm', status: 'doing' }])).toBe(0);
+    expect(milestoneReward({ id: 'm' }, [])).toBe(0);
+  });
+});
+
+describe('goal reward', () => {
+  const goal = (reward: 'S' | 'M' | 'L' | 'XL' | null, setOn = '2026-07-01') =>
+    ({ reward, rewardSetAt: reward ? new Date(`${setOn}T10:00:00`).toISOString() : null });
+  it('pays the chosen tier once the goal is old enough', () => {
+    expect(goalReward(goal('XL'), '2026-10-01')).toEqual({ tier: 'XL', amount: 3000, fullOn: null });
+    expect(goalReward(goal('S'), '2026-07-01').amount).toBe(300);
+  });
+  it('a goal reached too soon pays the biggest tier its age allows', () => {
+    expect(goalReward(goal('XL', '2026-10-01'), '2026-10-01')).toEqual({ tier: 'S', amount: 300, fullOn: '2026-12-30' });
+    expect(goalReward(goal('XL', '2026-10-01'), '2026-10-10').tier).toBe('M');
+    expect(goalReward(goal('L', '2026-10-01'), '2026-11-15').tier).toBe('L');
+  });
+  it('a goal without a tier pays nothing', () => {
+    expect(goalReward(goal(null), '2026-10-01').amount).toBe(0);
+  });
+  it('loading data keeps valid tiers and drops unknown ones', () => {
+    const d = normalize({ version: 3, goals: [{ id: 'a', reward: 'XL', rewardSetAt: '2026-01-01T00:00:00Z' }, { id: 'b', reward: 'HUGE', rewardSetAt: 'x' }, { id: 'c' }] });
+    expect(d.goals.map((g) => [g.reward, g.rewardSetAt])).toEqual([['XL', '2026-01-01T00:00:00Z'], [null, null], [null, null]]);
   });
 });

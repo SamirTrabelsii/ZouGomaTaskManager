@@ -41,3 +41,76 @@ describe('scope styles', () => {
     expect(SCOPE_ICONS).toContain(nextScopeStyle(all).icon);
   });
 });
+
+describe('completion rewards', () => {
+  const open = () => {
+    useStore.setState({ data: emptyData(), toasts: [] });
+    useStore.getState().openTreasury();
+  };
+  const ledger = () => useStore.getState().data.ledger.filter((e) => e.kind !== 'welcome');
+
+  it('pay nothing before the treasury is opened', () => {
+    useStore.setState({ data: emptyData(), toasts: [] });
+    const { addGoal, updateGoal } = useStore.getState();
+    const g = addGoal({ title: 'Read', target: 1, reward: 'S' });
+    updateGoal(g.id, { current: 1 });
+    expect(useStore.getState().data.ledger).toEqual([]);
+  });
+
+  it('a finished project pays once, even if reopened and finished again', () => {
+    open();
+    const { addProject, addTask, updateProject } = useStore.getState();
+    const p = addProject({ title: 'Site' });
+    addTask({ title: 'Build', projectId: p.id, size: 'XL', status: 'done' });
+    updateProject(p.id, { status: 'done' });
+    updateProject(p.id, { status: 'active' });
+    updateProject(p.id, { status: 'done' });
+    expect(ledger().map((e) => [e.kind, e.amount])).toEqual([['project', 280]]);
+  });
+
+  it('a project below the minimum pays nothing now but can still pay later', () => {
+    open();
+    const { addProject, addTask, updateProject } = useStore.getState();
+    const p = addProject({ title: 'Tiny' });
+    addTask({ title: 'One', projectId: p.id, size: 'S', status: 'done' });
+    updateProject(p.id, { status: 'done' });
+    expect(ledger()).toEqual([]);
+    updateProject(p.id, { status: 'active' });
+    addTask({ title: 'Two', projectId: p.id, size: 'L', status: 'done' });
+    updateProject(p.id, { status: 'done' });
+    expect(ledger().map((e) => e.amount)).toEqual([250]);
+  });
+
+  it('a milestone with finished work pays when ticked', () => {
+    open();
+    const { addProject, addMilestone, addTask, toggleMilestone } = useStore.getState();
+    const p = addProject({ title: 'Site' });
+    addMilestone(p.id, 'Beta');
+    const m = useStore.getState().data.milestones[0];
+    addTask({ title: 'Build', projectId: p.id, milestoneId: m.id, size: 'S', status: 'done' });
+    toggleMilestone(m.id);
+    toggleMilestone(m.id);
+    toggleMilestone(m.id);
+    expect(ledger().map((e) => e.amount)).toEqual([50]);
+  });
+
+  it('a goal pays when reached; its tier cannot be changed once picked', () => {
+    open();
+    const { addGoal, updateGoal } = useStore.getState();
+    const g = addGoal({ title: 'Read', target: 2, reward: 'S' });
+    updateGoal(g.id, { reward: 'XL' });
+    expect(useStore.getState().data.goals[0].reward).toBe('S');
+    updateGoal(g.id, { current: 2 });
+    expect(ledger().map((e) => e.amount)).toEqual([300]);
+  });
+
+  it('an older goal without a tier may pick one, once', () => {
+    open();
+    const { addGoal, updateGoal } = useStore.getState();
+    const g = addGoal({ title: 'Run' });
+    updateGoal(g.id, { reward: 'M' });
+    updateGoal(g.id, { reward: 'S' });
+    expect(useStore.getState().data.goals[0]).toMatchObject({ reward: 'M' });
+    expect(useStore.getState().data.goals[0].rewardSetAt).toBeTruthy();
+  });
+});

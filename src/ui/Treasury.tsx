@@ -3,8 +3,9 @@ import { useStore } from '../state/store';
 import { useToday } from '../state/hooks';
 import { formatDay } from '../domain/dates';
 import {
-  balance, BERRIES_PER_POINT, currentWeek, economyStart, formatBerries, lifetimeEarned, MAX_MULTIPLIER, OVERACHIEVER_BONUS,
-  OVERACHIEVER_MIN, pendingBounties, STREAK_STEP, WEEKLY_MIN, WELCOME_GIFT,
+  balance, BERRIES_PER_POINT, currentWeek, economyStart, formatBerries, GOAL_TIER_IDS, GOAL_TIERS, lifetimeEarned,
+  MAX_MULTIPLIER, MILESTONE_REWARD, OVERACHIEVER_BONUS, OVERACHIEVER_MIN, pendingBounties, PROJECT_BASE, PROJECT_MIN_POINTS,
+  PROJECT_PER_POINT, STREAK_STEP, WEEKLY_MIN, WELCOME_GIFT,
 } from '../domain/economy';
 import { Dialog, ProgressBar } from './common/ui';
 
@@ -31,6 +32,8 @@ function Rules() {
       <li>⚓ Finish <b>{WEEKLY_MIN}+ story points</b> in a week (Mon–Sun) to earn <b>{BERRIES_PER_POINT} ฿ per point</b>. Below {WEEKLY_MIN}, the week pays nothing.</li>
       <li>🔥 Every week in a row at {WEEKLY_MIN}+ adds <b>×{STREAK_STEP}</b> to the multiplier (up to ×{MAX_MULTIPLIER}). Missing a week resets it.</li>
       <li>🏆 {OVERACHIEVER_MIN}+ points in a week adds a <b>{formatBerries(OVERACHIEVER_BONUS)}</b> bonus.</li>
+      <li>📘 A finished project pays <b>{formatBerries(PROJECT_BASE)} + {PROJECT_PER_POINT} ฿ per point</b> of its finished tasks (needs {PROJECT_MIN_POINTS}+ pts). A milestone with finished work pays <b>{formatBerries(MILESTONE_REWARD)}</b>.</li>
+      <li>🏺 A reached goal pays its tier, picked when you create it: {GOAL_TIER_IDS.map((t) => `${GOAL_TIERS[t].label} ${formatBerries(GOAL_TIERS[t].amount)}`).join(' · ')}. Bigger tiers pay in full only after {GOAL_TIER_IDS.filter((t) => GOAL_TIERS[t].minDays).map((t) => `${GOAL_TIERS[t].minDays}`).join(' / ')} days.</li>
       <li>📦 Collect each bounty once the week is over. Berries will buy One Piece card packs in the store (coming soon).</li>
     </ul>
   );

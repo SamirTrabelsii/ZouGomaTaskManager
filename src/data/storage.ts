@@ -25,6 +25,7 @@ const arr = (v: unknown): any[] => (Array.isArray(v) ? v.filter((x) => x && type
 
 const TASK_SIZES = new Set(['XS', 'S', 'M', 'L', 'XL', 'XXL']);
 const TASK_STATUSES = new Set(['todo', 'doing', 'blocked', 'onhold', 'done']);
+const GOAL_TIERS = new Set(['S', 'M', 'L', 'XL']);
 
 /** Older data has no `scopeId`; a task pointing at a scope that no longer exists simply becomes unscoped. */
 function normalizeTasks(tasks: any[], scopes: any[]): any[] {
@@ -67,7 +68,11 @@ export function normalize(raw: unknown): AppData {
     tasks: normalizeTasks(arr(r.tasks).filter((t) => typeof t.title === 'string'), scopes),
     projects: arr(r.projects).filter((t) => typeof t.title === 'string'),
     milestones: arr(r.milestones),
-    goals: arr(r.goals),
+    goals: arr(r.goals).map((g) => ({
+      ...g,
+      reward: GOAL_TIERS.has(g.reward) ? g.reward : null,
+      rewardSetAt: GOAL_TIERS.has(g.reward) && typeof g.rewardSetAt === 'string' ? g.rewardSetAt : null,
+    })),
     habits: arr(r.habits),
     habitLogs: arr(r.habitLogs),
     events: arr(r.events),
