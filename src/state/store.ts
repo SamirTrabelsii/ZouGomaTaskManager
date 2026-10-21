@@ -9,6 +9,7 @@ import { TEMPLATES, templateById } from '../domain/templates';
 import { emptyData, exportJson, LocalStorageAdapter, normalize, type BackupInfo } from '../data/storage';
 import { Syncer, initialCloud, type CloudState, type StartResult } from '../data/sync';
 import { cloud as cloudApi, ApiError, type CloudBackup } from '../data/cloud';
+import { bountyEntry, economyStart, formatBerries, pendingBounties, welcomeEntry, WELCOME_GIFT } from '../domain/economy';
 
 export const storage = new LocalStorageAdapter();
 
@@ -35,6 +36,7 @@ interface UIState {
   lookAt: 'poster' | null;
   settingsOpen: boolean;
   inboxOpen: boolean;
+  treasuryOpen: boolean;
   toasts: Toast[];
   pulse: Partial<Record<SceneObjectId, { key: number; celebrate: boolean }>>;
   cameraResetKey: number;
@@ -64,6 +66,7 @@ interface Actions {
   setFocus(f: UIState['focus']): void;
   toggleSettings(open?: boolean): void;
   toggleInbox(open?: boolean): void;
+  toggleTreasury(open?: boolean): void;
   resetCamera(): void;
   setLookAt(v: 'poster' | null): void;
   toast(text: string, kind?: Toast['kind'], action?: Toast['action']): void;
@@ -109,6 +112,11 @@ interface Actions {
   addNote(input: Partial<Note>): Note;
   updateNote(id: string, patch: Partial<Note>): void;
   deleteNote(id: string): void;
+  // berries
+  /** Starts the economy with the welcome gift. Weeks before today's week never pay. No-op if already open. */
+  openTreasury(): void;
+  /** Records every finished week not yet collected (paid or not) and returns the berries earned. */
+  collectBounties(): number;
   // prefs & data safety
   updatePrefs(fn: (p: Prefs) => Prefs): void;
   setTemplateEnabled(id: string, enabled: boolean): void;
@@ -183,6 +191,7 @@ export const useStore = create<Store>((set, get) => {
     lookAt: null,
     settingsOpen: false,
     inboxOpen: false,
+    treasuryOpen: false,
     toasts: [],
     pulse: {},
     cameraResetKey: 0,
@@ -245,7 +254,7 @@ export const useStore = create<Store>((set, get) => {
     dismissRecoveryCode() { set({ recoveryCode: null }); },
     async signOut() {
       await syncer.signOut();
-      set({ status: 'signin', data: emptyData(), selected: null, settingsOpen: false, inboxOpen: false, recoveryCode: null });
+      set({ status: 'signin', data: emptyData(), selected: null, settingsOpen: false, inboxOpen: false, treasuryOpen: false, recoveryCode: null });
     },
     async resolveConflict(keep) {
       const data = await syncer.resolveConflict(keep);
@@ -274,6 +283,7 @@ export const useStore = create<Store>((set, get) => {
     setFocus: (focus) => set({ focus }),
     toggleSettings: (open) => set((s) => ({ settingsOpen: open ?? !s.settingsOpen })),
     toggleInbox: (open) => set((s) => ({ inboxOpen: open ?? !s.inboxOpen })),
+    toggleTreasury: (open) => set((s) => ({ treasuryOpen: open ?? !s.treasuryOpen })),
     resetCamera: () => {
       commit((d) => ({ ...d, prefs: { ...d.prefs, scene: { ...d.prefs.scene, camera: null } } }));
       set((s) => ({ cameraResetKey: s.cameraResetKey + 1, lookAt: null }));
@@ -547,6 +557,25 @@ export const useStore = create<Store>((set, get) => {
       const n = get().data.notes.find((x) => x.id === id);
       withUndo(`Deleted note “${n?.title || 'Untitled'}”`, () =>
         commit((d) => ({ ...d, notes: d.notes.filter((x) => x.id !== id) })));
+    },
+
+    /* ── berries ── */
+    openTreasury() {
+      if (economyStart(get().data.ledger)) return;
+      commit((d) => ({ ...d, ledger: [...d.ledger, welcomeEntry(uid(), nowIso())] }));
+      toast(`Treasury open! ${formatBerries(WELCOME_GIFT)} welcome gift.`);
+    },
+    collectBounties() {
+      const pending = pendingBounties(get().data, todayStr());
+      if (!pending.length) return 0;
+      const at = nowIso();
+      commit((d) => {
+        const have = new Set(d.ledger.map((e) => e.key));
+        return { ...d, ledger: [...d.ledger, ...pending.map((b) => bountyEntry(uid(), at, b)).filter((e) => !have.has(e.key))] };
+      });
+      const earned = pending.reduce((n, b) => n + b.total, 0);
+      toast(earned ? `Bounty collected: ${formatBerries(earned)}` : 'Week closed. No bounty this time. Next week!', earned ? 'ok' : 'info');
+      return earned;
     },
 
     /* ── prefs & data safety ── */
