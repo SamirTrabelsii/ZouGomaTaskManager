@@ -4,10 +4,11 @@ import { useToday } from '../state/hooks';
 import { formatDay, LOCALE } from '../domain/dates';
 import type { LedgerEntry } from '../domain/types';
 import {
-  balance, BERRIES_PER_POINT, currentWeek, economyStart, formatBerries, GOAL_TIER_IDS, GOAL_TIERS, HABIT_WEEK_REWARD, lifetimeEarned,
+  balance, BERRIES_PER_POINT, CERT_REWARD, currentWeek, economyStart, formatBerries, GOAL_TIER_IDS, GOAL_TIERS, HABIT_WEEK_REWARD, lifetimeEarned,
   MAX_MULTIPLIER, MILESTONE_REWARD, MILESTONES_PER_WEEK, OVERACHIEVER_BONUS, OVERACHIEVER_MIN, pendingBounties, PROJECT_REWARD, PROJECTS_PER_WEEK, STREAK_STEP,
   WEEKLY_MIN, WELCOME_GIFT,
 } from '../domain/economy';
+import { CERT_LEVEL_IDS, CERT_LEVELS } from '../domain/certs';
 import { Dialog, Segmented } from './common/ui';
 import { ShopPage } from './cards/Shop';
 import { BinderPage } from './cards/Binder';
@@ -38,6 +39,7 @@ function Rules() {
       <li>🌿 Every habit kept the <b>whole week</b> (logged every day, or its weekly target met) adds <b>{formatBerries(HABIT_WEEK_REWARD)}</b> to that week's bounty, even below {WEEKLY_MIN} points. A habit counts from its first full week.</li>
       <li>📘 A finished project pays <b>{formatBerries(PROJECT_REWARD)}</b> and a milestone <b>{formatBerries(MILESTONE_REWARD)}</b>, once at least one of their tasks is finished. Up to {PROJECTS_PER_WEEK} projects and {MILESTONES_PER_WEEK} milestones pay each week.</li>
       <li>🏺 A reached goal pays its tier, picked when you create it: {GOAL_TIER_IDS.map((t) => `${GOAL_TIERS[t].label} ${formatBerries(GOAL_TIERS[t].amount)}`).join(' · ')}. Bigger tiers pay in full only after {GOAL_TIER_IDS.filter((t) => GOAL_TIERS[t].minDays).map((t) => `${GOAL_TIERS[t].minDays}`).join(' / ')} days.</li>
+      <li>🎓 An earned certification pays its level once: {CERT_LEVEL_IDS.map((l) => `${CERT_LEVELS[l].label} ${formatBerries(CERT_REWARD[l])}`).join(' · ')}.</li>
       <li>📦 A week's bounty is ready from Monday. Collect it whenever you like, it never expires: unclaimed weeks wait in the Wallet. Then spend Berries on One Piece card packs in the Shop.</li>
     </ul>
   );
@@ -150,7 +152,7 @@ function TreasuryPage() {
 /* ───────── Wallet ───────── */
 
 const KIND_ICON: Record<LedgerEntry['kind'], string> = {
-  welcome: '🎁', weekly: '⚓', project: '📘', milestone: '🚩', goal: '🏺', purchase: '🃏', sale: '💱',
+  welcome: '🎁', weekly: '⚓', project: '📘', milestone: '🚩', goal: '🏺', cert: '🎓', purchase: '🃏', sale: '💱',
 };
 type HistoryFilter = 'all' | 'in' | 'out';
 
@@ -283,6 +285,7 @@ function WaysToEarn() {
     { icon: '🌿', title: 'Habit kept all week', text: `${formatBerries(HABIT_WEEK_REWARD)} per habit, every week` },
     { icon: '📘', title: 'Finished project', text: `${formatBerries(PROJECT_REWARD)} each, ${PROJECTS_PER_WEEK} a week · milestones ${formatBerries(MILESTONE_REWARD)}` },
     { icon: '🏺', title: 'Reached goal', text: `${formatBerries(GOAL_TIERS[GOAL_TIER_IDS[0]].amount)} to ${formatBerries(GOAL_TIERS[GOAL_TIER_IDS[GOAL_TIER_IDS.length - 1]].amount)} by tier` },
+    { icon: '🎓', title: 'Earned certification', text: `${formatBerries(CERT_REWARD[CERT_LEVEL_IDS[0]])} to ${formatBerries(CERT_REWARD[CERT_LEVEL_IDS[CERT_LEVEL_IDS.length - 1]])} by level` },
   ];
   return (
     <section aria-label="Ways to earn">

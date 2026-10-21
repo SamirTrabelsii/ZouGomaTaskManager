@@ -57,6 +57,41 @@ describe('certification renewal reminder', () => {
   });
 });
 
+describe('certification reward', () => {
+  const certPayments = () => st().data.ledger.filter((e) => e.kind === 'cert');
+  beforeEach(() => {
+    useStore.setState({ data: emptyData(), toasts: [] });
+    st().openTreasury();
+  });
+
+  it('pays its level the moment it is marked earned, with no waiting period', () => {
+    const c = st().addCert({ title: 'CKA', level: 'professional', status: 'studying' });
+    expect(certPayments()).toEqual([]);
+    st().updateCert(c.id, { status: 'earned' });
+    expect(certPayments()).toEqual([expect.objectContaining({ key: `cert:${c.id}`, amount: 1000 })]);
+  });
+
+  it('pays every level its agreed amount, also when added as already earned', () => {
+    for (const level of ['badge', 'foundational', 'associate', 'professional', 'expert'] as const) {
+      st().addCert({ title: level, level, status: 'earned' });
+    }
+    expect(certPayments().map((e) => e.amount)).toEqual([50, 100, 500, 1000, 3000]);
+  });
+
+  it('pays only once, even if unmarked, re-marked or moved to a higher level', () => {
+    const c = st().addCert({ title: 'Badge', level: 'badge', status: 'earned' });
+    st().updateCert(c.id, { status: 'studying' });
+    st().updateCert(c.id, { status: 'earned', level: 'expert' });
+    expect(certPayments().map((e) => e.amount)).toEqual([50]);
+  });
+
+  it('pays nothing before the treasury is opened', () => {
+    useStore.setState({ data: emptyData() });
+    st().addCert({ title: 'CKA', status: 'earned' });
+    expect(certPayments()).toEqual([]);
+  });
+});
+
 describe('certifications on the calendar', () => {
   it('shows the exam date until earned, then the expiry date', () => {
     useStore.setState({ data: emptyData() });

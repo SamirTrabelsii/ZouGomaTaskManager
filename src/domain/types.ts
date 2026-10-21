@@ -8,6 +8,8 @@ export type ProjectStatus = 'active' | 'paused' | 'done';
 export type GoalTier = 'S' | 'M' | 'L' | 'XL';
 /** Where a certification stands. "Expired" is not stored: it follows from the expiry date (see certState). */
 export type CertStatus = 'planned' | 'studying' | 'earned';
+/** How advanced a certification is; sets its Berries reward (see CERT_REWARD). */
+export type CertLevel = 'badge' | 'foundational' | 'associate' | 'professional' | 'expert';
 export type NoteKind = 'note' | 'idea' | 'journal' | 'reflection' | 'review' | 'lesson';
 export type SceneObjectId = 'desk' | 'bookshelf' | 'plants' | 'calendar' | 'notebook' | 'chest';
 export type ViewId = 'home' | 'tasks' | 'calendar' | 'insights';
@@ -81,6 +83,7 @@ export interface Certification {
   id: ID;
   title: string;
   issuer: string;
+  level: CertLevel;
   status: CertStatus;
   examDate: string | null; // YYYY-MM-DD
   earnedOn: string | null; // YYYY-MM-DD
@@ -198,7 +201,7 @@ export interface ExternalEvent {
 export interface LedgerEntry {
   id: ID;
   key: string;
-  kind: 'welcome' | 'weekly' | 'project' | 'milestone' | 'goal' | 'purchase' | 'sale';
+  kind: 'welcome' | 'weekly' | 'project' | 'milestone' | 'goal' | 'cert' | 'purchase' | 'sale';
   /** Positive = earned, negative = spent. May be 0 (a week closed below the minimum is still recorded). */
   amount: number;
   label: string;
