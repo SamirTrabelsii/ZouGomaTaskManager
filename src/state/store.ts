@@ -11,7 +11,7 @@ import { Syncer, initialCloud, type CloudState, type StartResult } from '../data
 import { cloud as cloudApi, ApiError, type CloudBackup } from '../data/cloud';
 import {
   bountyEntry, economyStart, formatBerries, goalEntry, goalReward, milestoneEntry, milestoneReward, pendingBounties,
-  projectEntry, projectReward, PROJECT_MIN_POINTS, welcomeEntry, WELCOME_GIFT,
+  projectEntry, projectReward, welcomeEntry, WELCOME_GIFT,
 } from '../domain/economy';
 import { openSealed, openSealedMany, purchase, sellCards, type OpenedPack } from '../domain/shop';
 
@@ -426,7 +426,7 @@ export const useStore = create<Store>((set, get) => {
         const project = { ...before, ...patch };
         const r = projectReward(project, get().data.tasks);
         if (earn(projectEntry(uid(), nowIso(), project, r))) toast(`Project complete! +${formatBerries(r.amount)}`);
-        else if (r.points < PROJECT_MIN_POINTS && economyStart(get().data.ledger)) toast(`Project complete. Finished tasks worth ${PROJECT_MIN_POINTS}+ points earn Berries.`);
+        else if (!r.amount && economyStart(get().data.ledger)) toast('Project complete. Projects with a finished task earn Berries.');
         else toast('Project complete — nicely done.');
       } else pulse('bookshelf');
     },

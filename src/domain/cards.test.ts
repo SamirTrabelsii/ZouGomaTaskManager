@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cardSets, cardById, cardImageUrl, cardSet } from './cards';
+import { cardSets, cardById, cardImageUrl, cardSet, packArt } from './cards';
 
 const op01 = cardSet('OP-01')!;
 
@@ -22,5 +22,16 @@ describe('OP-01 catalog', () => {
     expect(cardById('OP01-120_p2')).toMatchObject({ name: 'Shanks', variant: 'manga', rarity: 'SEC' });
     expect(cardImageUrl('OP16-011_l76oKss.jpg', true)).toBe('/api/cards/img/OP16-011_l76oKss.jpg');
     expect(cardImageUrl('OP01-001.jpg', false)).toBe('https://optcgapi.com/media/static/Card_Images/OP01-001.jpg');
+  });
+});
+
+describe('pack pictures', () => {
+  it('come through the server proxy, framed on the pack', () => {
+    expect(packArt('OP-17', true)).toEqual({ src: '/api/cards/pack/OP-17', box: [164, 60, 526, 654, 690, 720] });
+  });
+  it('local-only mode and unknown sets keep the drawn wrapper', () => {
+    expect(packArt('OP-01', false)).toBeNull();
+    expect(packArt('OP-99', true)).toBeNull();
+    expect(packArt('constructor', true)).toBeNull();
   });
 });

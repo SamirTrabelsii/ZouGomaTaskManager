@@ -122,3 +122,14 @@ h1, h2 { text-shadow: 0 0 24px rgba(255,170,80,.12); }
 [data-reduce-motion="true"] .tcg-tease-glow, [data-reduce-motion="true"] .tcg-tease-legend, [data-reduce-motion="true"] .tcg-pack.is-torn,
 [data-reduce-motion="true"] .tcg-pop { animation: none; }
 [data-reduce-motion="true"] .tcg-flash { display: none; }
+
+/* Official pack picture: two copies of the image, clipped into the tear-off strip and the body */
+.tcg-pack-real { background: none; box-shadow: none; border-radius: 0; overflow: visible; filter: drop-shadow(0 16px 22px rgba(0,0,0,.55)); }
+.tcg-pack-real.is-loading { background: linear-gradient(160deg, rgba(52,66,122,.5), rgba(14,19,40,.5)); border-radius: .4rem; }
+.tcg-pack-art { position: absolute; inset: 0; overflow: hidden; }
+.tcg-pack-art img { position: absolute; max-width: none; transition: opacity .3s; }
+.tcg-pack-real.is-loading img { opacity: 0; }
+.tcg-pack-art-body { clip-path: inset(9% 0 0 0); }
+.tcg-pack-art-top { clip-path: inset(0 0 91% 0); z-index: 3; transition: transform .6s ease-in, opacity .6s ease-in; }
+.tcg-pack.is-torn .tcg-pack-art-top { transform: translate(18%, -14%) rotate(14deg); opacity: 0; }
+[data-reduce-motion="true"] .tcg-pack-art-top { transition: none; }

@@ -65,20 +65,20 @@ describe('completion rewards', () => {
     updateProject(p.id, { status: 'done' });
     updateProject(p.id, { status: 'active' });
     updateProject(p.id, { status: 'done' });
-    expect(ledger().map((e) => [e.kind, e.amount])).toEqual([['project', 280]]);
+    expect(ledger().map((e) => [e.kind, e.amount])).toEqual([['project', 200]]);
   });
 
-  it('a project below the minimum pays nothing now but can still pay later', () => {
+  it('a project with no finished task pays nothing now but can still pay later', () => {
     open();
     const { addProject, addTask, updateProject } = useStore.getState();
     const p = addProject({ title: 'Tiny' });
-    addTask({ title: 'One', projectId: p.id, size: 'S', status: 'done' });
+    addTask({ title: 'One', projectId: p.id, size: 'S' });
     updateProject(p.id, { status: 'done' });
     expect(ledger()).toEqual([]);
     updateProject(p.id, { status: 'active' });
-    addTask({ title: 'Two', projectId: p.id, size: 'L', status: 'done' });
+    addTask({ title: 'Two', projectId: p.id, size: 'S', status: 'done' });
     updateProject(p.id, { status: 'done' });
-    expect(ledger().map((e) => e.amount)).toEqual([250]);
+    expect(ledger().map((e) => e.amount)).toEqual([200]);
   });
 
   it('a milestone with finished work pays when ticked', () => {

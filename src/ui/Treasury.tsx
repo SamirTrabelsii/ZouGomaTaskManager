@@ -4,9 +4,9 @@ import { useToday } from '../state/hooks';
 import { formatDay, LOCALE } from '../domain/dates';
 import type { LedgerEntry } from '../domain/types';
 import {
-  balance, BERRIES_PER_POINT, currentWeek, economyStart, formatBerries, GOAL_TIER_IDS, GOAL_TIERS, lifetimeEarned,
-  MAX_MULTIPLIER, MILESTONE_REWARD, OVERACHIEVER_BONUS, OVERACHIEVER_MIN, pendingBounties, PROJECT_BASE, PROJECT_MIN_POINTS,
-  PROJECT_PER_POINT, STREAK_STEP, WEEKLY_MIN, WELCOME_GIFT,
+  balance, BERRIES_PER_POINT, currentWeek, economyStart, formatBerries, GOAL_TIER_IDS, GOAL_TIERS, HABIT_WEEK_REWARD, lifetimeEarned,
+  MAX_MULTIPLIER, MILESTONE_REWARD, OVERACHIEVER_BONUS, OVERACHIEVER_MIN, pendingBounties, PROJECT_REWARD, STREAK_STEP,
+  WEEKLY_MIN, WELCOME_GIFT,
 } from '../domain/economy';
 import { Dialog, Segmented } from './common/ui';
 import { ShopPage } from './cards/Shop';
@@ -35,9 +35,10 @@ function Rules() {
       <li>⚓ Finish <b>{WEEKLY_MIN}+ story points</b> in a week (Mon–Sun) to earn <b>{BERRIES_PER_POINT} ฿ per point</b>. Below {WEEKLY_MIN}, the week pays nothing.</li>
       <li>🔥 Every week in a row at {WEEKLY_MIN}+ adds <b>×{STREAK_STEP}</b> to the multiplier (up to ×{MAX_MULTIPLIER}). Missing a week resets it.</li>
       <li>🏆 {OVERACHIEVER_MIN}+ points in a week adds a <b>{formatBerries(OVERACHIEVER_BONUS)}</b> bonus.</li>
-      <li>📘 A finished project pays <b>{formatBerries(PROJECT_BASE)} + {PROJECT_PER_POINT} ฿ per point</b> of its finished tasks (needs {PROJECT_MIN_POINTS}+ pts). A milestone with finished work pays <b>{formatBerries(MILESTONE_REWARD)}</b>.</li>
+      <li>🌿 Every habit kept the <b>whole week</b> (logged every day, or its weekly target met) adds <b>{formatBerries(HABIT_WEEK_REWARD)}</b> to that week's bounty, even below {WEEKLY_MIN} points. A habit counts from its first full week.</li>
+      <li>📘 A finished project pays <b>{formatBerries(PROJECT_REWARD)}</b> and a milestone <b>{formatBerries(MILESTONE_REWARD)}</b>, once at least one of their tasks is finished.</li>
       <li>🏺 A reached goal pays its tier, picked when you create it: {GOAL_TIER_IDS.map((t) => `${GOAL_TIERS[t].label} ${formatBerries(GOAL_TIERS[t].amount)}`).join(' · ')}. Bigger tiers pay in full only after {GOAL_TIER_IDS.filter((t) => GOAL_TIERS[t].minDays).map((t) => `${GOAL_TIERS[t].minDays}`).join(' / ')} days.</li>
-      <li>📦 Collect each bounty once the week is over, then spend Berries on One Piece card packs in the Shop.</li>
+      <li>📦 A week's bounty is ready from Monday. Collect it whenever you like, it never expires: unclaimed weeks wait in the Wallet. Then spend Berries on One Piece card packs in the Shop.</li>
     </ul>
   );
 }
@@ -188,8 +189,8 @@ function Wallet() {
             <ul className="mb-3 space-y-1 text-sm">
               {pending.map((b) => (
                 <li key={b.start} className="flex justify-between gap-2">
-                  <span>{formatDay(b.start)} · {b.points} pts{b.qualified && b.multiplier > 1 ? ` · ×${b.multiplier}` : ''}{b.bonus ? ' · bonus' : ''}</span>
-                  <span className="tabular-nums">{b.qualified ? formatBerries(b.total) : `below ${WEEKLY_MIN}`}</span>
+                  <span>Week of {formatDay(b.start)} · {b.points} pts{b.qualified && b.multiplier > 1 ? ` · ×${b.multiplier}` : ''}{b.bonus ? ' · bonus' : ''}{b.habits ? ` · 🌿 ${b.habits}` : ''}</span>
+                  <span className="tabular-nums">{b.total ? formatBerries(b.total) : `below ${WEEKLY_MIN}`}</span>
                 </li>
               ))}
             </ul>
@@ -248,7 +249,7 @@ function ThisWeek({ week }: { week: ReturnType<typeof currentWeek> }) {
       <div className="mt-1 flex items-baseline gap-2">
         <span className="font-serif text-3xl font-semibold tabular-nums">{week.points}</span>
         <span className="text-sm text-ink-500">story points</span>
-        <span className="ml-auto font-semibold tabular-nums text-moss-400">{week.qualified ? formatBerries(week.total) : ''}</span>
+        <span className="ml-auto font-semibold tabular-nums text-moss-400">{week.total ? formatBerries(week.total) : ''}</span>
       </div>
       <div className="relative mb-5 mt-3">
         <div role="progressbar" aria-valuemin={0} aria-valuemax={OVERACHIEVER_MIN} aria-valuenow={Math.min(week.points, OVERACHIEVER_MIN)}
@@ -262,13 +263,15 @@ function ThisWeek({ week }: { week: ReturnType<typeof currentWeek> }) {
           </div>
         ))}
       </div>
+      <p className="mb-2 text-sm">🌿 <b>{week.habits}</b> habit{week.habits === 1 ? '' : 's'} on track{week.habits ? ` · +${formatBerries(week.habitBonus)}` : ''}
+        <span className="text-ink-500"> (logged every day so far, or weekly target met)</span></p>
       <p className="text-sm">
         {week.qualified
           ? week.points < OVERACHIEVER_MIN
             ? <>Bounty unlocked. <b>{OVERACHIEVER_MIN - week.points} more</b> for the {formatBerries(OVERACHIEVER_BONUS)} bonus.</>
             : <>Bounty and bonus unlocked. Every extra point still pays.</>
           : <><b>{week.toMinimum} more points</b> to unlock this week's bounty.</>}
-        <span className="text-ink-500"> Collect it once the week is over.</span>
+        <span className="text-ink-500"> Ready to collect from Monday, and it waits as long as you like.</span>
       </p>
     </section>
   );
@@ -277,8 +280,8 @@ function ThisWeek({ week }: { week: ReturnType<typeof currentWeek> }) {
 function WaysToEarn() {
   const tiles = [
     { icon: '⚓', title: 'Weekly bounty', text: `${BERRIES_PER_POINT} ฿ per point from ${WEEKLY_MIN} pts, streaks up to ×${MAX_MULTIPLIER}` },
-    { icon: '📘', title: 'Finished project', text: `${formatBerries(PROJECT_BASE)} + ${PROJECT_PER_POINT} ฿ per point` },
-    { icon: '🚩', title: 'Milestone', text: `${formatBerries(MILESTONE_REWARD)} each` },
+    { icon: '🌿', title: 'Habit kept all week', text: `${formatBerries(HABIT_WEEK_REWARD)} per habit, every week` },
+    { icon: '📘', title: 'Finished project', text: `${formatBerries(PROJECT_REWARD)} each · milestones ${formatBerries(MILESTONE_REWARD)}` },
     { icon: '🏺', title: 'Reached goal', text: `${formatBerries(GOAL_TIERS[GOAL_TIER_IDS[0]].amount)} to ${formatBerries(GOAL_TIERS[GOAL_TIER_IDS[GOAL_TIER_IDS.length - 1]].amount)} by tier` },
   ];
   return (
