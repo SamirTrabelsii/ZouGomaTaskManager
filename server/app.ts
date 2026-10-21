@@ -7,6 +7,7 @@ import type { Sender } from './push';
 import { feedRouter } from './feeds';
 import { safeFetchText, type FeedFetcher } from './feedFetch';
 import { cardImageRouter, fetchImage, type ImageFetcher } from './cardImages';
+import { catalogRouter } from './catalog';
 
 const COOKIE = 'lifeos_session';
 const SESSION_DAYS = 30;
@@ -441,6 +442,7 @@ export function createApp(opts: AppOptions) {
   /* ── calendar feeds (read-only iCal subscriptions) ── */
   app.use('/api/feeds', feedRouter(pool, requireAuth, (req) => (req as Authed).userId, opts.fetchFeed ?? safeFetchText));
   app.use('/api/cards', cardImageRouter(requireAuth, opts.fetchCardImage ?? fetchImage));
+  app.use('/api/cards', catalogRouter(pool, requireAuth));
 
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));
 

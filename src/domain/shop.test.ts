@@ -120,7 +120,7 @@ describe('binder', () => {
     expect(cards).toHaveLength(148);
     const i = cards.findIndex((c) => c.id === 'OP01-120');
     expect(cards.slice(i, i + 3).map((c) => c.id)).toEqual(['OP01-120', 'OP01-120_p1', 'OP01-120_p2']);
-    expect(cards.some((c) => c.variant === 'boxTopper')).toBe(false);
+    expect(cards.some((c) => c.variant === 'promo')).toBe(false);
   });
 });
 

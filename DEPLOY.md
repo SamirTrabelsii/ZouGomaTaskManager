@@ -42,6 +42,13 @@ Free Render services sleep after ~15 minutes without traffic, which would stop p
 calendar-feed sync. Create a free cron-job.org job: `GET https://<app>.onrender.com/healthz`
 every 10 minutes. `/healthz` does not touch the database.
 
+### Card catalog
+
+Once a day the server downloads the One Piece card catalog (every set, card facts and market prices, no art) from
+optcgapi.com into the `card_sets` table: about 23 small requests, with nothing to configure. The schedule is part of
+the same scheduler, so the database can still sleep between jobs. Card art is fetched on demand through
+`/api/cards/img/` and cached in memory.
+
 ## 4. Backups
 
 Free tiers have limited restore options. Run this from time to time (or schedule it):
