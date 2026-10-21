@@ -142,7 +142,19 @@ export const SELL_FLOOR: Record<Rarity, number> = { C: 1, UC: 2, PR: 2, R: 5, L:
  * What one copy sells for. Tied to real market prices, so a chase card is a jackpot, but low enough that a whole pack
  * resells for ~25% of its price: selling never funds the next pack on its own.
  */
-export const sellValue = (c: Card) => Math.min(SELL_CAP, Math.max(SELL_FLOOR[c.rarity], Math.round((c.price ?? 0) * SELL_RATE)));
+export const sellValue = (c: Card) => sellBreakdown(c).value;
+
+/**
+ * Why a card sells for what it does: its market price in Berries (`market`), its rarity's minimum when the market is
+ * lower (`floor`), or the cap for very expensive cards (`cap`).
+ */
+export function sellBreakdown(c: Card): { value: number; basis: 'market' | 'floor' | 'cap'; market: number; floor: number } {
+  const market = Math.round((c.price ?? 0) * SELL_RATE);
+  const floor = SELL_FLOOR[c.rarity];
+  if (market > SELL_CAP) return { value: SELL_CAP, basis: 'cap', market, floor };
+  if (market < floor) return { value: floor, basis: 'floor', market, floor };
+  return { value: market, basis: 'market', market, floor };
+}
 
 /** Copies beyond the first, per card. The first copy of every card always stays in the binder. */
 export function duplicates(d: AppData): { card: Card; extra: number }[] {

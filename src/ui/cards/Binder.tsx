@@ -6,7 +6,7 @@ import { formatBerries } from '../../domain/economy';
 import { binderCards, collectionStats, duplicates, sellValue, setProgress } from '../../domain/shop';
 import { ConfirmButton, EmptyState, ProgressBar, Segmented } from '../common/ui';
 import { CardFace, rarityText, toneOf } from './CardArt';
-import { CardModal } from './CardModal';
+import { CardModal, SellNote } from './CardModal';
 import { BoosterArt } from './Shop';
 
 type Show = 'all' | 'owned' | 'missing' | 'dupes';
@@ -240,7 +240,7 @@ function OwnedDetail({ card, count }: { card: Card; count: number }) {
           )}
         </div>
       ) : <p className="text-xs text-ink-500">Your only copy always stays in the binder. Duplicates can be sold.</p>}
-      {card.price != null && <p className="text-[11px] text-ink-400">Market price ≈ ${card.price.toFixed(2)} at the last sync.</p>}
+      <SellNote card={card} />
     </div>
   );
 }

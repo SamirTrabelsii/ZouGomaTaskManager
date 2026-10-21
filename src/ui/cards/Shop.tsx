@@ -8,7 +8,7 @@ import { balance, formatBerries } from '../../domain/economy';
 import { chaseCards, PRICES, productsFor, sealedBySet, sellValue, setProgress, shopSets, type Product } from '../../domain/shop';
 import { ConfirmButton, ProgressBar } from '../common/ui';
 import { CardFace, rarityText, toneOf } from './CardArt';
-import { CardModal } from './CardModal';
+import { CardModal, SellNote } from './CardModal';
 
 /**
  * A set's booster pack, sized with its container; the top strip tears off when opened. It shows Bandai's official
@@ -320,7 +320,7 @@ function SetPage({ set }: { set: CardSet }) {
             <div className="card py-2"><dt className="label mb-0">In your binder</dt><dd className="text-lg font-semibold">{data.cards.owned[zoomed.id] ?? 0}</dd></div>
             <div className="card py-2"><dt className="label mb-0">Sells for</dt><dd className="text-lg font-semibold">{formatBerries(sellValue(zoomed))}</dd></div>
           </dl>
-          {zoomed.price != null && <p className="text-xs text-ink-500">Market price ≈ ${zoomed.price.toFixed(2)} at the last sync.</p>}
+          <SellNote card={zoomed} />
         </CardModal>
       )}
     </div>
