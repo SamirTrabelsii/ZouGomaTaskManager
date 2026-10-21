@@ -17,7 +17,7 @@ export function emptyData(): AppData {
   return {
     version: DATA_VERSION,
     tasks: [], scopes: [], projects: [], milestones: [], goals: [], habits: [], habitLogs: [],
-    events: [], reminders: [], notes: [], ledger: [], prefs: defaultPrefs(),
+    events: [], reminders: [], notes: [], ledger: [], cards: { sealed: [], owned: {} }, prefs: defaultPrefs(),
   };
 }
 
@@ -51,6 +51,16 @@ function normalizeLedger(entries: any[]): any[] {
   });
 }
 
+function normalizeCards(raw: any): AppData['cards'] {
+  const sealed = arr(raw?.sealed).filter((p) =>
+    typeof p.setId === 'string' && Array.isArray(p.cards) && p.cards.length > 0 && p.cards.every((c: unknown) => typeof c === 'string'));
+  const owned: Record<string, number> = {};
+  if (raw?.owned && typeof raw.owned === 'object' && !Array.isArray(raw.owned)) {
+    for (const [id, n] of Object.entries(raw.owned)) if (Number.isInteger(n) && (n as number) > 0) owned[id] = n as number;
+  }
+  return { sealed, owned };
+}
+
 /** Validates + migrates arbitrary JSON into AppData. Throws on anything that is clearly not LifeOS data. */
 export function normalize(raw: unknown): AppData {
   if (!raw || typeof raw !== 'object') throw new Error('Not a LifeOS data file.');
@@ -79,6 +89,7 @@ export function normalize(raw: unknown): AppData {
     reminders: arr(r.reminders),
     notes: arr(r.notes),
     ledger: normalizeLedger(arr(r.ledger)),
+    cards: normalizeCards(r.cards),
     prefs: {
       notifications: { ...base.prefs.notifications, ...prefs.notifications },
       templates: { ...base.prefs.templates, ...prefs.templates },

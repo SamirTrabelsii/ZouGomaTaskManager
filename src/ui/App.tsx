@@ -11,6 +11,7 @@ import { InsightsView } from './views/InsightsView';
 import { Settings } from './Settings';
 import { Inbox } from './Inbox';
 import { Treasury, WalletChip } from './Treasury';
+import { PackOpening } from './cards/PackOpening';
 import { Toasts } from './Toasts';
 import { Recovery } from './Recovery';
 import { AuthGate } from './AuthGate';
@@ -94,6 +95,7 @@ export default function App() {
 
       {settingsOpen && <Settings />}
       <Treasury />
+      <PackOpening />
       <ConflictDialog />
       <RecoveryCodeDialog />
       <Toasts />

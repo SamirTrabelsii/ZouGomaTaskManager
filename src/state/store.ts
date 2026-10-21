@@ -13,6 +13,7 @@ import {
   bountyEntry, economyStart, formatBerries, goalEntry, goalReward, milestoneEntry, milestoneReward, pendingBounties,
   projectEntry, projectReward, PROJECT_MIN_POINTS, welcomeEntry, WELCOME_GIFT,
 } from '../domain/economy';
+import { openSealed, purchase, type OpenedPack } from '../domain/shop';
 
 export const storage = new LocalStorageAdapter();
 
@@ -40,6 +41,9 @@ interface UIState {
   settingsOpen: boolean;
   inboxOpen: boolean;
   treasuryOpen: boolean;
+  treasuryTab: 'wallet' | 'shop';
+  /** The pack being revealed in the opening overlay. Its cards are already in the collection. */
+  packReveal: OpenedPack | null;
   toasts: Toast[];
   pulse: Partial<Record<SceneObjectId, { key: number; celebrate: boolean }>>;
   cameraResetKey: number;
@@ -70,6 +74,7 @@ interface Actions {
   toggleSettings(open?: boolean): void;
   toggleInbox(open?: boolean): void;
   toggleTreasury(open?: boolean): void;
+  setTreasuryTab(tab: 'wallet' | 'shop'): void;
   resetCamera(): void;
   setLookAt(v: 'poster' | null): void;
   toast(text: string, kind?: Toast['kind'], action?: Toast['action']): void;
@@ -120,6 +125,12 @@ interface Actions {
   openTreasury(): void;
   /** Records every finished week not yet collected (paid or not) and returns the berries earned. */
   collectBounties(): number;
+  // card shop
+  /** Spends Berries on a product; its packs go to the sealed pile. Returns false (with a toast) when it can't. */
+  buyProduct(productId: string): boolean;
+  /** Adds the pack's cards to the collection, then shows the reveal. */
+  openSealedPack(packId: string): void;
+  closeReveal(): void;
   // prefs & data safety
   updatePrefs(fn: (p: Prefs) => Prefs): void;
   setTemplateEnabled(id: string, enabled: boolean): void;
@@ -205,6 +216,8 @@ export const useStore = create<Store>((set, get) => {
     settingsOpen: false,
     inboxOpen: false,
     treasuryOpen: false,
+    treasuryTab: 'wallet',
+    packReveal: null,
     toasts: [],
     pulse: {},
     cameraResetKey: 0,
@@ -267,7 +280,7 @@ export const useStore = create<Store>((set, get) => {
     dismissRecoveryCode() { set({ recoveryCode: null }); },
     async signOut() {
       await syncer.signOut();
-      set({ status: 'signin', data: emptyData(), selected: null, settingsOpen: false, inboxOpen: false, treasuryOpen: false, recoveryCode: null });
+      set({ status: 'signin', data: emptyData(), selected: null, settingsOpen: false, inboxOpen: false, treasuryOpen: false, packReveal: null, recoveryCode: null });
     },
     async resolveConflict(keep) {
       const data = await syncer.resolveConflict(keep);
@@ -297,6 +310,7 @@ export const useStore = create<Store>((set, get) => {
     toggleSettings: (open) => set((s) => ({ settingsOpen: open ?? !s.settingsOpen })),
     toggleInbox: (open) => set((s) => ({ inboxOpen: open ?? !s.inboxOpen })),
     toggleTreasury: (open) => set((s) => ({ treasuryOpen: open ?? !s.treasuryOpen })),
+    setTreasuryTab: (treasuryTab) => set({ treasuryTab }),
     resetCamera: () => {
       commit((d) => ({ ...d, prefs: { ...d.prefs, scene: { ...d.prefs.scene, camera: null } } }));
       set((s) => ({ cameraResetKey: s.cameraResetKey + 1, lookAt: null }));
@@ -605,6 +619,22 @@ export const useStore = create<Store>((set, get) => {
       toast(earned ? `Bounty collected: ${formatBerries(earned)}` : 'Week closed. No bounty this time. Next week!', earned ? 'ok' : 'info');
       return earned;
     },
+
+    /* ── card shop ── */
+    buyProduct(productId) {
+      const r = purchase(get().data, productId, nowIso(), uid);
+      if (!r.ok) { toast(r.error, 'error'); return false; }
+      set({ data: r.data });
+      toast(r.packs.length === 1 ? 'Pack bought! Open it whenever you like.' : `${r.packs.length} packs bought!`);
+      return true;
+    },
+    openSealedPack(packId) {
+      const r = openSealed(get().data, packId);
+      if (!r) return;
+      // the cards are saved before the reveal starts, so closing or reloading mid-reveal loses nothing
+      set({ data: r.data, packReveal: r.opened });
+    },
+    closeReveal() { set({ packReveal: null }); },
 
     /* ── prefs & data safety ── */
     updatePrefs(fn) {
