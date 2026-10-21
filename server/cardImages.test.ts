@@ -3,7 +3,7 @@ import express from 'express';
 import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
 import { cardImageRouter, imageSourceUrl, type ImageFetcher } from './cardImages';
-import { PACK_ART } from './packArt';
+import { CARD_BACK, PACK_ART } from './packArt';
 
 let server: Server | null = null;
 afterEach(() => { server?.close(); server = null; });
@@ -92,5 +92,14 @@ describe('card image proxy', () => {
     const { calls, fetcher } = fakeFetcher();
     expect((await start(fetcher, { signedIn: false })('/api/cards/pack/OP-01')).status).toBe(401);
     expect(calls).toEqual([]);
+  });
+
+  it('serves the official card back from its one listed URL', async () => {
+    const { calls, fetcher } = fakeFetcher();
+    const get = start(fetcher);
+    expect((await get('/api/cards/back')).status).toBe(200);
+    await get('/api/cards/back');
+    expect(calls).toEqual([CARD_BACK.url]);
+    expect((await start(fetcher, { signedIn: false })('/api/cards/back')).status).toBe(401);
   });
 });

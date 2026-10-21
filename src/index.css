@@ -133,3 +133,5 @@ h1, h2 { text-shadow: 0 0 24px rgba(255,170,80,.12); }
 .tcg-pack-art-top { clip-path: inset(0 0 91% 0); z-index: 3; transition: transform .6s ease-in, opacity .6s ease-in; }
 .tcg-pack.is-torn .tcg-pack-art-top { transform: translate(18%, -14%) rotate(14deg); opacity: 0; }
 [data-reduce-motion="true"] .tcg-pack-art-top { transition: none; }
+/* Official card back: navy while the picture loads */
+.tcg-back-real { background: #1b2350; }

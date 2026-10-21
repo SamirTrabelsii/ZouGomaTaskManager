@@ -1,13 +1,14 @@
 import { Router, type RequestHandler } from 'express';
 import { IMAGE_FILE } from './catalog';
-import { PACK_ART } from './packArt';
+import { CARD_BACK, PACK_ART } from './packArt';
 
 /**
  * Card art proxy: GET /api/cards/img/:file serves one One Piece TCG card image (the catalog's `img`, e.g.
  * "OP16-011_l76oKss.jpg"), fetched once from optcgapi.com and then kept in memory. Browsers may cache the answer for a
  * year, so a device asks at most once per card.
  *
- * GET /api/cards/pack/:setId does the same for a set's official booster pack picture (see packArt.ts).
+ * GET /api/cards/pack/:setId does the same for a set's official booster pack picture, and GET /api/cards/back for the
+ * official card back (see packArt.ts).
  *
  * It is not an open proxy: a card must be a plain image file name, fetched only from optcgapi.com's card-image folder,
  * and a pack must be a set listed in PACK_ART, fetched only from its listed URL.
@@ -71,6 +72,14 @@ export function cardImageRouter(auth: RequestHandler, fetcher: ImageFetcher = fe
     } catch (e) {
       const status = (e as { status?: number }).status ?? 502;
       res.status(status).json({ error: status === 404 ? 'Unknown card' : 'Card image unavailable right now' });
+    }
+  });
+  router.get('/back', auth, async (_req, res) => {
+    try {
+      const img = await load('back', CARD_BACK.url);
+      res.set('Cache-Control', 'private, max-age=604800').type(img.type).send(img.body);
+    } catch (e) {
+      res.status((e as { status?: number }).status ?? 502).json({ error: 'Card back unavailable right now' });
     }
   });
   router.get('/pack/:setId', auth, async (req, res) => {
