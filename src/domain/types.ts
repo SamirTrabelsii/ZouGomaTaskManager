@@ -7,7 +7,7 @@ export type ProjectStatus = 'active' | 'paused' | 'done';
 /** How big a goal's Berries reward is; chosen when the goal is created, then locked (see GOAL_TIERS). */
 export type GoalTier = 'S' | 'M' | 'L' | 'XL';
 export type NoteKind = 'note' | 'idea' | 'journal' | 'reflection' | 'review' | 'lesson';
-export type SceneObjectId = 'desk' | 'bookshelf' | 'plants' | 'calendar' | 'notebook';
+export type SceneObjectId = 'desk' | 'bookshelf' | 'plants' | 'calendar' | 'notebook' | 'chest';
 export type ViewId = 'home' | 'tasks' | 'calendar' | 'insights';
 
 export interface Task {

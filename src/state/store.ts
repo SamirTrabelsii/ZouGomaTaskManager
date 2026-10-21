@@ -197,6 +197,7 @@ export const useStore = create<Store>((set, get) => {
     const { ledger } = get().data;
     if (entry.amount <= 0 || !economyStart(ledger) || ledger.some((e) => e.key === entry.key)) return false;
     commit((d) => ({ ...d, ledger: [...d.ledger, entry] }));
+    pulse('chest', true);
     return true;
   };
   const eventReminderAt = (e: CalEvent): string | null => {
@@ -307,7 +308,11 @@ export const useStore = create<Store>((set, get) => {
     },
 
     setView: (view) => set({ view, selected: view === 'home' ? get().selected : null, lookAt: view === 'home' ? get().lookAt : null }),
-    select: (selected) => set({ selected, view: selected ? 'home' : get().view, focus: null, lookAt: selected ? null : get().lookAt }),
+    select: (selected) => {
+      // the treasure chest has no side panel: it opens the Treasury
+      if (selected === 'chest') { set({ treasuryOpen: true, hovered: null }); return; }
+      set({ selected, view: selected ? 'home' : get().view, focus: null, lookAt: selected ? null : get().lookAt });
+    },
     setLookAt: (lookAt) => set(lookAt ? { lookAt, selected: null, view: 'home', hovered: null } : { lookAt: null }),
     hover: (hovered) => set({ hovered }),
     setFocus: (focus) => set({ focus }),
@@ -610,6 +615,7 @@ export const useStore = create<Store>((set, get) => {
       if (economyStart(get().data.ledger)) return;
       commit((d) => ({ ...d, ledger: [...d.ledger, welcomeEntry(uid(), nowIso())] }));
       toast(`Treasury open! ${formatBerries(WELCOME_GIFT)} welcome gift.`);
+      pulse('chest', true);
     },
     collectBounties() {
       const pending = pendingBounties(get().data, todayStr());
@@ -621,6 +627,7 @@ export const useStore = create<Store>((set, get) => {
       });
       const earned = pending.reduce((n, b) => n + b.total, 0);
       toast(earned ? `Bounty collected: ${formatBerries(earned)}` : 'Week closed. No bounty this time. Next week!', earned ? 'ok' : 'info');
+      pulse('chest', earned > 0);
       return earned;
     },
 

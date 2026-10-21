@@ -1,15 +1,20 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
+import { Sparkles } from '@react-three/drei';
 import { useStore } from '../state/store';
+import { useToday } from '../state/hooks';
+import { balance, chestCoins, economyStart, pendingBounties, posterBounty } from '../domain/economy';
+import { Interactive } from './Interactive';
 
 /**
  * Pirate-adventure "goodies": original low-poly homages (straw hat, ship model, wanted posters, flag, log-pose-style
- * compass, treasure chest…). Decorative only — no data, no click handlers. Drawn from simple shapes, not official art.
+ * compass, treasure chest…). Drawn from simple shapes, not official art. Two are live: the wanted poster's bounty is
+ * your lifetime Berries, and the treasure chest is the Treasury's hotspot.
  */
 
-/** Edit these to change the custom wanted poster on the left wall. */
-export const POSTER = { name: 'SAMIR', bounty: '1,500,000,000' };
+/** Edit this to change the name on the wanted poster on the left wall. The bounty is your lifetime Berries earned. */
+export const POSTER = { name: 'SAMIR' };
 
 const WOOD = '#a97b4f';
 const WOOD_DARK = '#6e4b30';
@@ -18,14 +23,13 @@ const GOLD = '#d4a84b';
 export function PirateGoodies({ evening, reduceMotion }: { evening: boolean; reduceMotion: boolean }) {
   return (
     <group>
-      <WantedPoster name={POSTER.name} bounty={POSTER.bounty} position={[-3.97, 2.3, 1.35]} size={[0.75, 1.05]} zoomable />
+      <LiveWantedPoster reduceMotion={reduceMotion} />
       <PirateFlag />
       <ShipsWheel />
       <StrawHat />
       <ShipModel />
       <LogPose reduceMotion={reduceMotion} />
       <TreasureMap />
-      <TreasureChest evening={evening} />
       <FruitBowl />
       <SnailPhone reduceMotion={reduceMotion} />
       <MeatOnBone />
@@ -246,26 +250,81 @@ function TreasureMap() {
   );
 }
 
-/* ───────── Treasure chest ───────── */
-function TreasureChest({ evening }: { evening: boolean }) {
-  const coins = useMemo(() => Array.from({ length: 16 }, (_, i) => ({ x: ((i * 37) % 17) / 17 * 0.36 - 0.18, z: ((i * 53) % 13) / 13 * 0.18 - 0.09, y: 0.27 + (i % 4) * 0.012 })), []);
+/* ───────── Live wanted poster ───────── */
+/** Your poster: the bounty is every Berry you've earned from work. It sparkles when it goes up. */
+function LiveWantedPoster({ reduceMotion }: { reduceMotion: boolean }) {
+  const bounty = useStore((s) => posterBounty(s.data.ledger));
+  const [sparkle, setSparkle] = useState(0);
+  const last = useRef(bounty);
+  useEffect(() => {
+    const up = Number(bounty.replace(/,/g, '')) > Number(last.current.replace(/,/g, ''));
+    last.current = bounty;
+    if (!up || reduceMotion) return;
+    setSparkle((n) => n + 1);
+    const t = setTimeout(() => setSparkle(0), 3000);
+    return () => clearTimeout(t);
+  }, [bounty, reduceMotion]);
   return (
-    <group position={[0.95, 0, 2.35]} rotation={[0, -0.9, 0]}>
-      <mesh position={[0, 0.14, 0]} castShadow receiveShadow><boxGeometry args={[0.5, 0.28, 0.32]} /><meshStandardMaterial color={WOOD} roughness={0.75} /></mesh>
-      {[-0.17, 0.17].map((x) => <mesh key={x} position={[x, 0.14, 0]}><boxGeometry args={[0.04, 0.29, 0.33]} /><meshStandardMaterial color="#4a4a52" metalness={0.6} roughness={0.4} /></mesh>)}
-      <mesh position={[0, 0.27, 0]}><boxGeometry args={[0.46, 0.02, 0.28]} /><meshStandardMaterial color="#3a2615" roughness={1} /></mesh>
-      {coins.map((c, i) => (
-        <mesh key={i} position={[c.x, c.y, c.z]} rotation={[((i * 7) % 5) * 0.3, 0, ((i * 3) % 5) * 0.3]}>
-          <cylinderGeometry args={[0.03, 0.03, 0.006, 10]} /><meshStandardMaterial color="#ffd36a" emissive="#ffb340" emissiveIntensity={evening ? 1.6 : 0.5} metalness={0.7} roughness={0.3} toneMapped={false} />
-        </mesh>
-      ))}
-      {/* open lid, hinged at the back */}
-      <group position={[0, 0.28, -0.16]} rotation={[-1.85, 0, 0]}>
-        <mesh position={[0, 0, 0.16]} castShadow><boxGeometry args={[0.5, 0.04, 0.32]} /><meshStandardMaterial color={WOOD} roughness={0.75} /></mesh>
-        {[-0.17, 0.17].map((x) => <mesh key={x} position={[x, 0.005, 0.16]}><boxGeometry args={[0.04, 0.05, 0.33]} /><meshStandardMaterial color="#4a4a52" metalness={0.6} roughness={0.4} /></mesh>)}
+    <>
+      <WantedPoster name={POSTER.name} bounty={bounty} position={[-3.97, 2.3, 1.35]} size={[0.75, 1.05]} zoomable />
+      {sparkle > 0 && <Sparkles key={sparkle} count={30} scale={[0.2, 1.2, 0.9]} position={[-3.9, 2.3, 1.35]} size={4} speed={0.6} color="#f7e2a8" />}
+    </>
+  );
+}
+
+/* ───────── Treasure chest: the Treasury's hotspot ───────── */
+/**
+ * Closed until the treasury is opened; then the lid stands open over a pile of gold that grows with your balance.
+ * It glows while a finished week's bounty or sealed packs are waiting. Clicking it opens the Treasury.
+ */
+export function TreasureChestSpot({ evening, reduceMotion }: { evening: boolean; reduceMotion: boolean }) {
+  const data = useStore((s) => s.data);
+  const today = useToday();
+  const started = !!economyStart(data.ledger);
+  const coinCount = chestCoins(balance(data.ledger));
+  const waiting = started && (data.cards.sealed.length > 0 || pendingBounties(data, today).length > 0);
+  const coins = useMemo(() => Array.from({ length: coinCount }, (_, i) => ({
+    x: ((i * 37) % 17) / 17 * 0.36 - 0.18,
+    z: ((i * 53) % 13) / 13 * 0.2 - 0.1,
+    y: 0.27 + Math.floor(i / 8) * 0.012 + (i % 3) * 0.004, // later coins pile higher
+    tilt: [((i * 7) % 5) * 0.3, ((i * 3) % 5) * 0.3] as const,
+  })), [coinCount]);
+  const lid = useRef<THREE.Group>(null);
+  const light = useRef<THREE.PointLight>(null);
+  useFrame(({ clock, invalidate }, dt) => {
+    const target = started ? -1.85 : 0;
+    if (lid.current) {
+      const r = lid.current.rotation;
+      r.x = reduceMotion ? target : r.x + (target - r.x) * Math.min(1, dt * 3);
+      if (Math.abs(target - r.x) > 0.001) invalidate();
+    }
+    if (light.current) light.current.intensity = waiting ? (reduceMotion ? 2 : 1.5 + Math.sin(clock.elapsedTime * 3) * 1.2) : 0;
+  });
+  return (
+    <Interactive
+      id="chest" label="Treasure chest" hint="Berries, card shop & binder" reduceMotion={reduceMotion}
+      box={{ size: [0.6, 0.5, 0.45], center: [0.95, 0.25, 2.35] }} pin={[0.95, 0.75, 2.35]}
+      hit={{ size: [0.7, 0.6, 0.55], center: [0.95, 0.25, 2.35] }}
+    >
+      <group position={[0.95, 0, 2.35]} rotation={[0, -0.9, 0]}>
+        <mesh position={[0, 0.14, 0]} castShadow receiveShadow><boxGeometry args={[0.5, 0.28, 0.32]} /><meshStandardMaterial color={WOOD} roughness={0.75} /></mesh>
+        {[-0.17, 0.17].map((x) => <mesh key={x} position={[x, 0.14, 0]}><boxGeometry args={[0.04, 0.29, 0.33]} /><meshStandardMaterial color="#4a4a52" metalness={0.6} roughness={0.4} /></mesh>)}
+        <mesh position={[0, 0.27, 0]}><boxGeometry args={[0.46, 0.02, 0.28]} /><meshStandardMaterial color="#3a2615" roughness={1} /></mesh>
+        {coins.map((c, i) => (
+          <mesh key={i} position={[c.x, c.y, c.z]} rotation={[c.tilt[0], 0, c.tilt[1]]}>
+            <cylinderGeometry args={[0.03, 0.03, 0.006, 10]} /><meshStandardMaterial color="#ffd36a" emissive="#ffb340" emissiveIntensity={evening ? 1.6 : 0.5} metalness={0.7} roughness={0.3} toneMapped={false} />
+          </mesh>
+        ))}
+        {/* lid, hinged at the back: closed until the treasury opens */}
+        <group ref={lid} position={[0, 0.28, -0.16]} rotation={[started ? -1.85 : 0, 0, 0]}>
+          <mesh position={[0, 0, 0.16]} castShadow><boxGeometry args={[0.5, 0.04, 0.32]} /><meshStandardMaterial color={WOOD} roughness={0.75} /></mesh>
+          {[-0.17, 0.17].map((x) => <mesh key={x} position={[x, 0.005, 0.16]}><boxGeometry args={[0.04, 0.05, 0.33]} /><meshStandardMaterial color="#4a4a52" metalness={0.6} roughness={0.4} /></mesh>)}
+        </group>
+        <mesh position={[0, 0.2, 0.165]}><boxGeometry args={[0.07, 0.07, 0.01]} /><meshStandardMaterial color={GOLD} metalness={0.7} roughness={0.3} /></mesh>
+        <pointLight ref={light} position={[0, 0.45, 0]} color="#ffc35a" intensity={0} distance={1.6} decay={2} />
+        {waiting && !reduceMotion && <Sparkles count={14} scale={[0.5, 0.4, 0.4]} position={[0, 0.42, 0]} size={3} speed={0.4} color="#ffe39a" />}
       </group>
-      <mesh position={[0, 0.2, 0.165]}><boxGeometry args={[0.07, 0.07, 0.01]} /><meshStandardMaterial color={GOLD} metalness={0.7} roughness={0.3} /></mesh>
-    </group>
+    </Interactive>
   );
 }
 

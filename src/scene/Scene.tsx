@@ -11,6 +11,7 @@ import { resolveQuality } from './quality';
 import { Lighting, RoomShell } from './Room';
 import { Bookshelf, Desk, Notebook, Plants, WallCalendar } from './objects';
 import { Decor } from './decor';
+import { TreasureChestSpot } from './onepiece';
 
 const DEFAULT_POS: [number, number, number] = [11.8, 10.8, 11.9]; // isometric-style diagonal view
 const DEFAULT_TARGET: [number, number, number] = [0.2, 0.8, 0.3];
@@ -23,6 +24,8 @@ const FOCUS: Record<SceneObjectId, { target: [number, number, number]; dist: num
   plants: { target: [2.4, 1.0, -3.0], dist: 11 },
   calendar: { target: [2.4, 2.1, -3.4], dist: 11.5 },
   notebook: { target: [0.55, 0.9, -1.8], dist: 8.5 },
+  // never focused: the chest opens the Treasury dialog instead of a panel
+  chest: { target: [0.95, 0.3, 2.35], dist: 8.5 },
 };
 
 /** Reading view for the wall poster: as close and as square-on as the orbit limits allow. */
@@ -185,6 +188,7 @@ export default function Scene({ onContextLost }: { onContextLost?: () => void })
       <Bookshelf reduceMotion={scene.reduceMotion} />
       <Plants reduceMotion={scene.reduceMotion} />
       <WallCalendar reduceMotion={scene.reduceMotion} />
+      <TreasureChestSpot evening={evening} reduceMotion={scene.reduceMotion} />
       {q !== 'low' && (
         <EffectComposer multisampling={0}>
           <Bloom intensity={evening ? 0.8 : 0.25} luminanceThreshold={0.92} luminanceSmoothing={0.25} mipmapBlur />

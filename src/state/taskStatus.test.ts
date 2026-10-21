@@ -114,3 +114,16 @@ describe('completion rewards', () => {
     expect(useStore.getState().data.goals[0].rewardSetAt).toBeTruthy();
   });
 });
+
+describe('the treasure chest', () => {
+  it('opens the Treasury instead of a side panel', () => {
+    useStore.setState({ data: emptyData(), toasts: [], selected: null, treasuryOpen: false });
+    useStore.getState().select('chest');
+    expect(useStore.getState()).toMatchObject({ treasuryOpen: true, selected: null });
+  });
+  it('sparkles when Berries come in', () => {
+    useStore.setState({ data: emptyData(), toasts: [], pulse: {} });
+    useStore.getState().openTreasury();
+    expect(useStore.getState().pulse.chest?.celebrate).toBe(true);
+  });
+});

@@ -171,3 +171,12 @@ export function milestoneEntry(id: string, at: string, m: Pick<Milestone, 'id' |
 export function goalEntry(id: string, at: string, goal: Pick<Goal, 'id' | 'title'>, r: { tier: GoalTier | null; amount: number }): LedgerEntry {
   return { id, key: goalKey(goal.id), kind: 'goal', amount: r.amount, at, label: `Goal reached · ${goal.title}${r.tier ? ` (${GOAL_TIERS[r.tier].label})` : ''}` };
 }
+
+/* ───────── In the room ───────── */
+
+/** Coins piled in the room's treasure chest: none when empty, then growing with the balance (a few per doubling), up to 40. */
+export const chestCoins = (berries: number) =>
+  berries <= 0 ? 0 : Math.min(40, 6 + Math.round(Math.log2(1 + berries / 150) * 5));
+
+/** The wanted poster's bounty: lifetime Berries earned from work, written like a bounty ("12,450"). */
+export const posterBounty = (ledger: LedgerEntry[]) => Math.round(lifetimeEarned(ledger)).toLocaleString('en-US');

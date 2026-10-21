@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  balance, bountyEntry, currentWeek, economyStart, goalReward, lifetimeEarned, milestoneReward, pendingBounties,
+  balance, bountyEntry, chestCoins, currentWeek, posterBounty, economyStart, goalReward, lifetimeEarned, milestoneReward, pendingBounties,
   projectReward, streakMultiplier, weekBounty, welcomeEntry, WELCOME_GIFT,
 } from './economy';
 import { emptyData, normalize } from '../data/storage';
@@ -152,5 +152,20 @@ describe('goal reward', () => {
   it('loading data keeps valid tiers and drops unknown ones', () => {
     const d = normalize({ version: 3, goals: [{ id: 'a', reward: 'XL', rewardSetAt: '2026-01-01T00:00:00Z' }, { id: 'b', reward: 'HUGE', rewardSetAt: 'x' }, { id: 'c' }] });
     expect(d.goals.map((g) => [g.reward, g.rewardSetAt])).toEqual([['XL', '2026-01-01T00:00:00Z'], [null, null], [null, null]]);
+  });
+});
+
+describe('in the room', () => {
+  it('the chest fills with the balance but never overflows', () => {
+    expect(chestCoins(0)).toBe(0);
+    expect(chestCoins(-50)).toBe(0);
+    expect(chestCoins(150)).toBe(11);
+    expect(chestCoins(1500)).toBeGreaterThan(chestCoins(150));
+    expect(chestCoins(10_000_000)).toBe(40);
+  });
+  it('the wanted poster shows lifetime earnings, not the balance', () => {
+    const spent: LedgerEntry = { id: 's', key: 'buy:1', kind: 'purchase', amount: -3000, label: 'x', at: '' };
+    const bounty: LedgerEntry = { id: 'b', key: 'week:x', kind: 'weekly', amount: 12_000, label: 'x', at: '' };
+    expect(posterBounty([opened(), bounty, spent])).toBe('12,450');
   });
 });
