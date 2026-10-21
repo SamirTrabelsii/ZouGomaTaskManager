@@ -22,6 +22,7 @@ export function useAgendaOpener() {
       const m = st.data.milestones.find((x) => x.id === i.refId);
       if (m) { st.select('bookshelf'); st.setFocus({ type: 'project', id: m.projectId }); }
     } else if (i.kind === 'project') { st.select('bookshelf'); st.setFocus({ type: 'project', id: i.refId }); }
+    else if (i.kind === 'cert') { st.select('bookshelf'); st.setFocus({ type: 'cert', id: i.refId }); }
     else if (i.kind === 'reminder') st.toast('Manage reminders in the Reminders list below the calendar.', 'info');
   };
   const node = <>{taskDlg.node}{eventId && <EventDialog eventId={eventId} onClose={() => setEventId(null)} />}{externalId && <ExternalEventDialog eventId={externalId} onClose={() => setExternalId(null)} />}</>;

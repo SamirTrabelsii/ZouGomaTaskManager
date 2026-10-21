@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import {
-  type AppData, type CalEvent, type Goal, type LedgerEntry, type Habit, type Milestone, type Note, type Project,
+  type AppData, type CalEvent, type Certification, type Goal, type LedgerEntry, type Habit, type Milestone, type Note, type Project,
   type Reminder, type SceneObjectId, type Scope, type Task, type ViewId, type Prefs,
 } from '../domain/types';
 import { showSystemNotification } from './notify';
@@ -13,6 +13,7 @@ import {
   bountyEntry, economyStart, formatBerries, goalEntry, goalReward, milestoneEntry, milestoneReward, pendingBounties,
   projectEntry, projectReward, PROJECTS_PER_WEEK, welcomeEntry, WELCOME_GIFT,
 } from '../domain/economy';
+import { certReminderAt, certReminderTitle, DEFAULT_REMIND_BEFORE, safeUrl } from '../domain/certs';
 import { openSealed, openSealedMany, purchase, sellCards, type OpenedPack } from '../domain/shop';
 
 export type TreasuryTab = 'wallet' | 'shop' | 'binder';
@@ -54,7 +55,7 @@ interface UIState {
   pulse: Partial<Record<SceneObjectId, { key: number; celebrate: boolean }>>;
   cameraResetKey: number;
   /** Deep-link into panels: e.g. open a given project or note. */
-  focus: { type: 'project' | 'goal' | 'habit' | 'note' | 'event'; id: string } | null;
+  focus: { type: 'project' | 'goal' | 'cert' | 'habit' | 'note' | 'event'; id: string } | null;
 }
 
 interface Actions {
@@ -111,6 +112,10 @@ interface Actions {
   addGoal(input: Partial<Goal> & { title: string }): Goal;
   updateGoal(id: string, patch: Partial<Goal>): void;
   deleteGoal(id: string): void;
+  // certifications (an earned one with an expiry date keeps a renewal reminder in sync)
+  addCert(input: Partial<Certification> & { title: string }): Certification;
+  updateCert(id: string, patch: Partial<Certification>): void;
+  deleteCert(id: string): void;
   // habits
   addHabit(input: Partial<Habit> & { title: string }): Habit;
   updateHabit(id: string, patch: Partial<Habit>): void;
@@ -214,6 +219,11 @@ export const useStore = create<Store>((set, get) => {
     if (e.remindBefore == null) return null;
     const base = dateTimeOf(e.date, e.time ?? '09:00');
     return toLocalInput(new Date(base.getTime() - e.remindBefore * 60000));
+  };
+
+  const syncCertReminder = (d: AppData, c: Certification): AppData => {
+    const at = certReminderAt(c, todayStr());
+    return upsertReminder(d, { type: 'cert', id: c.id }, at ? certReminderTitle(c) : '', at);
   };
 
   return {
@@ -499,6 +509,36 @@ export const useStore = create<Store>((set, get) => {
           ...d,
           goals: d.goals.filter((x) => x.id !== id),
           tasks: d.tasks.map((t) => (t.goalId === id ? { ...t, goalId: null } : t)),
+        })));
+    },
+
+    /* ── certifications ── */
+    addCert(input) {
+      const c: Certification = {
+        id: uid(), issuer: '', status: 'planned', examDate: null, earnedOn: null, expiresOn: null, credentialId: '',
+        notes: '', remindBefore: DEFAULT_REMIND_BEFORE, createdAt: nowIso(), ...input,
+        title: input.title.trim(), credentialUrl: safeUrl(input.credentialUrl ?? ''),
+      };
+      commit((d) => syncCertReminder({ ...d, certifications: [c, ...d.certifications] }, c));
+      pulse('bookshelf', c.status === 'earned');
+      return c;
+    },
+    updateCert(id, patch) {
+      const before = get().data.certifications.find((c) => c.id === id);
+      if (!before) return;
+      const after: Certification = { ...before, ...patch, ...(patch.credentialUrl !== undefined ? { credentialUrl: safeUrl(patch.credentialUrl) } : {}) };
+      commit((d) => syncCertReminder({ ...d, certifications: d.certifications.map((c) => (c.id === id ? after : c)) }, after));
+      const earned = after.status === 'earned' && before.status !== 'earned';
+      pulse('bookshelf', earned);
+      if (earned) toast(`Certified: ${after.title} 🎓`);
+    },
+    deleteCert(id) {
+      const c = get().data.certifications.find((x) => x.id === id);
+      withUndo(`Deleted certification “${c?.title ?? ''}”`, () =>
+        commit((d) => ({
+          ...d,
+          certifications: d.certifications.filter((x) => x.id !== id),
+          reminders: d.reminders.filter((r) => !(r.link?.type === 'cert' && r.link.id === id)),
         })));
     },
 

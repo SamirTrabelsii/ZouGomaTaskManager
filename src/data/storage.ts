@@ -1,5 +1,6 @@
 import { DATA_VERSION, type AppData, type Prefs } from '../domain/types';
 import { TEMPLATES } from '../domain/templates';
+import { safeUrl } from '../domain/certs';
 
 /* ───────── Defaults & normalisation (also used to validate imports) ───────── */
 
@@ -16,7 +17,7 @@ export function defaultPrefs(): Prefs {
 export function emptyData(): AppData {
   return {
     version: DATA_VERSION,
-    tasks: [], scopes: [], projects: [], milestones: [], goals: [], habits: [], habitLogs: [],
+    tasks: [], scopes: [], projects: [], milestones: [], goals: [], certifications: [], habits: [], habitLogs: [],
     events: [], reminders: [], notes: [], ledger: [], cards: { sealed: [], owned: {} }, prefs: defaultPrefs(),
   };
 }
@@ -38,6 +39,27 @@ function normalizeTasks(tasks: any[], scopes: any[]): any[] {
     blockedBy: t.status === 'blocked' && typeof t.blockedBy === 'string' ? t.blockedBy : '',
     resumeOn: t.status === 'onhold' && typeof t.resumeOn === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(t.resumeOn) ? t.resumeOn : null,
     scopeId: typeof t.scopeId === 'string' && ids.has(t.scopeId) ? t.scopeId : null,
+  }));
+}
+
+const CERT_STATUSES = new Set(['planned', 'studying', 'earned']);
+const day = (v: unknown): string | null => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
+const text = (v: unknown): string => (typeof v === 'string' ? v : '');
+
+/** Data older than v4 has no certifications. */
+function normalizeCerts(certs: any[]): any[] {
+  return certs.filter((c) => typeof c.title === 'string').map((c) => ({
+    ...c,
+    issuer: text(c.issuer),
+    status: CERT_STATUSES.has(c.status) ? c.status : 'planned',
+    examDate: day(c.examDate),
+    earnedOn: day(c.earnedOn),
+    expiresOn: day(c.expiresOn),
+    credentialId: text(c.credentialId),
+    credentialUrl: safeUrl(text(c.credentialUrl)),
+    notes: text(c.notes),
+    remindBefore: Number.isInteger(c.remindBefore) && c.remindBefore > 0 ? c.remindBefore : null,
+    createdAt: typeof c.createdAt === 'string' ? c.createdAt : new Date(0).toISOString(),
   }));
 }
 
@@ -83,6 +105,7 @@ export function normalize(raw: unknown): AppData {
       reward: GOAL_TIERS.has(g.reward) ? g.reward : null,
       rewardSetAt: GOAL_TIERS.has(g.reward) && typeof g.rewardSetAt === 'string' ? g.rewardSetAt : null,
     })),
+    certifications: normalizeCerts(arr(r.certifications)),
     habits: arr(r.habits),
     habitLogs: arr(r.habitLogs),
     events: arr(r.events),

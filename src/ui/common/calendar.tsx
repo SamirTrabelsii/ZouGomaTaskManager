@@ -8,10 +8,10 @@ import type { AgendaItem } from '../../domain/services';
 import { ConfirmButton, Dialog, Field } from './ui';
 
 export const KIND_ICON: Record<AgendaItem['kind'], string> = {
-  event: '●', deadline: '■', task: '☑', milestone: '◆', project: '📘', reminder: '🔔', external: '◉',
+  event: '●', deadline: '■', task: '☑', milestone: '◆', project: '📘', cert: '🎓', reminder: '🔔', external: '◉',
 };
 export const KIND_LABEL: Record<AgendaItem['kind'], string> = {
-  event: 'Event', deadline: 'Deadline', task: 'Task due', milestone: 'Milestone', project: 'Project deadline', reminder: 'Reminder', external: 'Imported (read-only)',
+  event: 'Event', deadline: 'Deadline', task: 'Task due', milestone: 'Milestone', project: 'Project deadline', cert: 'Certification', reminder: 'Reminder', external: 'Imported (read-only)',
 };
 
 /** The little marker in front of an agenda row: a kind icon, or the calendar's own colour for imported meetings. */

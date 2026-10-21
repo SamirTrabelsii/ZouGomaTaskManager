@@ -15,7 +15,7 @@ export const PIN_ICON: Record<SceneObjectId, string> = {
 export function useFirstRun(): boolean {
   return useStore((s) => {
     const d = s.data;
-    return !(d.tasks.length || d.projects.length || d.goals.length || d.habits.length || d.events.length || d.reminders.length || d.notes.length);
+    return !(d.tasks.length || d.projects.length || d.goals.length || d.certifications.length || d.habits.length || d.events.length || d.reminders.length || d.notes.length);
   });
 }
 
@@ -35,9 +35,10 @@ export function useRoomInfo(id: SceneObjectId): { summary: string; prompt: strin
       }
       case 'bookshelf': {
         const active = data.projects.filter((p) => p.status === 'active').length;
+        const certs = data.certifications.length;
         return {
-          summary: `${active} active project${active === 1 ? '' : 's'} · ${data.goals.length} goal${data.goals.length === 1 ? '' : 's'}`,
-          prompt: data.projects.length + data.goals.length ? null : 'Start a project or goal',
+          summary: `${active} active project${active === 1 ? '' : 's'} · ${data.goals.length} goal${data.goals.length === 1 ? '' : 's'}${certs ? ` · ${certs} cert${certs === 1 ? '' : 's'}` : ''}`,
+          prompt: data.projects.length + data.goals.length + certs ? null : 'Start a project or goal',
         };
       }
       case 'plants': {
