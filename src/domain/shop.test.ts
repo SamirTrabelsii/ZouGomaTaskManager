@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { openSealed, purchase, PACK_PRICE, BOX_PRICE, setProgress } from './shop';
+import { binderCards, duplicates, openSealed, purchase, PACK_PRICE, BOX_PRICE, sellCards, sellValue, setProgress } from './shop';
 import { balance, welcomeEntry } from './economy';
-import { seededRng } from './cards';
+import { cardById, cardSet, openPack, seededRng } from './cards';
 import { emptyData, normalize } from '../data/storage';
 import type { AppData } from './types';
 
@@ -75,6 +75,52 @@ describe('opening', () => {
   it('counts set progress by distinct prints, without box toppers', () => {
     const d = { ...emptyData(), cards: { sealed: [], owned: { 'OP01-001': 3, 'OP01-120_p2': 1, 'OP01-008_p1': 1 } } };
     expect(setProgress(d, 'OP-01')).toEqual({ owned: 2, total: 148 });
+  });
+});
+
+describe('selling duplicates', () => {
+  const owning = (owned: Record<string, number>, berries = 0): AppData => ({ ...withBerries(berries), cards: { sealed: [], owned } });
+
+  it('prices follow the market snapshot, with a floor per rarity', () => {
+    expect(sellValue(cardById('OP01-120_p2')!)).toBe(1533); // manga Shanks, $1532.80
+    expect(sellValue(cardById('OP01-117')!)).toBe(1); // a common worth cents
+    expect(sellValue(cardById('OP01-121')!)).toBeGreaterThanOrEqual(40); // SEC floor
+  });
+  it('a whole pack resells for well under its price, so selling never funds the next pack', () => {
+    const set = cardSet('OP-01')!;
+    const rng = seededRng(11);
+    let total = 0;
+    const packs = 24 * 400;
+    for (let i = 0; i < packs; i++) total += openPack(set, rng).reduce((n, c) => n + sellValue(c), 0);
+    expect(total / packs).toBeLessThan(PACK_PRICE * 0.35);
+  });
+  it('lists only copies beyond the first', () => {
+    expect(duplicates(owning({ 'OP01-001': 3, 'OP01-002': 1 }))).toEqual([{ card: cardById('OP01-001'), extra: 2 }]);
+  });
+  it('sells duplicates for berries, recorded in the ledger', () => {
+    const r = sellCards(owning({ 'OP01-016': 3 }), [{ id: 'OP01-016', count: 2 }], 'now', newId);
+    if (!r.ok) throw new Error(r.error);
+    expect(r.data.cards.owned['OP01-016']).toBe(1);
+    expect(r.earned).toBe(sellValue(cardById('OP01-016')!) * 2);
+    expect(balance(r.data.ledger)).toBe(r.earned);
+    expect(r.data.ledger.at(-1)).toMatchObject({ kind: 'sale', label: 'Sold 2× Nami (OP01-016)' });
+  });
+  it('never sells the last copy, and changes nothing when refused', () => {
+    const d = owning({ 'OP01-016': 2, 'OP01-001': 1 });
+    expect(sellCards(d, [{ id: 'OP01-016', count: 2 }], 'now', newId).ok).toBe(false);
+    expect(sellCards(d, [{ id: 'OP01-016', count: 1 }, { id: 'OP01-001', count: 1 }], 'now', newId).ok).toBe(false);
+    expect(sellCards(d, [{ id: 'OP01-016', count: 0 }], 'now', newId).ok).toBe(false);
+    expect(sellCards(d, [{ id: 'NOPE', count: 1 }], 'now', newId).ok).toBe(false);
+  });
+});
+
+describe('binder', () => {
+  it('holds every pullable print, alternate arts right after their base card', () => {
+    const cards = binderCards('OP-01');
+    expect(cards).toHaveLength(148);
+    const i = cards.findIndex((c) => c.id === 'OP01-120');
+    expect(cards.slice(i, i + 3).map((c) => c.id)).toEqual(['OP01-120', 'OP01-120_p1', 'OP01-120_p2']);
+    expect(cards.some((c) => c.variant === 'boxTopper')).toBe(false);
   });
 });
 

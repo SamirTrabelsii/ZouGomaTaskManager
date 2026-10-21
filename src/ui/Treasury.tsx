@@ -9,6 +9,7 @@ import {
 } from '../domain/economy';
 import { Dialog, ProgressBar, Segmented } from './common/ui';
 import { ShopTab } from './cards/Shop';
+import { BinderTab } from './cards/Binder';
 
 /** Header button showing the Berries balance; a dot means a finished week's bounty is waiting. */
 export function WalletChip() {
@@ -78,10 +79,14 @@ function TreasuryDialog() {
   const history = [...data.ledger].reverse().slice(0, 12);
 
   return (
-    <Dialog title="Treasury" onClose={close}>
+    <Dialog title="Treasury" onClose={close} wide={tab === 'binder'}>
       <Segmented label="Treasury section" value={tab} onChange={setTab}
-        options={[{ value: 'wallet', label: '🪙 Wallet' }, { value: 'shop', label: `🃏 Card shop${data.cards.sealed.length ? ` · ${data.cards.sealed.length} sealed` : ''}` }]} />
-      <div className="mt-4">{tab === 'shop' ? <ShopTab /> : (
+        options={[
+          { value: 'wallet', label: '🪙 Wallet' },
+          { value: 'shop', label: `🃏 Shop${data.cards.sealed.length ? ` (${data.cards.sealed.length})` : ''}` },
+          { value: 'binder', label: '📒 Binder' },
+        ]} />
+      <div className="mt-4">{tab === 'shop' ? <ShopTab /> : tab === 'binder' ? <BinderTab /> : (
       <div className="space-y-4">
         <div className="flex items-end justify-between">
           <div>

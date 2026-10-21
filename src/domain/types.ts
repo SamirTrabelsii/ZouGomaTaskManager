@@ -177,7 +177,7 @@ export interface ExternalEvent {
 export interface LedgerEntry {
   id: ID;
   key: string;
-  kind: 'welcome' | 'weekly' | 'project' | 'milestone' | 'goal' | 'purchase';
+  kind: 'welcome' | 'weekly' | 'project' | 'milestone' | 'goal' | 'purchase' | 'sale';
   /** Positive = earned, negative = spent. May be 0 (a week closed below the minimum is still recorded). */
   amount: number;
   label: string;
