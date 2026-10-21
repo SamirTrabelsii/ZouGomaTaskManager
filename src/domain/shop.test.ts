@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { binderCards, duplicates, openSealed, purchase, PACK_PRICE, BOX_PRICE, sellCards, sellValue, setProgress } from './shop';
+import { binderCards, chaseCards, collectionStats, duplicates, openSealed, openSealedMany, purchase, sealedBySet, PACK_PRICE, BOX_PRICE, sellCards, sellValue, setProgress } from './shop';
 import { balance, welcomeEntry } from './economy';
 import { cardById, cardSet } from './cards';
 import { openPack, seededRng } from './odds';
@@ -76,6 +76,52 @@ describe('opening', () => {
   it('counts set progress by distinct prints, without box toppers', () => {
     const d = { ...emptyData(), cards: { sealed: [], owned: { 'OP01-001': 3, 'OP01-120_p2': 1, 'OP01-008_p1': 1 } } };
     expect(setProgress(d, 'OP-01')).toEqual({ owned: 2, total: 148 });
+  });
+});
+
+describe('opening several packs at once', () => {
+  const box = () => {
+    const r = purchase(withBerries(3000), 'OP-01:box', '', newId, seededRng(7));
+    if (!r.ok) throw new Error(r.error);
+    return r.data;
+  };
+  it('opens every pack, best cards first, each new card counted once', () => {
+    const d = box();
+    const ids = d.cards.sealed.slice(0, 5).map((p) => p.id);
+    const r = openSealedMany(d, ids)!;
+    expect(r.opened.packs).toBe(5);
+    expect(r.opened.setId).toBe('OP-01');
+    expect(r.opened.cards).toHaveLength(60);
+    expect(r.data.cards.sealed).toHaveLength(19);
+    expect(new Set(r.opened.fresh).size).toBe(r.opened.fresh.length);
+    expect(r.opened.fresh.length).toBe(Object.keys(r.data.cards.owned).length);
+    expect(Object.values(r.data.cards.owned).reduce((n, c) => n + c, 0)).toBe(60);
+  });
+  it('skips unknown ids and opens nothing for none', () => {
+    const d = box();
+    expect(openSealedMany(d, ['nope'])).toBeNull();
+    expect(openSealedMany(d, [d.cards.sealed[0].id, 'nope'])!.opened.packs).toBe(1);
+  });
+  it('groups sealed packs by set', () => {
+    const d = box();
+    expect(sealedBySet(d)).toEqual([{ setId: 'OP-01', ids: d.cards.sealed.map((p) => p.id) }]);
+  });
+});
+
+describe('shop shelf', () => {
+  it('chase cards are the priciest prints, never promos or reprints', () => {
+    const set = cardSet('OP-01')!;
+    const chase = chaseCards(set, 4);
+    expect(chase).toHaveLength(4);
+    for (const c of chase) expect(['promo', 'reprint']).not.toContain(c.variant);
+    const prices = chase.map((c) => c.price ?? 0);
+    expect(prices).toEqual([...prices].sort((a, b) => b - a));
+  });
+  it('sums up the collection', () => {
+    const d = { ...withBerries(0), cards: { sealed: [], owned: { 'OP01-001': 1, 'OP01-002': 3 } } };
+    const s = collectionStats(d);
+    expect(s).toMatchObject({ distinct: 2, copies: 4, sets: 1, dupes: 2 });
+    expect(s.dupeValue).toBe(2 * sellValue(cardById('OP01-002')!));
   });
 });
 
