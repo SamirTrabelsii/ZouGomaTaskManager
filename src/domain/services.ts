@@ -187,7 +187,7 @@ export function habitCompletionToday(habits: Habit[], logs: HabitLog[], today: s
 
 /* ───────── Calendar ───────── */
 
-export type AgendaKind = 'event' | 'deadline' | 'task' | 'milestone' | 'project' | 'reminder' | 'external';
+export type AgendaKind = 'event' | 'deadline' | 'task' | 'milestone' | 'project' | 'cert' | 'reminder' | 'external';
 export interface AgendaItem {
   key: string;
   kind: AgendaKind;
@@ -205,7 +205,7 @@ export interface AgendaItem {
   span?: { startDay: string; lastDay: string; startTime: string | null; endTime: string | null; allDay: boolean };
 }
 
-/** Everything that lands on a date: events, deadlines, scheduled tasks, milestones, reminders – plus any imported meetings passed in. */
+/** Everything that lands on a date: events, deadlines, scheduled tasks, milestones, certification exams and expiries, reminders – plus any imported meetings passed in. */
 export function agendaItems(d: AppData, imported: AgendaItem[] = []): AgendaItem[] {
   const out: AgendaItem[] = [...imported];
   d.events.forEach((e) => out.push({ key: 'e' + e.id, kind: e.kind, date: e.date, time: e.time, endTime: e.endTime, title: e.title, refId: e.id }));
@@ -217,6 +217,10 @@ export function agendaItems(d: AppData, imported: AgendaItem[] = []): AgendaItem
   });
   d.projects.forEach((p) => {
     if (p.deadline && p.status !== 'done') out.push({ key: 'p' + p.id, kind: 'project', date: p.deadline, time: null, title: `${p.title} deadline`, refId: p.id });
+  });
+  d.certifications.forEach((c) => {
+    if (c.status !== 'earned' && c.examDate) out.push({ key: 'ce' + c.id, kind: 'cert', date: c.examDate, time: null, title: `${c.title} exam`, refId: c.id });
+    if (c.status === 'earned' && c.expiresOn) out.push({ key: 'cx' + c.id, kind: 'cert', date: c.expiresOn, time: null, title: `${c.title} expires`, refId: c.id });
   });
   d.reminders.forEach((r) => {
     if (!r.link) out.push({ key: 'r' + r.id, kind: 'reminder', date: r.at.slice(0, 10), time: r.at.slice(11, 16), title: r.title, refId: r.id });

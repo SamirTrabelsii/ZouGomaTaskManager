@@ -157,8 +157,8 @@ describe('story points', () => {
 
 describe('data version', () => {
   it('upgrades v1 data and refuses data from a newer app', () => {
-    expect(normalize({ version: 1, tasks: [{ id: 'a', title: 'A' }] }).version).toBe(3);
-    expect(() => normalize({ version: 4, tasks: [] })).toThrow(/newer LifeOS/);
+    expect(normalize({ version: 1, tasks: [{ id: 'a', title: 'A' }] }).version).toBe(4);
+    expect(() => normalize({ version: 5, tasks: [] })).toThrow(/newer LifeOS/);
   });
 });
 

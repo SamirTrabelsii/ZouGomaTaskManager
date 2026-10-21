@@ -6,6 +6,8 @@ export type TaskSize = 'XS' | 'S' | 'M' | 'L' | 'XL' | 'XXL';
 export type ProjectStatus = 'active' | 'paused' | 'done';
 /** How big a goal's Berries reward is; chosen when the goal is created, then locked (see GOAL_TIERS). */
 export type GoalTier = 'S' | 'M' | 'L' | 'XL';
+/** Where a certification stands. "Expired" is not stored: it follows from the expiry date (see certState). */
+export type CertStatus = 'planned' | 'studying' | 'earned';
 export type NoteKind = 'note' | 'idea' | 'journal' | 'reflection' | 'review' | 'lesson';
 export type SceneObjectId = 'desk' | 'bookshelf' | 'plants' | 'calendar' | 'notebook' | 'chest';
 export type ViewId = 'home' | 'tasks' | 'calendar' | 'insights';
@@ -74,6 +76,25 @@ export interface Goal {
   rewardSetAt: string | null;
 }
 
+/** A professional certification: something you work toward, then a credential you keep current. */
+export interface Certification {
+  id: ID;
+  title: string;
+  issuer: string;
+  status: CertStatus;
+  examDate: string | null; // YYYY-MM-DD
+  earnedOn: string | null; // YYYY-MM-DD
+  /** null = never expires. */
+  expiresOn: string | null; // YYYY-MM-DD
+  credentialId: string;
+  /** Verification link; only http(s) is kept. */
+  credentialUrl: string;
+  notes: string;
+  /** Days before expiry to remind about renewal; null = no reminder. */
+  remindBefore: number | null;
+  createdAt: string; // ISO
+}
+
 export interface Habit {
   id: ID;
   title: string;
@@ -106,7 +127,7 @@ export interface Reminder {
   id: ID;
   title: string;
   at: string; // local 'YYYY-MM-DDTHH:mm'
-  link: { type: 'event' | 'task'; id: ID } | null;
+  link: { type: 'event' | 'task' | 'cert'; id: ID } | null;
   /** Set once delivered by any channel — guarantees we never deliver twice. */
   deliveredAt: string | null;
   deliveredVia: 'browser' | 'in-app' | null;
@@ -202,10 +223,10 @@ export interface CardCollection {
 }
 
 /**
- * 2: tasks gained scopes + sizes. 3: the Berries ledger.
+ * 2: tasks gained scopes + sizes. 3: the Berries ledger. 4: certifications.
  * Older app copies refuse newer data instead of silently stripping the new fields on their next save.
  */
-export const DATA_VERSION = 3;
+export const DATA_VERSION = 4;
 
 export interface AppData {
   version: number;
@@ -214,6 +235,7 @@ export interface AppData {
   projects: Project[];
   milestones: Milestone[];
   goals: Goal[];
+  certifications: Certification[];
   habits: Habit[];
   habitLogs: HabitLog[];
   events: CalEvent[];
