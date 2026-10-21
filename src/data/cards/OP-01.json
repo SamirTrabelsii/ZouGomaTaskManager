@@ -1,0 +1,1548 @@
+{
+ "id": "OP-01",
+ "name": "Romance Dawn",
+ "source": "optcgapi.com",
+ "snapshotAt": "2026-10-21",
+ "cards": [
+  {
+   "id": "OP01-001",
+   "number": "OP01-001",
+   "name": "Roronoa Zoro",
+   "rarity": "L",
+   "variant": "base",
+   "color": "Red",
+   "type": "Leader",
+   "price": 1.7
+  },
+  {
+   "id": "OP01-001_p1",
+   "number": "OP01-001",
+   "name": "Roronoa Zoro",
+   "rarity": "L",
+   "variant": "parallel",
+   "color": "Red",
+   "type": "Leader",
+   "price": 568.01
+  },
+  {
+   "id": "OP01-002",
+   "number": "OP01-002",
+   "name": "Trafalgar Law",
+   "rarity": "L",
+   "variant": "base",
+   "color": "Green Red",
+   "type": "Leader",
+   "price": 1.68
+  },
+  {
+   "id": "OP01-002_p1",
+   "number": "OP01-002",
+   "name": "Trafalgar Law",
+   "rarity": "L",
+   "variant": "parallel",
+   "color": "Green Red",
+   "type": "Leader",
+   "price": 440.22
+  },
+  {
+   "id": "OP01-003",
+   "number": "OP01-003",
+   "name": "Monkey.D.Luffy",
+   "rarity": "L",
+   "variant": "base",
+   "color": "Green Red",
+   "type": "Leader",
+   "price": 4.97
+  },
+  {
+   "id": "OP01-003_p1",
+   "number": "OP01-003",
+   "name": "Monkey.D.Luffy",
+   "rarity": "L",
+   "variant": "parallel",
+   "color": "Green Red",
+   "type": "Leader",
+   "price": 355.88
+  },
+  {
+   "id": "OP01-004",
+   "number": "OP01-004",
+   "name": "Usopp",
+   "rarity": "R",
+   "variant": "base",
+   "color": "Red",
+   "type": "Character",
+   "price": 0.28
+  },
+  {
+   "id": "OP01-005",
+   "number": "OP01-005",
+   "name": "Uta",
+   "rarity": "R",
+   "variant": "base",
+   "color": "Red",
+   "type": "Character",
+   "price": 0.3
+  },
+  {
+   "id": "OP01-006",
+   "number": "OP01-006",
+   "name": "Otama",
+   "rarity": "UC",
+   "variant": "base",
+   "color": "Red",
+   "type": "Character",
+   "price": 0.29
+  },
+  {
+   "id": "OP01-007",
+   "number": "OP01-007",
+   "name": "Caribou",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Red",
+   "type": "Character",
+   "price": 0.06
+  },
+  {
+   "id": "OP01-008",
+   "number": "OP01-008",
+   "name": "Cavendish",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Red",
+   "type": "Character",
+   "price": 0.07
+  },
+  {
+   "id": "OP01-008_p1",
+   "number": "OP01-008",
+   "name": "Cavendish",
+   "rarity": "C",
+   "variant": "boxTopper",
+   "color": "Red",
+   "type": "Character",
+   "price": 3.12
+  },
+  {
+   "id": "OP01-009",
+   "number": "OP01-009",
+   "name": "Carrot",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Red",
+   "type": "Character",
+   "price": 0.22
+  },
+  {
+   "id": "OP01-010",
+   "number": "OP01-010",
+   "name": "Komachiyo",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Red",
+   "type": "Character",
+   "price": 0.07
+  },
+  {
+   "id": "OP01-011",
+   "number": "OP01-011",
+   "name": "Gordon",
+   "rarity": "UC",
+   "variant": "base",
+   "color": "Red",
+   "type": "Character",
+   "price": 0.1
+  },
+  {
+   "id": "OP01-012",
+   "number": "OP01-012",
+   "name": "Sai",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Red",
+   "type": "Character",
+   "price": 0.06
+  },
+  {
+   "id": "OP01-013",
+   "number": "OP01-013",
+   "name": "Sanji",
+   "rarity": "R",
+   "variant": "base",
+   "color": "Red",
+   "type": "Character",
+   "price": 0.52
+  },
+  {
+   "id": "OP01-013_p1",
+   "number": "OP01-013",
+   "name": "Sanji",
+   "rarity": "R",
+   "variant": "parallel",
+   "color": "Red",
+   "type": "Character",
+   "price": 74.32
+  },
+  {
+   "id": "OP01-014",
+   "number": "OP01-014",
+   "name": "Jinbe",
+   "rarity": "UC",
+   "variant": "base",
+   "color": "Red",
+   "type": "Character",
+   "price": 0.16
+  },
+  {
+   "id": "OP01-015",
+   "number": "OP01-015",
+   "name": "Tony Tony.Chopper",
+   "rarity": "UC",
+   "variant": "base",
+   "color": "Red",
+   "type": "Character",
+   "price": 1.12
+  },
+  {
+   "id": "OP01-016",
+   "number": "OP01-016",
+   "name": "Nami",
+   "rarity": "R",
+   "variant": "base",
+   "color": "Red",
+   "type": "Character",
+   "price": 4.75
+  },
+  {
+   "id": "OP01-016_p1",
+   "number": "OP01-016",
+   "name": "Nami",
+   "rarity": "R",
+   "variant": "parallel",
+   "color": "Red",
+   "type": "Character",
+   "price": 454.88
+  },
+  {
+   "id": "OP01-017",
+   "number": "OP01-017",
+   "name": "Nico Robin",
+   "rarity": "R",
+   "variant": "base",
+   "color": "Red",
+   "type": "Character",
+   "price": 0.38
+  },
+  {
+   "id": "OP01-018",
+   "number": "OP01-018",
+   "name": "Hajrudin",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Red",
+   "type": "Character",
+   "price": 0.06
+  },
+  {
+   "id": "OP01-019",
+   "number": "OP01-019",
+   "name": "Bartolomeo",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Red",
+   "type": "Character",
+   "price": 0.08
+  },
+  {
+   "id": "OP01-020",
+   "number": "OP01-020",
+   "name": "Hyogoro",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Red",
+   "type": "Character",
+   "price": 0.06
+  },
+  {
+   "id": "OP01-021",
+   "number": "OP01-021",
+   "name": "Franky",
+   "rarity": "UC",
+   "variant": "base",
+   "color": "Red",
+   "type": "Character",
+   "price": 0.17
+  },
+  {
+   "id": "OP01-022",
+   "number": "OP01-022",
+   "name": "Brook",
+   "rarity": "UC",
+   "variant": "base",
+   "color": "Red",
+   "type": "Character",
+   "price": 0.23
+  },
+  {
+   "id": "OP01-023",
+   "number": "OP01-023",
+   "name": "Marco",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Red",
+   "type": "Character",
+   "price": 0.06
+  },
+  {
+   "id": "OP01-024",
+   "number": "OP01-024",
+   "name": "Monkey.D.Luffy",
+   "rarity": "SR",
+   "variant": "base",
+   "color": "Red",
+   "type": "Character",
+   "price": 1.66
+  },
+  {
+   "id": "OP01-024_p1",
+   "number": "OP01-024",
+   "name": "Monkey.D.Luffy",
+   "rarity": "SR",
+   "variant": "parallel",
+   "color": "Red",
+   "type": "Character",
+   "price": 233.96
+  },
+  {
+   "id": "OP01-025",
+   "number": "OP01-025",
+   "name": "Roronoa Zoro",
+   "rarity": "SR",
+   "variant": "base",
+   "color": "Red",
+   "type": "Character",
+   "price": 3.25
+  },
+  {
+   "id": "OP01-025_p1",
+   "number": "OP01-025",
+   "name": "Roronoa Zoro",
+   "rarity": "SR",
+   "variant": "parallel",
+   "color": "Red",
+   "type": "Character",
+   "price": 237.02
+  },
+  {
+   "id": "OP01-026",
+   "number": "OP01-026",
+   "name": "Gum-Gum Fire-Fist Pistol Red Hawk",
+   "rarity": "R",
+   "variant": "base",
+   "color": "Red",
+   "type": "Event",
+   "price": 0.46
+  },
+  {
+   "id": "OP01-027",
+   "number": "OP01-027",
+   "name": "Round Table",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Red",
+   "type": "Event",
+   "price": 0.44
+  },
+  {
+   "id": "OP01-028",
+   "number": "OP01-028",
+   "name": "Green Star Rafflesia",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Red",
+   "type": "Event",
+   "price": 0.08
+  },
+  {
+   "id": "OP01-029",
+   "number": "OP01-029",
+   "name": "Radical Beam!!",
+   "rarity": "UC",
+   "variant": "base",
+   "color": "Red",
+   "type": "Event",
+   "price": 0.24
+  },
+  {
+   "id": "OP01-030",
+   "number": "OP01-030",
+   "name": "In Two Years!! At the Sabaody Archipelago!!",
+   "rarity": "UC",
+   "variant": "base",
+   "color": "Red",
+   "type": "Event",
+   "price": 0.94
+  },
+  {
+   "id": "OP01-031",
+   "number": "OP01-031",
+   "name": "Kouzuki Oden",
+   "rarity": "L",
+   "variant": "base",
+   "color": "Green",
+   "type": "Leader",
+   "price": 0.31
+  },
+  {
+   "id": "OP01-031_p1",
+   "number": "OP01-031",
+   "name": "Kouzuki Oden",
+   "rarity": "L",
+   "variant": "parallel",
+   "color": "Green",
+   "type": "Leader",
+   "price": 79.42
+  },
+  {
+   "id": "OP01-032",
+   "number": "OP01-032",
+   "name": "Ashura Doji",
+   "rarity": "UC",
+   "variant": "base",
+   "color": "Green",
+   "type": "Character",
+   "price": 0.1
+  },
+  {
+   "id": "OP01-033",
+   "number": "OP01-033",
+   "name": "Izo",
+   "rarity": "UC",
+   "variant": "base",
+   "color": "Green",
+   "type": "Character",
+   "price": 0.2
+  },
+  {
+   "id": "OP01-034",
+   "number": "OP01-034",
+   "name": "Inuarashi",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Green",
+   "type": "Character",
+   "price": 0.1
+  },
+  {
+   "id": "OP01-034_p1",
+   "number": "OP01-034",
+   "name": "Inuarashi",
+   "rarity": "C",
+   "variant": "boxTopper",
+   "color": "Green",
+   "type": "Character",
+   "price": 3.03
+  },
+  {
+   "id": "OP01-035",
+   "number": "OP01-035",
+   "name": "Okiku",
+   "rarity": "R",
+   "variant": "base",
+   "color": "Green",
+   "type": "Character",
+   "price": 0.2
+  },
+  {
+   "id": "OP01-036",
+   "number": "OP01-036",
+   "name": "Otsuru",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Green",
+   "type": "Character",
+   "price": 0.07
+  },
+  {
+   "id": "OP01-037",
+   "number": "OP01-037",
+   "name": "Kawamatsu",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Green",
+   "type": "Character",
+   "price": 0.07
+  },
+  {
+   "id": "OP01-038",
+   "number": "OP01-038",
+   "name": "Kanjuro",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Green",
+   "type": "Character",
+   "price": 0.05
+  },
+  {
+   "id": "OP01-039",
+   "number": "OP01-039",
+   "name": "Killer",
+   "rarity": "UC",
+   "variant": "base",
+   "color": "Green",
+   "type": "Character",
+   "price": 0.31
+  },
+  {
+   "id": "OP01-040",
+   "number": "OP01-040",
+   "name": "Kin'emon",
+   "rarity": "SR",
+   "variant": "base",
+   "color": "Green",
+   "type": "Character",
+   "price": 0.6
+  },
+  {
+   "id": "OP01-040_p1",
+   "number": "OP01-040",
+   "name": "Kin'emon",
+   "rarity": "SR",
+   "variant": "parallel",
+   "color": "Green",
+   "type": "Character",
+   "price": 5.53
+  },
+  {
+   "id": "OP01-041",
+   "number": "OP01-041",
+   "name": "Kouzuki Momonosuke",
+   "rarity": "R",
+   "variant": "base",
+   "color": "Green",
+   "type": "Character",
+   "price": 0.14
+  },
+  {
+   "id": "OP01-042",
+   "number": "OP01-042",
+   "name": "Komurasaki",
+   "rarity": "UC",
+   "variant": "base",
+   "color": "Green",
+   "type": "Character",
+   "price": 0.1
+  },
+  {
+   "id": "OP01-043",
+   "number": "OP01-043",
+   "name": "Shinobu",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Green",
+   "type": "Character",
+   "price": 0.07
+  },
+  {
+   "id": "OP01-044",
+   "number": "OP01-044",
+   "name": "Shachi",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Green",
+   "type": "Character",
+   "price": 0.07
+  },
+  {
+   "id": "OP01-045",
+   "number": "OP01-045",
+   "name": "Jean Bart",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Green",
+   "type": "Character",
+   "price": 0.08
+  },
+  {
+   "id": "OP01-046",
+   "number": "OP01-046",
+   "name": "Denjiro",
+   "rarity": "R",
+   "variant": "base",
+   "color": "Green",
+   "type": "Character",
+   "price": 0.21
+  },
+  {
+   "id": "OP01-047",
+   "number": "OP01-047",
+   "name": "Trafalgar Law",
+   "rarity": "SR",
+   "variant": "base",
+   "color": "Green",
+   "type": "Character",
+   "price": 0.52
+  },
+  {
+   "id": "OP01-047_p1",
+   "number": "OP01-047",
+   "name": "Trafalgar Law",
+   "rarity": "SR",
+   "variant": "parallel",
+   "color": "Green",
+   "type": "Character",
+   "price": 57.68
+  },
+  {
+   "id": "OP01-048",
+   "number": "OP01-048",
+   "name": "Nekomamushi",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Green",
+   "type": "Character",
+   "price": 0.09
+  },
+  {
+   "id": "OP01-048_p1",
+   "number": "OP01-048",
+   "name": "Nekomamushi",
+   "rarity": "C",
+   "variant": "boxTopper",
+   "color": "Green",
+   "type": "Character",
+   "price": 2.82
+  },
+  {
+   "id": "OP01-049",
+   "number": "OP01-049",
+   "name": "Bepo",
+   "rarity": "R",
+   "variant": "base",
+   "color": "Green",
+   "type": "Character",
+   "price": 0.2
+  },
+  {
+   "id": "OP01-050",
+   "number": "OP01-050",
+   "name": "Penguin",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Green",
+   "type": "Character",
+   "price": 0.06
+  },
+  {
+   "id": "OP01-051",
+   "number": "OP01-051",
+   "name": "Eustass\"Captain\"Kid",
+   "rarity": "SR",
+   "variant": "base",
+   "color": "Green",
+   "type": "Character",
+   "price": 0.53
+  },
+  {
+   "id": "OP01-051_p1",
+   "number": "OP01-051",
+   "name": "Eustass\"Captain\"Kid",
+   "rarity": "SR",
+   "variant": "parallel",
+   "color": "Green",
+   "type": "Character",
+   "price": 14.73
+  },
+  {
+   "id": "OP01-052",
+   "number": "OP01-052",
+   "name": "Raizo",
+   "rarity": "UC",
+   "variant": "base",
+   "color": "Green",
+   "type": "Character",
+   "price": 0.08
+  },
+  {
+   "id": "OP01-053",
+   "number": "OP01-053",
+   "name": "Wire",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Green",
+   "type": "Character",
+   "price": 0.06
+  },
+  {
+   "id": "OP01-054",
+   "number": "OP01-054",
+   "name": "X.Drake",
+   "rarity": "R",
+   "variant": "base",
+   "color": "Green",
+   "type": "Character",
+   "price": 0.23
+  },
+  {
+   "id": "OP01-055",
+   "number": "OP01-055",
+   "name": "You Can Be My Samurai!!",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Green",
+   "type": "Event",
+   "price": 0.86
+  },
+  {
+   "id": "OP01-056",
+   "number": "OP01-056",
+   "name": "Demon Face",
+   "rarity": "UC",
+   "variant": "base",
+   "color": "Green",
+   "type": "Event",
+   "price": 0.1
+  },
+  {
+   "id": "OP01-057",
+   "number": "OP01-057",
+   "name": "Paradise Waterfall",
+   "rarity": "UC",
+   "variant": "base",
+   "color": "Green",
+   "type": "Event",
+   "price": 0.95
+  },
+  {
+   "id": "OP01-058",
+   "number": "OP01-058",
+   "name": "Punk Gibson",
+   "rarity": "R",
+   "variant": "base",
+   "color": "Green",
+   "type": "Event",
+   "price": 0.31
+  },
+  {
+   "id": "OP01-059",
+   "number": "OP01-059",
+   "name": "BE-BENG!!",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Green",
+   "type": "Event",
+   "price": 0.08
+  },
+  {
+   "id": "OP01-060",
+   "number": "OP01-060",
+   "name": "Donquixote Doflamingo",
+   "rarity": "L",
+   "variant": "base",
+   "color": "Blue",
+   "type": "Leader",
+   "price": 0.41
+  },
+  {
+   "id": "OP01-060_p1",
+   "number": "OP01-060",
+   "name": "Donquixote Doflamingo",
+   "rarity": "L",
+   "variant": "parallel",
+   "color": "Blue",
+   "type": "Leader",
+   "price": 240.79
+  },
+  {
+   "id": "OP01-061",
+   "number": "OP01-061",
+   "name": "Kaido",
+   "rarity": "L",
+   "variant": "base",
+   "color": "Blue Purple",
+   "type": "Leader",
+   "price": 0.43
+  },
+  {
+   "id": "OP01-061_p1",
+   "number": "OP01-061",
+   "name": "Kaido",
+   "rarity": "L",
+   "variant": "parallel",
+   "color": "Blue Purple",
+   "type": "Leader",
+   "price": 127.07
+  },
+  {
+   "id": "OP01-062",
+   "number": "OP01-062",
+   "name": "Crocodile",
+   "rarity": "L",
+   "variant": "base",
+   "color": "Blue Purple",
+   "type": "Leader",
+   "price": 0.34
+  },
+  {
+   "id": "OP01-062_p1",
+   "number": "OP01-062",
+   "name": "Crocodile",
+   "rarity": "L",
+   "variant": "parallel",
+   "color": "Blue Purple",
+   "type": "Leader",
+   "price": 132.06
+  },
+  {
+   "id": "OP01-063",
+   "number": "OP01-063",
+   "name": "Arlong",
+   "rarity": "UC",
+   "variant": "base",
+   "color": "Blue",
+   "type": "Character",
+   "price": 0.13
+  },
+  {
+   "id": "OP01-064",
+   "number": "OP01-064",
+   "name": "Alvida",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Blue",
+   "type": "Character",
+   "price": 0.17
+  },
+  {
+   "id": "OP01-064_p1",
+   "number": "OP01-064",
+   "name": "Alvida",
+   "rarity": "C",
+   "variant": "boxTopper",
+   "color": "Blue",
+   "type": "Character",
+   "price": 5.77
+  },
+  {
+   "id": "OP01-065",
+   "number": "OP01-065",
+   "name": "Vergo",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Blue",
+   "type": "Character",
+   "price": 0.06
+  },
+  {
+   "id": "OP01-066",
+   "number": "OP01-066",
+   "name": "Krieg",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Blue",
+   "type": "Character",
+   "price": 0.08
+  },
+  {
+   "id": "OP01-067",
+   "number": "OP01-067",
+   "name": "Crocodile",
+   "rarity": "SR",
+   "variant": "base",
+   "color": "Blue",
+   "type": "Character",
+   "price": 0.61
+  },
+  {
+   "id": "OP01-067_p1",
+   "number": "OP01-067",
+   "name": "Crocodile",
+   "rarity": "SR",
+   "variant": "parallel",
+   "color": "Blue",
+   "type": "Character",
+   "price": 9.21
+  },
+  {
+   "id": "OP01-068",
+   "number": "OP01-068",
+   "name": "Gecko Moria",
+   "rarity": "R",
+   "variant": "base",
+   "color": "Blue",
+   "type": "Character",
+   "price": 0.21
+  },
+  {
+   "id": "OP01-069",
+   "number": "OP01-069",
+   "name": "Caesar Clown",
+   "rarity": "R",
+   "variant": "base",
+   "color": "Blue",
+   "type": "Character",
+   "price": 0.17
+  },
+  {
+   "id": "OP01-070",
+   "number": "OP01-070",
+   "name": "Dracule Mihawk",
+   "rarity": "SR",
+   "variant": "base",
+   "color": "Blue",
+   "type": "Character",
+   "price": 0.9
+  },
+  {
+   "id": "OP01-070_p1",
+   "number": "OP01-070",
+   "name": "Dracule Mihawk",
+   "rarity": "SR",
+   "variant": "parallel",
+   "color": "Blue",
+   "type": "Character",
+   "price": 48.61
+  },
+  {
+   "id": "OP01-071",
+   "number": "OP01-071",
+   "name": "Jinbe",
+   "rarity": "R",
+   "variant": "base",
+   "color": "Blue",
+   "type": "Character",
+   "price": 0.21
+  },
+  {
+   "id": "OP01-072",
+   "number": "OP01-072",
+   "name": "Smiley",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Blue",
+   "type": "Character",
+   "price": 0.07
+  },
+  {
+   "id": "OP01-073",
+   "number": "OP01-073",
+   "name": "Donquixote Doflamingo",
+   "rarity": "R",
+   "variant": "base",
+   "color": "Blue",
+   "type": "Character",
+   "price": 0.31
+  },
+  {
+   "id": "OP01-073_p1",
+   "number": "OP01-073",
+   "name": "Donquixote Doflamingo",
+   "rarity": "R",
+   "variant": "parallel",
+   "color": "Blue",
+   "type": "Character",
+   "price": 18.74
+  },
+  {
+   "id": "OP01-074",
+   "number": "OP01-074",
+   "name": "Bartholomew Kuma",
+   "rarity": "R",
+   "variant": "base",
+   "color": "Blue",
+   "type": "Character",
+   "price": 0.25
+  },
+  {
+   "id": "OP01-075",
+   "number": "OP01-075",
+   "name": "Pacifista",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Blue",
+   "type": "Character",
+   "price": 0.23
+  },
+  {
+   "id": "OP01-076",
+   "number": "OP01-076",
+   "name": "Bellamy",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Blue",
+   "type": "Character",
+   "price": 0.07
+  },
+  {
+   "id": "OP01-077",
+   "number": "OP01-077",
+   "name": "Perona",
+   "rarity": "UC",
+   "variant": "base",
+   "color": "Blue",
+   "type": "Character",
+   "price": 0.63
+  },
+  {
+   "id": "OP01-077_p1",
+   "number": "OP01-077",
+   "name": "Perona",
+   "rarity": "UC",
+   "variant": "boxTopper",
+   "color": "Blue",
+   "type": "Character",
+   "price": 27.72
+  },
+  {
+   "id": "OP01-078",
+   "number": "OP01-078",
+   "name": "Boa Hancock",
+   "rarity": "SR",
+   "variant": "base",
+   "color": "Blue",
+   "type": "Character",
+   "price": 1.08
+  },
+  {
+   "id": "OP01-078_p1",
+   "number": "OP01-078",
+   "name": "Boa Hancock",
+   "rarity": "SR",
+   "variant": "parallel",
+   "color": "Blue",
+   "type": "Character",
+   "price": 128.56
+  },
+  {
+   "id": "OP01-079",
+   "number": "OP01-079",
+   "name": "Ms. All Sunday",
+   "rarity": "R",
+   "variant": "base",
+   "color": "Blue",
+   "type": "Character",
+   "price": 0.88
+  },
+  {
+   "id": "OP01-080",
+   "number": "OP01-080",
+   "name": "Miss Doublefinger",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Blue",
+   "type": "Character",
+   "price": 0.1
+  },
+  {
+   "id": "OP01-081",
+   "number": "OP01-081",
+   "name": "Mocha",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Blue",
+   "type": "Character",
+   "price": 0.04
+  },
+  {
+   "id": "OP01-082",
+   "number": "OP01-082",
+   "name": "Monet",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Blue",
+   "type": "Character",
+   "price": 0.14
+  },
+  {
+   "id": "OP01-083",
+   "number": "OP01-083",
+   "name": "Mr.1",
+   "rarity": "UC",
+   "variant": "base",
+   "color": "Blue",
+   "type": "Character",
+   "price": 0.1
+  },
+  {
+   "id": "OP01-084",
+   "number": "OP01-084",
+   "name": "Mr.2.Bon.Kurei",
+   "rarity": "UC",
+   "variant": "base",
+   "color": "Blue",
+   "type": "Character",
+   "price": 0.16
+  },
+  {
+   "id": "OP01-085",
+   "number": "OP01-085",
+   "name": "Mr.3",
+   "rarity": "UC",
+   "variant": "base",
+   "color": "Blue",
+   "type": "Character",
+   "price": 0.1
+  },
+  {
+   "id": "OP01-086",
+   "number": "OP01-086",
+   "name": "Overheat",
+   "rarity": "R",
+   "variant": "base",
+   "color": "Blue",
+   "type": "Event",
+   "price": 0.15
+  },
+  {
+   "id": "OP01-087",
+   "number": "OP01-087",
+   "name": "Officer Agents",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Blue",
+   "type": "Event",
+   "price": 0.08
+  },
+  {
+   "id": "OP01-088",
+   "number": "OP01-088",
+   "name": "Desert Spada",
+   "rarity": "UC",
+   "variant": "base",
+   "color": "Blue",
+   "type": "Event",
+   "price": 0.36
+  },
+  {
+   "id": "OP01-089",
+   "number": "OP01-089",
+   "name": "Crescent Cutlass",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Blue",
+   "type": "Event",
+   "price": 0.07
+  },
+  {
+   "id": "OP01-090",
+   "number": "OP01-090",
+   "name": "Baroque Works",
+   "rarity": "UC",
+   "variant": "base",
+   "color": "Blue",
+   "type": "Event",
+   "price": 0.18
+  },
+  {
+   "id": "OP01-091",
+   "number": "OP01-091",
+   "name": "King",
+   "rarity": "L",
+   "variant": "base",
+   "color": "Purple",
+   "type": "Leader",
+   "price": 0.38
+  },
+  {
+   "id": "OP01-091_p1",
+   "number": "OP01-091",
+   "name": "King",
+   "rarity": "L",
+   "variant": "parallel",
+   "color": "Purple",
+   "type": "Leader",
+   "price": 81.78
+  },
+  {
+   "id": "OP01-092",
+   "number": "OP01-092",
+   "name": "Urashima",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Purple",
+   "type": "Character",
+   "price": 0.06
+  },
+  {
+   "id": "OP01-093",
+   "number": "OP01-093",
+   "name": "Ulti",
+   "rarity": "R",
+   "variant": "base",
+   "color": "Purple",
+   "type": "Character",
+   "price": 0.25
+  },
+  {
+   "id": "OP01-093_p1",
+   "number": "OP01-093",
+   "name": "Ulti",
+   "rarity": "R",
+   "variant": "parallel",
+   "color": "Purple",
+   "type": "Character",
+   "price": 12.55
+  },
+  {
+   "id": "OP01-094",
+   "number": "OP01-094",
+   "name": "Kaido",
+   "rarity": "SR",
+   "variant": "base",
+   "color": "Purple",
+   "type": "Character",
+   "price": 3.66
+  },
+  {
+   "id": "OP01-094_p1",
+   "number": "OP01-094",
+   "name": "Kaido",
+   "rarity": "SR",
+   "variant": "parallel",
+   "color": "Purple",
+   "type": "Character",
+   "price": 29.17
+  },
+  {
+   "id": "OP01-095",
+   "number": "OP01-095",
+   "name": "Kyoshirou",
+   "rarity": "UC",
+   "variant": "base",
+   "color": "Purple",
+   "type": "Character",
+   "price": 0.13
+  },
+  {
+   "id": "OP01-096",
+   "number": "OP01-096",
+   "name": "King",
+   "rarity": "SR",
+   "variant": "base",
+   "color": "Purple",
+   "type": "Character",
+   "price": 0.58
+  },
+  {
+   "id": "OP01-096_p1",
+   "number": "OP01-096",
+   "name": "King",
+   "rarity": "SR",
+   "variant": "parallel",
+   "color": "Purple",
+   "type": "Character",
+   "price": 10.12
+  },
+  {
+   "id": "OP01-097",
+   "number": "OP01-097",
+   "name": "Queen",
+   "rarity": "R",
+   "variant": "base",
+   "color": "Purple",
+   "type": "Character",
+   "price": 0.2
+  },
+  {
+   "id": "OP01-097_p1",
+   "number": "OP01-097",
+   "name": "Queen",
+   "rarity": "R",
+   "variant": "parallel",
+   "color": "Purple",
+   "type": "Character",
+   "price": 5.47
+  },
+  {
+   "id": "OP01-098",
+   "number": "OP01-098",
+   "name": "Kurozumi Orochi",
+   "rarity": "UC",
+   "variant": "base",
+   "color": "Purple",
+   "type": "Character",
+   "price": 0.24
+  },
+  {
+   "id": "OP01-099",
+   "number": "OP01-099",
+   "name": "Kurozumi Semimaru",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Purple",
+   "type": "Character",
+   "price": 0.06
+  },
+  {
+   "id": "OP01-100",
+   "number": "OP01-100",
+   "name": "Kurozumi Higurashi",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Purple",
+   "type": "Character",
+   "price": 0.06
+  },
+  {
+   "id": "OP01-101",
+   "number": "OP01-101",
+   "name": "Sasaki",
+   "rarity": "UC",
+   "variant": "base",
+   "color": "Purple",
+   "type": "Character",
+   "price": 0.19
+  },
+  {
+   "id": "OP01-102",
+   "number": "OP01-102",
+   "name": "Jack",
+   "rarity": "R",
+   "variant": "base",
+   "color": "Purple",
+   "type": "Character",
+   "price": 0.18
+  },
+  {
+   "id": "OP01-102_p1",
+   "number": "OP01-102",
+   "name": "Jack",
+   "rarity": "R",
+   "variant": "parallel",
+   "color": "Purple",
+   "type": "Character",
+   "price": 6.07
+  },
+  {
+   "id": "OP01-103",
+   "number": "OP01-103",
+   "name": "Scratchmen Apoo",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Purple",
+   "type": "Character",
+   "price": 0.06
+  },
+  {
+   "id": "OP01-104",
+   "number": "OP01-104",
+   "name": "Speed",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Purple",
+   "type": "Character",
+   "price": 0.1
+  },
+  {
+   "id": "OP01-105",
+   "number": "OP01-105",
+   "name": "Bao Huang",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Purple",
+   "type": "Character",
+   "price": 0.06
+  },
+  {
+   "id": "OP01-106",
+   "number": "OP01-106",
+   "name": "Basil Hawkins",
+   "rarity": "UC",
+   "variant": "base",
+   "color": "Purple",
+   "type": "Character",
+   "price": 0.16
+  },
+  {
+   "id": "OP01-107",
+   "number": "OP01-107",
+   "name": "Babanuki",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Purple",
+   "type": "Character",
+   "price": 0.06
+  },
+  {
+   "id": "OP01-108",
+   "number": "OP01-108",
+   "name": "Hitokiri Kamazo",
+   "rarity": "UC",
+   "variant": "base",
+   "color": "Purple",
+   "type": "Character",
+   "price": 0.13
+  },
+  {
+   "id": "OP01-109",
+   "number": "OP01-109",
+   "name": "Who's.Who",
+   "rarity": "UC",
+   "variant": "base",
+   "color": "Purple",
+   "type": "Character",
+   "price": 0.08
+  },
+  {
+   "id": "OP01-109_p1",
+   "number": "OP01-109",
+   "name": "Who's.Who",
+   "rarity": "UC",
+   "variant": "boxTopper",
+   "color": "Purple",
+   "type": "Character",
+   "price": 2.72
+  },
+  {
+   "id": "OP01-110",
+   "number": "OP01-110",
+   "name": "Fukurokuju",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Purple",
+   "type": "Character",
+   "price": 0.06
+  },
+  {
+   "id": "OP01-111",
+   "number": "OP01-111",
+   "name": "Black Maria",
+   "rarity": "R",
+   "variant": "base",
+   "color": "Purple",
+   "type": "Character",
+   "price": 0.18
+  },
+  {
+   "id": "OP01-112",
+   "number": "OP01-112",
+   "name": "Page One",
+   "rarity": "R",
+   "variant": "base",
+   "color": "Purple",
+   "type": "Character",
+   "price": 0.22
+  },
+  {
+   "id": "OP01-113",
+   "number": "OP01-113",
+   "name": "Holedem",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Purple",
+   "type": "Character",
+   "price": 0.06
+  },
+  {
+   "id": "OP01-114",
+   "number": "OP01-114",
+   "name": "X.Drake",
+   "rarity": "R",
+   "variant": "base",
+   "color": "Purple",
+   "type": "Character",
+   "price": 0.18
+  },
+  {
+   "id": "OP01-115",
+   "number": "OP01-115",
+   "name": "Elephant's Marchoo",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Purple",
+   "type": "Event",
+   "price": 0.07
+  },
+  {
+   "id": "OP01-116",
+   "number": "OP01-116",
+   "name": "Artificial Devil Fruit SMILE",
+   "rarity": "UC",
+   "variant": "base",
+   "color": "Purple",
+   "type": "Event",
+   "price": 0.14
+  },
+  {
+   "id": "OP01-117",
+   "number": "OP01-117",
+   "name": "Sheep's Horn",
+   "rarity": "C",
+   "variant": "base",
+   "color": "Purple",
+   "type": "Event",
+   "price": 0.13
+  },
+  {
+   "id": "OP01-118",
+   "number": "OP01-118",
+   "name": "Ulti-Mortar",
+   "rarity": "UC",
+   "variant": "base",
+   "color": "Purple",
+   "type": "Event",
+   "price": 0.14
+  },
+  {
+   "id": "OP01-119",
+   "number": "OP01-119",
+   "name": "Thunder Bagua",
+   "rarity": "R",
+   "variant": "base",
+   "color": "Purple",
+   "type": "Event",
+   "price": 0.34
+  },
+  {
+   "id": "OP01-120",
+   "number": "OP01-120",
+   "name": "Shanks",
+   "rarity": "SEC",
+   "variant": "base",
+   "color": "Red",
+   "type": "Character",
+   "price": 7.99
+  },
+  {
+   "id": "OP01-120_p1",
+   "number": "OP01-120",
+   "name": "Shanks",
+   "rarity": "SEC",
+   "variant": "parallel",
+   "color": "Red",
+   "type": "Character",
+   "price": 76.68
+  },
+  {
+   "id": "OP01-120_p2",
+   "number": "OP01-120",
+   "name": "Shanks",
+   "rarity": "SEC",
+   "variant": "manga",
+   "color": "Red",
+   "type": "Character",
+   "price": 1532.8
+  },
+  {
+   "id": "OP01-121",
+   "number": "OP01-121",
+   "name": "Yamato",
+   "rarity": "SEC",
+   "variant": "base",
+   "color": "Green",
+   "type": "Character",
+   "price": 5.02
+  },
+  {
+   "id": "OP01-121_p1",
+   "number": "OP01-121",
+   "name": "Yamato",
+   "rarity": "SEC",
+   "variant": "parallel",
+   "color": "Green",
+   "type": "Character",
+   "price": 114.83
+  }
+ ]
+}
