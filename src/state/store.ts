@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import {
-  type AppData, type CalEvent, type Goal, type Habit, type Milestone, type Note, type Project,
+  type AppData, type CalEvent, type Goal, type LedgerEntry, type Habit, type Milestone, type Note, type Project,
   type Reminder, type SceneObjectId, type Scope, type Task, type ViewId, type Prefs,
 } from '../domain/types';
 import { showSystemNotification } from './notify';
@@ -9,7 +9,10 @@ import { TEMPLATES, templateById } from '../domain/templates';
 import { emptyData, exportJson, LocalStorageAdapter, normalize, type BackupInfo } from '../data/storage';
 import { Syncer, initialCloud, type CloudState, type StartResult } from '../data/sync';
 import { cloud as cloudApi, ApiError, type CloudBackup } from '../data/cloud';
-import { bountyEntry, economyStart, formatBerries, pendingBounties, welcomeEntry, WELCOME_GIFT } from '../domain/economy';
+import {
+  bountyEntry, economyStart, formatBerries, goalEntry, goalReward, milestoneEntry, milestoneReward, pendingBounties,
+  projectEntry, projectReward, PROJECT_MIN_POINTS, welcomeEntry, WELCOME_GIFT,
+} from '../domain/economy';
 
 export const storage = new LocalStorageAdapter();
 
@@ -170,6 +173,16 @@ export const useStore = create<Store>((set, get) => {
     }
     const rem: Reminder = { id: uid(), title, at, link, deliveredAt: null, deliveredVia: null, ackedAt: null };
     return { ...d, reminders: [...d.reminders, rem] };
+  };
+  /**
+   * Pays a completion reward into the ledger. Nothing is paid before the treasury is opened, for a zero amount, or for
+   * a source that was already paid. Returns whether it paid.
+   */
+  const earn = (entry: LedgerEntry): boolean => {
+    const { ledger } = get().data;
+    if (entry.amount <= 0 || !economyStart(ledger) || ledger.some((e) => e.key === entry.key)) return false;
+    commit((d) => ({ ...d, ledger: [...d.ledger, entry] }));
+    return true;
   };
   const eventReminderAt = (e: CalEvent): string | null => {
     if (e.remindBefore == null) return null;
@@ -371,9 +384,13 @@ export const useStore = create<Store>((set, get) => {
     updateProject(id, patch) {
       const before = get().data.projects.find((p) => p.id === id);
       commit((d) => ({ ...d, projects: d.projects.map((p) => (p.id === id ? { ...p, ...patch } : p)) }));
-      if (patch.status === 'done' && before?.status !== 'done') {
+      if (before && patch.status === 'done' && before.status !== 'done') {
         pulse('bookshelf', true);
-        toast('Project complete — nicely done.');
+        const project = { ...before, ...patch };
+        const r = projectReward(project, get().data.tasks);
+        if (earn(projectEntry(uid(), nowIso(), project, r))) toast(`Project complete! +${formatBerries(r.amount)}`);
+        else if (r.points < PROJECT_MIN_POINTS && economyStart(get().data.ledger)) toast(`Project complete. Finished tasks worth ${PROJECT_MIN_POINTS}+ points earn Berries.`);
+        else toast('Project complete — nicely done.');
       } else pulse('bookshelf');
     },
     deleteProject(id) {
@@ -400,7 +417,9 @@ export const useStore = create<Store>((set, get) => {
       const done = !m.done;
       commit((d) => ({ ...d, milestones: d.milestones.map((x) => (x.id === id ? { ...x, done, completedAt: done ? nowIso() : null } : x)) }));
       pulse('bookshelf', done);
-      if (done) toast(`Milestone reached: ${m.title}`);
+      if (!done) return;
+      const amount = milestoneReward(m, get().data.tasks);
+      toast(earn(milestoneEntry(uid(), nowIso(), m, amount)) ? `Milestone reached: ${m.title} · +${formatBerries(amount)}` : `Milestone reached: ${m.title}`);
     },
     deleteMilestone(id) {
       withUndo('Milestone deleted', () =>
@@ -413,18 +432,27 @@ export const useStore = create<Store>((set, get) => {
 
     /* ── goals ── */
     addGoal(input) {
-      const g: Goal = { id: uid(), description: '', unit: '', target: 100, current: 0, deadline: null, createdAt: nowIso(), ...input, title: input.title.trim() };
+      const g: Goal = {
+        id: uid(), description: '', unit: '', target: 100, current: 0, deadline: null, createdAt: nowIso(), ...input,
+        title: input.title.trim(), reward: input.reward ?? null, rewardSetAt: input.reward ? nowIso() : null,
+      };
       commit((d) => ({ ...d, goals: [g, ...d.goals] }));
       pulse('bookshelf');
       return g;
     },
     updateGoal(id, patch) {
       const before = get().data.goals.find((g) => g.id === id);
-      commit((d) => ({ ...d, goals: d.goals.map((g) => (g.id === id ? { ...g, ...patch } : g)) }));
-      const after = { ...before!, ...patch };
-      const reached = before && before.current < before.target && after.current >= after.target && after.target > 0;
-      pulse('bookshelf', !!reached);
-      if (reached) toast(`Goal reached: ${after.title}`);
+      if (!before) return;
+      // the reward tier is locked once picked; a goal without one may pick it once, which starts its clock
+      const { reward, rewardSetAt: _ignored, ...rest } = patch;
+      const tier = !before.reward && reward ? { reward, rewardSetAt: nowIso() } : {};
+      const after: Goal = { ...before, ...rest, ...tier };
+      commit((d) => ({ ...d, goals: d.goals.map((g) => (g.id === id ? after : g)) }));
+      const reached = before.current < before.target && after.current >= after.target && after.target > 0;
+      pulse('bookshelf', reached);
+      if (!reached) return;
+      const r = goalReward(after, todayStr());
+      toast(earn(goalEntry(uid(), nowIso(), after, r)) ? `Goal reached: ${after.title} · +${formatBerries(r.amount)}` : `Goal reached: ${after.title}`);
     },
     deleteGoal(id) {
       const g = get().data.goals.find((x) => x.id === id);

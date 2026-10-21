@@ -4,6 +4,8 @@ export type TaskStatus = 'todo' | 'doing' | 'blocked' | 'onhold' | 'done';
 /** T-shirt size of a task; each size is worth a fixed number of story points (see SIZE_POINTS). */
 export type TaskSize = 'XS' | 'S' | 'M' | 'L' | 'XL' | 'XXL';
 export type ProjectStatus = 'active' | 'paused' | 'done';
+/** How big a goal's Berries reward is; chosen when the goal is created, then locked (see GOAL_TIERS). */
+export type GoalTier = 'S' | 'M' | 'L' | 'XL';
 export type NoteKind = 'note' | 'idea' | 'journal' | 'reflection' | 'review' | 'lesson';
 export type SceneObjectId = 'desk' | 'bookshelf' | 'plants' | 'calendar' | 'notebook';
 export type ViewId = 'home' | 'tasks' | 'calendar' | 'insights';
@@ -66,6 +68,10 @@ export interface Goal {
   current: number;
   deadline: string | null;
   createdAt: string;
+  /** Reward tier; null for goals made before rewards existed (they may pick one, once). */
+  reward: GoalTier | null;
+  /** When the tier was picked (ISO). Bigger tiers only pay in full once the goal is old enough. */
+  rewardSetAt: string | null;
 }
 
 export interface Habit {
@@ -171,7 +177,7 @@ export interface ExternalEvent {
 export interface LedgerEntry {
   id: ID;
   key: string;
-  kind: 'welcome' | 'weekly';
+  kind: 'welcome' | 'weekly' | 'project' | 'milestone' | 'goal';
   /** Positive = earned, negative = spent. May be 0 (a week closed below the minimum is still recorded). */
   amount: number;
   label: string;

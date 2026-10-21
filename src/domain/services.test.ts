@@ -72,7 +72,7 @@ describe('progress', () => {
     expect(r.ratio).toBe(0.5);
   });
   it('goal progress is clamped', () => {
-    expect(goalProgress({ id: 'g', title: '', description: '', unit: '', target: 10, current: 25, deadline: null, createdAt: '' })).toBe(1);
+    expect(goalProgress({ id: 'g', title: '', description: '', unit: '', target: 10, current: 25, deadline: null, createdAt: '', reward: null, rewardSetAt: null })).toBe(1);
   });
   it('weekly summary only counts the given week', () => {
     const d = emptyData();

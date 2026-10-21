@@ -1,15 +1,55 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useStore } from '../../state/store';
 import { useToday } from '../../state/hooks';
 import { goalProgress, projectProgress, sortMilestones, sortTasks } from '../../domain/services';
-import { relativeDay } from '../../domain/dates';
-import type { Goal, Project, ProjectStatus } from '../../domain/types';
+import { formatDay, relativeDay } from '../../domain/dates';
+import type { Goal, GoalTier, Project, ProjectStatus } from '../../domain/types';
+import {
+  economyStart, formatBerries, goalKey, goalReward, GOAL_TIER_IDS, GOAL_TIERS, MILESTONE_REWARD, paidAmount, projectKey,
+  projectReward, PROJECT_MIN_POINTS,
+} from '../../domain/economy';
 import { resolveTemplates } from '../../domain/templates';
-import { ConfirmButton, Dialog, EmptyState, Field, ProgressBar } from '../common/ui';
+import { ConfirmButton, Dialog, EmptyState, Field, ProgressBar, Segmented } from '../common/ui';
 import { QuickAdd, TaskList, useTaskDialog } from '../common/tasks';
 import { PanelShell, Section, Tabs } from './PanelShell';
 
 const STATUS: Record<ProjectStatus, string> = { active: '▶ Active', paused: '⏸ Paused', done: '✓ Complete' };
+
+/** One quiet line about the Berries a project or goal earns; hidden until the treasury is opened. */
+function RewardLine({ children }: { children: ReactNode }) {
+  const started = useStore((s) => !!economyStart(s.data.ledger));
+  return started ? <div className="mt-1 text-xs text-ink-500">🪙 {children}</div> : null;
+}
+
+function ProjectReward({ id }: { id: string }) {
+  const data = useStore((s) => s.data);
+  const paid = paidAmount(data.ledger, projectKey(id));
+  if (paid != null) return <RewardLine>Earned {formatBerries(paid)}</RewardLine>;
+  const r = projectReward({ id }, data.tasks);
+  return (
+    <RewardLine>
+      {r.amount
+        ? <>Worth {formatBerries(r.amount)} when complete ({r.points} pts finished)</>
+        : <>Finish {PROJECT_MIN_POINTS - r.points} more pts of its tasks to earn Berries</>}
+    </RewardLine>
+  );
+}
+
+function GoalRewardLine({ goal }: { goal: Goal }) {
+  const ledger = useStore((s) => s.data.ledger);
+  const today = useToday();
+  const paid = paidAmount(ledger, goalKey(goal.id));
+  if (paid != null) return <RewardLine>Earned {formatBerries(paid)}</RewardLine>;
+  if (!goal.reward) return <RewardLine>No reward tier yet. Pick one with ✎</RewardLine>;
+  const r = goalReward(goal, today);
+  const chosen = GOAL_TIERS[goal.reward];
+  return (
+    <RewardLine>
+      {chosen.label} · {formatBerries(chosen.amount)}
+      {r.fullOn && <> · pays {formatBerries(r.amount)} if reached now, in full from {formatDay(r.fullOn)}</>}
+    </RewardLine>
+  );
+}
 
 export function BookshelfPanel() {
   const data = useStore((s) => s.data);
@@ -142,6 +182,7 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
       <div className="card">
         <ProgressBar value={pr.ratio} label="Project progress" />
         <div className="mt-1 text-xs text-ink-500">{pr.done} of {pr.total} tasks &amp; milestones done · {Math.round(pr.ratio * 100)}%</div>
+        <ProjectReward id={id} />
         {p.status !== 'done'
           ? <button className="btn mt-2" onClick={() => st.updateProject(id, { status: 'done' })}>Mark project complete</button>
           : <button className="btn mt-2" onClick={() => st.updateProject(id, { status: 'active' })}>Reopen project</button>}
@@ -164,6 +205,7 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
           <input type="date" className="input w-36" aria-label="Milestone due date" value={msDue} onChange={(e) => setMsDue(e.target.value)} />
           <button className="btn" disabled={!ms.trim()}>Add</button>
         </form>
+        <RewardLine>A milestone with a finished linked task earns {formatBerries(MILESTONE_REWARD)}</RewardLine>
       </Section>
 
       <Section title="Linked tasks">
@@ -183,7 +225,8 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
 
 function GoalForm({ goal, onClose, onSaved }: { goal?: Goal; onClose: () => void; onSaved?: (id: string) => void }) {
   const { addGoal, updateGoal, toast } = useStore.getState();
-  const [f, setF] = useState({ title: goal?.title ?? '', description: goal?.description ?? '', unit: goal?.unit ?? '', target: goal?.target ?? 10, current: goal?.current ?? 0, deadline: goal?.deadline ?? '' });
+  const [f, setF] = useState({ title: goal?.title ?? '', description: goal?.description ?? '', unit: goal?.unit ?? '', target: goal?.target ?? 10, current: goal?.current ?? 0, deadline: goal?.deadline ?? '', reward: goal?.reward ?? ('S' as GoalTier) });
+  const locked = !!goal?.reward;
   const [err, setErr] = useState('');
   return (
     <Dialog title={goal ? 'Edit goal' : 'New goal'} onClose={onClose}>
@@ -204,6 +247,22 @@ function GoalForm({ goal, onClose, onSaved }: { goal?: Goal; onClose: () => void
           <Field label="Unit"><input className="input" placeholder="books" value={f.unit} onChange={(e) => setF({ ...f, unit: e.target.value })} /></Field>
         </div>
         <Field label="Target date"><input type="date" className="input" value={f.deadline} onChange={(e) => setF({ ...f, deadline: e.target.value })} /></Field>
+        <div>
+          <span className="label">Reward</span>
+          {locked ? (
+            <p className="text-sm">🔒 {GOAL_TIERS[f.reward].label} · {formatBerries(GOAL_TIERS[f.reward].amount)} <span className="text-xs text-ink-500">(locked once picked)</span></p>
+          ) : (
+            <>
+              <Segmented label="Reward tier" value={f.reward} onChange={(reward) => setF({ ...f, reward })}
+                options={GOAL_TIER_IDS.map((t) => ({ value: t, label: `${GOAL_TIERS[t].label} ${formatBerries(GOAL_TIERS[t].amount)}` }))} />
+              <p className="mt-1 text-xs text-ink-500">
+                Locked once saved. {GOAL_TIERS[f.reward].minDays > 0
+                  ? `Pays in full if reached ${GOAL_TIERS[f.reward].minDays}+ days from now; sooner pays a smaller tier.`
+                  : 'Pays as soon as the goal is reached.'}
+              </p>
+            </>
+          )}
+        </div>
         <div className="flex justify-end gap-2"><button type="button" className="btn" onClick={onClose}>Cancel</button><button className="btn btn-primary" type="submit">Save</button></div>
       </form>
     </Dialog>
@@ -224,6 +283,7 @@ function GoalDetail({ id, onBack }: { id: string; onBack: () => void }) {
       {g.description && <p className="text-sm text-ink-700">{g.description}</p>}
       <div className="card">
         <ProgressBar value={pr} label="Goal progress" />
+        <GoalRewardLine goal={g} />
         <div className="mt-2 flex items-center gap-2">
           <button className="btn" aria-label="Decrease progress" onClick={() => st.updateGoal(id, { current: Math.max(0, g.current - 1) })}>−</button>
           <span className="flex-1 text-center text-sm">{g.current} / {g.target} {g.unit} · {Math.round(pr * 100)}%</span>
