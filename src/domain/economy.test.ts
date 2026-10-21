@@ -99,6 +99,9 @@ describe('ledger', () => {
     const l = [opened(), spent];
     expect(balance(l)).toBe(WELCOME_GIFT - 150);
     expect(lifetimeEarned(l)).toBe(WELCOME_GIFT);
+    const sold: LedgerEntry = { id: 'x', key: 'sell:1', kind: 'sale', amount: 300, label: 'x', at: '' };
+    expect(lifetimeEarned([...l, sold])).toBe(WELCOME_GIFT); // card sales are trading, not earnings
+    expect(balance([...l, sold])).toBe(WELCOME_GIFT - 150 + 300);
   });
   it('loading data keeps only one entry per source key and drops malformed ones', () => {
     const d = normalize({

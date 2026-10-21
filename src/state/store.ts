@@ -13,7 +13,9 @@ import {
   bountyEntry, economyStart, formatBerries, goalEntry, goalReward, milestoneEntry, milestoneReward, pendingBounties,
   projectEntry, projectReward, PROJECT_MIN_POINTS, welcomeEntry, WELCOME_GIFT,
 } from '../domain/economy';
-import { openSealed, purchase, type OpenedPack } from '../domain/shop';
+import { openSealed, purchase, sellCards, type OpenedPack } from '../domain/shop';
+
+export type TreasuryTab = 'wallet' | 'shop' | 'binder';
 
 export const storage = new LocalStorageAdapter();
 
@@ -41,7 +43,7 @@ interface UIState {
   settingsOpen: boolean;
   inboxOpen: boolean;
   treasuryOpen: boolean;
-  treasuryTab: 'wallet' | 'shop';
+  treasuryTab: TreasuryTab;
   /** The pack being revealed in the opening overlay. Its cards are already in the collection. */
   packReveal: OpenedPack | null;
   toasts: Toast[];
@@ -74,7 +76,7 @@ interface Actions {
   toggleSettings(open?: boolean): void;
   toggleInbox(open?: boolean): void;
   toggleTreasury(open?: boolean): void;
-  setTreasuryTab(tab: 'wallet' | 'shop'): void;
+  setTreasuryTab(tab: TreasuryTab): void;
   resetCamera(): void;
   setLookAt(v: 'poster' | null): void;
   toast(text: string, kind?: Toast['kind'], action?: Toast['action']): void;
@@ -131,6 +133,8 @@ interface Actions {
   /** Adds the pack's cards to the collection, then shows the reveal. */
   openSealedPack(packId: string): void;
   closeReveal(): void;
+  /** Sells duplicate copies for Berries; the last copy of a card is never sold. Returns false (with a toast) if refused. */
+  sellDuplicates(sales: { id: string; count: number }[]): boolean;
   // prefs & data safety
   updatePrefs(fn: (p: Prefs) => Prefs): void;
   setTemplateEnabled(id: string, enabled: boolean): void;
@@ -635,6 +639,13 @@ export const useStore = create<Store>((set, get) => {
       set({ data: r.data, packReveal: r.opened });
     },
     closeReveal() { set({ packReveal: null }); },
+    sellDuplicates(sales) {
+      const r = sellCards(get().data, sales, nowIso(), uid);
+      if (!r.ok) { toast(r.error, 'error'); return false; }
+      set({ data: r.data });
+      toast(`Sold ${r.count} card${r.count === 1 ? '' : 's'} · +${formatBerries(r.earned)}`);
+      return true;
+    },
 
     /* ── prefs & data safety ── */
     updatePrefs(fn) {
