@@ -1,6 +1,6 @@
 import { DATA_VERSION, type AppData, type Prefs } from '../domain/types';
 import { TEMPLATES } from '../domain/templates';
-import { safeUrl } from '../domain/certs';
+import { CERT_LEVELS, DEFAULT_CERT_LEVEL, safeUrl } from '../domain/certs';
 
 /* ───────── Defaults & normalisation (also used to validate imports) ───────── */
 
@@ -51,6 +51,7 @@ function normalizeCerts(certs: any[]): any[] {
   return certs.filter((c) => typeof c.title === 'string').map((c) => ({
     ...c,
     issuer: text(c.issuer),
+    level: Object.hasOwn(CERT_LEVELS, c.level) ? c.level : DEFAULT_CERT_LEVEL,
     status: CERT_STATUSES.has(c.status) ? c.status : 'planned',
     examDate: day(c.examDate),
     earnedOn: day(c.earnedOn),

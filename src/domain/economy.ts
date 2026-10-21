@@ -1,4 +1,4 @@
-import type { AppData, Goal, GoalTier, Habit, HabitLog, LedgerEntry, Milestone, Project, Task } from './types';
+import type { AppData, CertLevel, Certification, Goal, GoalTier, Habit, HabitLog, LedgerEntry, Milestone, Project, Task } from './types';
 import { addDays, diffDays, isoToDay, startOfWeek } from './dates';
 import { sumPoints, taskPoints } from './services';
 
@@ -36,12 +36,15 @@ export const GOAL_TIERS: Record<GoalTier, { label: string; amount: number; minDa
   XL: { label: 'Legendary', amount: 3000, minDays: 90 },
 };
 export const GOAL_TIER_IDS = Object.keys(GOAL_TIERS) as GoalTier[];
+/** Paid once, the first time a certification is marked earned. */
+export const CERT_REWARD: Record<CertLevel, number> = { badge: 50, foundational: 100, associate: 500, professional: 1000, expert: 3000 };
 
 export const WELCOME_KEY = 'welcome';
 export const weekKey = (weekStart: string) => `week:${weekStart}`;
 export const projectKey = (id: string) => `project:${id}`;
 export const milestoneKey = (id: string) => `milestone:${id}`;
 export const goalKey = (id: string) => `goal:${id}`;
+export const certKey = (id: string) => `cert:${id}`;
 export const paidAmount = (ledger: LedgerEntry[], key: string): number | null => {
   const e = ledger.find((x) => x.key === key);
   return e ? e.amount : null;
@@ -255,6 +258,10 @@ export function milestoneEntry(id: string, at: string, m: Pick<Milestone, 'id' |
 
 export function goalEntry(id: string, at: string, goal: Pick<Goal, 'id' | 'title'>, r: { tier: GoalTier | null; amount: number }): LedgerEntry {
   return { id, key: goalKey(goal.id), kind: 'goal', amount: r.amount, at, label: `Goal reached · ${goal.title}${r.tier ? ` (${GOAL_TIERS[r.tier].label})` : ''}` };
+}
+
+export function certEntry(id: string, at: string, c: Pick<Certification, 'id' | 'title' | 'level'>): LedgerEntry {
+  return { id, key: certKey(c.id), kind: 'cert', amount: CERT_REWARD[c.level], at, label: `Certified · ${c.title}` };
 }
 
 /* ───────── In the room ───────── */

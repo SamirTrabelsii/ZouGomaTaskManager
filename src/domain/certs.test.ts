@@ -5,7 +5,7 @@ import type { Certification } from './types';
 
 const TODAY = '2026-10-22';
 const cert = (over: Partial<Certification>): Certification => ({
-  id: 'c', title: 'Cert', issuer: '', status: 'earned', examDate: null, earnedOn: null, expiresOn: null, credentialId: '',
+  id: 'c', title: 'Cert', issuer: '', level: 'associate', status: 'earned', examDate: null, earnedOn: null, expiresOn: null, credentialId: '',
   credentialUrl: '', notes: '', remindBefore: 60, createdAt: '2026-01-01T00:00:00Z', ...over,
 });
 
@@ -74,6 +74,6 @@ describe('normalize certifications', () => {
         { id: 'b' },
       ],
     }).certifications;
-    expect(c).toMatchObject({ id: 'a', status: 'planned', examDate: null, expiresOn: '2027-01-01', credentialUrl: '', remindBefore: null, issuer: '' });
+    expect(c).toMatchObject({ id: 'a', level: 'associate', status: 'planned', examDate: null, expiresOn: '2027-01-01', credentialUrl: '', remindBefore: null, issuer: '' });
   });
 });

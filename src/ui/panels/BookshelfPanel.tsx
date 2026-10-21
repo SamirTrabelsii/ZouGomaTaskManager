@@ -3,14 +3,14 @@ import { useStore } from '../../state/store';
 import { useToday } from '../../state/hooks';
 import { goalProgress, projectProgress, sortMilestones, sortTasks } from '../../domain/services';
 import { diffDays, formatDay, relativeDay } from '../../domain/dates';
-import type { Certification, CertStatus, Goal, GoalTier, Project, ProjectStatus } from '../../domain/types';
+import type { CertLevel, Certification, CertStatus, Goal, GoalTier, Project, ProjectStatus } from '../../domain/types';
 import {
-  economyStart, formatBerries, goalKey, goalReward, GOAL_TIER_IDS, GOAL_TIERS, MILESTONE_REWARD, paidAmount, projectKey,
+  certKey, CERT_REWARD, economyStart, formatBerries, goalKey, goalReward, GOAL_TIER_IDS, GOAL_TIERS, MILESTONE_REWARD, paidAmount, projectKey,
   projectReward, PROJECTS_PER_WEEK,
 } from '../../domain/economy';
 import { resolveTemplates } from '../../domain/templates';
 import {
-  CERT_STATUS, certReminderAt, certState, DEFAULT_REMIND_BEFORE, EXPIRING_SOON_DAYS, formatCertDate, REMIND_OPTIONS, safeUrl, sortCerts,
+  CERT_LEVEL_IDS, CERT_LEVELS, CERT_STATUS, certReminderAt, certState, DEFAULT_CERT_LEVEL, DEFAULT_REMIND_BEFORE, EXPIRING_SOON_DAYS, formatCertDate, REMIND_OPTIONS, safeUrl, sortCerts,
   type CertState,
 } from '../../domain/certs';
 import { ConfirmButton, Dialog, EmptyState, Field, ProgressBar, Segmented } from '../common/ui';
@@ -67,6 +67,7 @@ export function BookshelfPanel() {
   const [openGoal, setOpenGoal] = useState<string | null>(null);
   const [openCert, setOpenCert] = useState<string | null>(null);
   const [form, setForm] = useState<null | 'project' | 'goal' | 'cert'>(null);
+  const [level, setLevel] = useState<CertLevel | 'all'>('all');
   const today = useToday();
 
   useEffect(() => {
@@ -93,12 +94,17 @@ export function BookshelfPanel() {
           {data.certifications.length === 0 ? (
             <EmptyState icon="🎓" title="No certifications yet" hint="Track the ones you're studying for, then keep the credential, its link and its expiry date here." />
           ) : (
+            <>
+            {data.certifications.length > 1 && (
+              <Segmented label="Filter by level" value={level} onChange={setLevel}
+                options={[{ value: 'all' as const, label: 'All' }, ...CERT_LEVEL_IDS.map((l) => ({ value: l, label: CERT_LEVELS[l].icon }))]} />
+            )}
             <ul className="space-y-2">
-              {sortCerts(data.certifications, today).map((c) => (
+              {sortCerts(data.certifications.filter((c) => level === 'all' || c.level === level), today).map((c) => (
                 <li key={c.id}>
                   <button className="card w-full text-left transition hover:border-moss-500" onClick={() => setOpenCert(c.id)}>
                     <div className="flex items-center justify-between gap-2">
-                      <span className="truncate font-medium">{c.title}</span>
+                      <span className="truncate font-medium"><span title={CERT_LEVELS[c.level].label}>{CERT_LEVELS[c.level].icon}</span> {c.title}</span>
                       <CertChip state={certState(c, today)} />
                     </div>
                     <div className="mt-1 flex justify-between gap-2 text-xs text-ink-500">
@@ -109,6 +115,7 @@ export function BookshelfPanel() {
                 </li>
               ))}
             </ul>
+            </>
           )}
         </>
       ) : tab === 'projects' ? (
@@ -364,12 +371,23 @@ function certDateLine(c: Certification, today: string): string {
   return left <= EXPIRING_SOON_DAYS ? `Expires in ${left} day${left === 1 ? '' : 's'}` : `Valid until ${formatCertDate(c.expiresOn)}`;
 }
 
+function CertReward({ cert }: { cert: Certification }) {
+  const paid = useStore((s) => paidAmount(s.data.ledger, certKey(cert.id)));
+  if (paid != null) return <RewardLine>Earned {formatBerries(paid)}</RewardLine>;
+  return <RewardLine>{CERT_LEVELS[cert.level].label} · worth {formatBerries(CERT_REWARD[cert.level])} when earned</RewardLine>;
+}
+
+function CertRewardHint({ level, paid }: { level: CertLevel; paid: boolean }) {
+  if (paid) return <RewardLine>Its reward is already paid; changing the level won't pay again.</RewardLine>;
+  return <RewardLine>{CERT_LEVELS[level].label} pays {formatBerries(CERT_REWARD[level])} once, when marked earned</RewardLine>;
+}
+
 /** `earnNow` opens the form already switched to Earned, for the "I passed" button. */
 function CertForm({ cert, earnNow, onClose, onSaved }: { cert?: Certification; earnNow?: boolean; onClose: () => void; onSaved?: (id: string) => void }) {
   const { addCert, updateCert, toast } = useStore.getState();
   const today = useToday();
   const [f, setF] = useState({
-    title: cert?.title ?? '', issuer: cert?.issuer ?? '', status: earnNow ? 'earned' : cert?.status ?? ('planned' as CertStatus),
+    title: cert?.title ?? '', issuer: cert?.issuer ?? '', level: cert?.level ?? DEFAULT_CERT_LEVEL, status: earnNow ? 'earned' : cert?.status ?? ('planned' as CertStatus),
     examDate: cert?.examDate ?? '', earnedOn: cert?.earnedOn ?? (earnNow ? today : ''), expiresOn: cert?.expiresOn ?? '',
     credentialId: cert?.credentialId ?? '', credentialUrl: cert?.credentialUrl ?? '', notes: cert?.notes ?? '',
     remindBefore: cert ? cert.remindBefore : DEFAULT_REMIND_BEFORE,
@@ -390,12 +408,20 @@ function CertForm({ cert, earnNow, onClose, onSaved }: { cert?: Certification; e
         };
         if (cert) updateCert(cert.id, patch); else onSaved?.(addCert(patch).id);
         // the store already celebrates a newly earned certification
-        if (!(cert && earned && cert.status !== 'earned')) toast(cert ? 'Certification saved' : 'Certification added');
+        if (!(earned && cert?.status !== 'earned')) toast(cert ? 'Certification saved' : 'Certification added');
         onClose();
       }}>
         <Field label="Name"><input className="input" placeholder="AWS Solutions Architect – Associate" value={f.title} onChange={(e) => set({ title: e.target.value })} /></Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Issuer"><input className="input" placeholder="Amazon Web Services" value={f.issuer} onChange={(e) => set({ issuer: e.target.value })} /></Field>
+          <Field label="Level">
+            <select className="input" value={f.level} onChange={(e) => set({ level: e.target.value as CertLevel })}>
+              {CERT_LEVEL_IDS.map((l) => <option key={l} value={l}>{CERT_LEVELS[l].icon} {CERT_LEVELS[l].label}</option>)}
+            </select>
+          </Field>
+        </div>
+        <CertRewardHint level={f.level} paid={!!cert && paidAmount(useStore.getState().data.ledger, certKey(cert.id)) != null} />
+        <div className="grid grid-cols-2 gap-3">
           <Field label="Status">
             <select className="input" value={f.status} onChange={(e) => set({ status: e.target.value as CertStatus, earnedOn: e.target.value === 'earned' && !f.earnedOn ? today : f.earnedOn })}>
               {Object.entries(CERT_STATUS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
@@ -451,7 +477,7 @@ function CertDetail({ id, onBack }: { id: string; onBack: () => void }) {
     if (c.expiresOn) rows.push(['Reminder', remindAt ? `${formatCertDate(remindAt.slice(0, 10))} (${c.remindBefore} days before)` : 'None']);
   }
   return (
-    <PanelShell title={c.title} icon="🎓" subtitle={c.issuer || CERT_STATUS[c.status]}
+    <PanelShell title={c.title} icon={CERT_LEVELS[c.level].icon} subtitle={[CERT_LEVELS[c.level].label, c.issuer].filter(Boolean).join(' · ')}
       actions={<button className="btn btn-ghost px-2" onClick={() => setEdit('edit')} aria-label="Edit certification">✎</button>}>
       <button className="text-sm text-sky-500 underline" onClick={onBack}>← All certifications</button>
       <div className="card space-y-2">
@@ -461,6 +487,7 @@ function CertDetail({ id, onBack }: { id: string; onBack: () => void }) {
             {rows.flatMap(([k, v]) => [<dt key={`k-${k}`} className="text-ink-500">{k}</dt>, <dd key={`v-${k}`} className="min-w-0">{v}</dd>])}
           </dl>
         )}
+        <CertReward cert={c} />
         {c.status !== 'earned' && <button className="btn btn-primary" onClick={() => setEdit('earn')}>🎓 I passed: mark as earned</button>}
       </div>
       {c.notes && <p className="whitespace-pre-wrap text-sm text-ink-700">{c.notes}</p>}
