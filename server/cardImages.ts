@@ -1,13 +1,16 @@
 import { Router, type RequestHandler } from 'express';
 import { IMAGE_FILE } from './catalog';
+import { PACK_ART } from './packArt';
 
 /**
  * Card art proxy: GET /api/cards/img/:file serves one One Piece TCG card image (the catalog's `img`, e.g.
  * "OP16-011_l76oKss.jpg"), fetched once from optcgapi.com and then kept in memory. Browsers may cache the answer for a
  * year, so a device asks at most once per card.
  *
- * It is not an open proxy: the name must be a plain image file name, and the only place it ever fetches from is
- * optcgapi.com's card-image folder.
+ * GET /api/cards/pack/:setId does the same for a set's official booster pack picture (see packArt.ts).
+ *
+ * It is not an open proxy: a card must be a plain image file name, fetched only from optcgapi.com's card-image folder,
+ * and a pack must be a set listed in PACK_ART, fetched only from its listed URL.
  */
 
 export type ImageFetcher = (url: string) => Promise<{ type: string; body: Buffer }>;
@@ -42,7 +45,7 @@ export function cardImageRouter(auth: RequestHandler, fetcher: ImageFetcher = fe
     }
   };
 
-  const load = (id: string) => {
+  const load = (id: string, url: string) => {
     const hit = cache.get(id);
     if (hit) {
       cache.delete(id); // re-insert = most recently used
@@ -52,7 +55,7 @@ export function cardImageRouter(auth: RequestHandler, fetcher: ImageFetcher = fe
     // concurrent requests for the same card share one upstream fetch
     let p = pending.get(id);
     if (!p) {
-      p = fetcher(imageSourceUrl(id)).then((img) => { remember(id, img); return img; }).finally(() => pending.delete(id));
+      p = fetcher(url).then((img) => { remember(id, img); return img; }).finally(() => pending.delete(id));
       pending.set(id, p);
     }
     return p;
@@ -63,11 +66,24 @@ export function cardImageRouter(auth: RequestHandler, fetcher: ImageFetcher = fe
     const id = String(req.params.file);
     if (!IMAGE_FILE.test(id)) return res.status(400).json({ error: 'Unknown card' });
     try {
-      const img = await load(id);
+      const img = await load(id, imageSourceUrl(id));
       res.set('Cache-Control', 'private, max-age=31536000, immutable').type(img.type).send(img.body);
     } catch (e) {
       const status = (e as { status?: number }).status ?? 502;
       res.status(status).json({ error: status === 404 ? 'Unknown card' : 'Card image unavailable right now' });
+    }
+  });
+  router.get('/pack/:setId', auth, async (req, res) => {
+    const setId = String(req.params.setId);
+    const art = Object.hasOwn(PACK_ART, setId) ? PACK_ART[setId] : null;
+    if (!art) return res.status(404).json({ error: 'No pack picture for this set' });
+    try {
+      const img = await load(`pack:${setId}`, art.url);
+      // a set's picture can be replaced (a better scan, a fixed URL), so it is cached for a week, not forever
+      res.set('Cache-Control', 'private, max-age=604800').type(img.type).send(img.body);
+    } catch (e) {
+      const status = (e as { status?: number }).status ?? 502;
+      res.status(status).json({ error: 'Pack picture unavailable right now' });
     }
   });
   return router;

@@ -3,6 +3,7 @@ import express from 'express';
 import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
 import { cardImageRouter, imageSourceUrl, type ImageFetcher } from './cardImages';
+import { PACK_ART } from './packArt';
 
 let server: Server | null = null;
 afterEach(() => { server?.close(); server = null; });
@@ -73,5 +74,23 @@ describe('card image proxy', () => {
     await get('/api/cards/img/OP01-001.jpg');
     await get('/api/cards/img/OP01-002.jpg');
     expect(calls.map((u) => u.match(/OP01-\d+/)![0])).toEqual(['OP01-001', 'OP01-002', 'OP01-003', 'OP01-002']);
+  });
+
+  it('serves official pack pictures for listed sets only, from their listed URL', async () => {
+    const { calls, fetcher } = fakeFetcher();
+    const get = start(fetcher);
+    const a = await get('/api/cards/pack/OP-01');
+    expect(a.status).toBe(200);
+    expect(a.headers.get('cache-control')).toContain('max-age=604800');
+    await get('/api/cards/pack/OP-01');
+    expect(calls).toEqual([PACK_ART['OP-01'].url]);
+    for (const bad of ['OP-99', 'constructor', '__proto__', '..%2Fx']) expect((await get(`/api/cards/pack/${bad}`)).status).toBe(404);
+    expect(calls).toHaveLength(1);
+  });
+
+  it('pack pictures need a signed-in user too', async () => {
+    const { calls, fetcher } = fakeFetcher();
+    expect((await start(fetcher, { signedIn: false })('/api/cards/pack/OP-01')).status).toBe(401);
+    expect(calls).toEqual([]);
   });
 });
