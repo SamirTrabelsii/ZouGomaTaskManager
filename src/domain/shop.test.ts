@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { binderCards, chaseCards, collectionStats, duplicates, openSealed, openSealedMany, purchase, sealedBySet, PACK_PRICE, BOX_PRICE, sellCards, sellValue, setProgress } from './shop';
+import { binderCards, chaseCards, sellBreakdown, collectionStats, duplicates, openSealed, openSealedMany, purchase, sealedBySet, PACK_PRICE, BOX_PRICE, sellCards, sellValue, setProgress } from './shop';
 import { balance, welcomeEntry } from './economy';
 import { cardById, cardSet } from './cards';
 import { openPack, seededRng } from './odds';
@@ -126,6 +126,14 @@ describe('shop shelf', () => {
 });
 
 describe('selling duplicates', () => {
+  it('explains each price: market, rarity minimum, or cap', () => {
+    const card = (rarity: 'L' | 'UC' | 'SEC', price: number | null) => ({ ...cardById('OP01-001')!, rarity, price });
+    expect(sellBreakdown(card('L', 0.11))).toEqual({ value: 10, basis: 'floor', market: 0, floor: 10 });
+    expect(sellBreakdown(card('UC', 0.13))).toEqual({ value: 2, basis: 'floor', market: 0, floor: 2 });
+    expect(sellBreakdown(card('UC', null))).toMatchObject({ value: 2, basis: 'floor' });
+    expect(sellBreakdown(card('SEC', 61.4))).toMatchObject({ value: 61, basis: 'market' });
+    expect(sellBreakdown(card('SEC', 25000))).toMatchObject({ value: 3000, basis: 'cap' });
+  });
   const owning = (owned: Record<string, number>, berries = 0): AppData => ({ ...withBerries(berries), cards: { sealed: [], owned } });
 
   it('prices follow the market snapshot, with a floor per rarity', () => {
