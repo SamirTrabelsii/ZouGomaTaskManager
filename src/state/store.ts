@@ -10,10 +10,10 @@ import { emptyData, exportJson, LocalStorageAdapter, normalize, type BackupInfo 
 import { Syncer, initialCloud, type CloudState, type StartResult } from '../data/sync';
 import { cloud as cloudApi, ApiError, type CloudBackup } from '../data/cloud';
 import {
-  bountyEntry, economyStart, formatBerries, goalEntry, goalReward, milestoneEntry, milestoneReward, pendingBounties,
-  projectEntry, projectReward, PROJECTS_PER_WEEK, welcomeEntry, WELCOME_GIFT,
+  bountyEntry, certEntry, economyStart, formatBerries, goalEntry, goalReward, milestoneEntry, milestoneReward, pendingBounties,
+  projectEntry, projectReward, PROJECTS_PER_WEEK, CERT_REWARD, welcomeEntry, WELCOME_GIFT,
 } from '../domain/economy';
-import { certReminderAt, certReminderTitle, DEFAULT_REMIND_BEFORE, safeUrl } from '../domain/certs';
+import { certReminderAt, certReminderTitle, DEFAULT_CERT_LEVEL, DEFAULT_REMIND_BEFORE, safeUrl } from '../domain/certs';
 import { openSealed, openSealedMany, purchase, sellCards, type OpenedPack } from '../domain/shop';
 
 export type TreasuryTab = 'wallet' | 'shop' | 'binder';
@@ -224,6 +224,11 @@ export const useStore = create<Store>((set, get) => {
   const syncCertReminder = (d: AppData, c: Certification): AppData => {
     const at = certReminderAt(c, todayStr());
     return upsertReminder(d, { type: 'cert', id: c.id }, at ? certReminderTitle(c) : '', at);
+  };
+  /** Celebrates a newly earned certification and pays its level's reward (once per certification, ever). */
+  const certified = (c: Certification) => {
+    const paid = earn(certEntry(uid(), nowIso(), c));
+    toast(paid ? `Certified: ${c.title} 🎓 +${formatBerries(CERT_REWARD[c.level])}` : `Certified: ${c.title} 🎓`);
   };
 
   return {
@@ -515,12 +520,13 @@ export const useStore = create<Store>((set, get) => {
     /* ── certifications ── */
     addCert(input) {
       const c: Certification = {
-        id: uid(), issuer: '', status: 'planned', examDate: null, earnedOn: null, expiresOn: null, credentialId: '',
+        id: uid(), issuer: '', level: DEFAULT_CERT_LEVEL, status: 'planned', examDate: null, earnedOn: null, expiresOn: null, credentialId: '',
         notes: '', remindBefore: DEFAULT_REMIND_BEFORE, createdAt: nowIso(), ...input,
         title: input.title.trim(), credentialUrl: safeUrl(input.credentialUrl ?? ''),
       };
       commit((d) => syncCertReminder({ ...d, certifications: [c, ...d.certifications] }, c));
       pulse('bookshelf', c.status === 'earned');
+      if (c.status === 'earned') certified(c);
       return c;
     },
     updateCert(id, patch) {
@@ -530,7 +536,7 @@ export const useStore = create<Store>((set, get) => {
       commit((d) => syncCertReminder({ ...d, certifications: d.certifications.map((c) => (c.id === id ? after : c)) }, after));
       const earned = after.status === 'earned' && before.status !== 'earned';
       pulse('bookshelf', earned);
-      if (earned) toast(`Certified: ${after.title} 🎓`);
+      if (earned) certified(after);
     },
     deleteCert(id) {
       const c = get().data.certifications.find((x) => x.id === id);

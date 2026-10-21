@@ -1,4 +1,4 @@
-import type { Certification, CertStatus } from './types';
+import type { CertLevel, Certification, CertStatus } from './types';
 import { addDays, diffDays, LOCALE, parseDay } from './dates';
 
 /** An earned certification counts as "expiring soon" this many days before its expiry date. */
@@ -8,6 +8,16 @@ export const REMIND_OPTIONS = [30, 60, 90] as const;
 export const DEFAULT_REMIND_BEFORE = 60;
 /** Renewal reminders go off at this local time. */
 const REMIND_TIME = '09:00';
+
+export const CERT_LEVELS: Record<CertLevel, { label: string; icon: string }> = {
+  badge: { label: 'Badge', icon: '🏅' },
+  foundational: { label: 'Foundational', icon: '🌱' },
+  associate: { label: 'Associate', icon: '🔷' },
+  professional: { label: 'Professional', icon: '🔶' },
+  expert: { label: 'Expert', icon: '💎' },
+};
+export const CERT_LEVEL_IDS = Object.keys(CERT_LEVELS) as CertLevel[];
+export const DEFAULT_CERT_LEVEL: CertLevel = 'associate';
 
 export const CERT_STATUS: Record<CertStatus, string> = { planned: '○ Planned', studying: '✎ Studying', earned: '✓ Earned' };
 
