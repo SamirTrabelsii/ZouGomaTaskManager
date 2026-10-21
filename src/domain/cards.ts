@@ -1,4 +1,5 @@
 import op01 from '../data/cards/OP-01.json';
+import { PACK_ART, type PackBox } from '../../server/packArt';
 
 /*
  * ───────── One Piece TCG catalog ─────────
@@ -69,5 +70,15 @@ export const cardById = (id: string) => byId.get(id) ?? null;
  * Card art. Signed-in (server present): the server's caching proxy, so each image is fetched from optcgapi.com once.
  * Local-only mode has no server, so it loads straight from optcgapi.com.
  */
+/**
+ * The set's official booster pack picture and where the pack sits in it, or null for a set without one. Bandai's site
+ * forbids embedding its images elsewhere (Cross-Origin-Resource-Policy), so they only come through the server's proxy:
+ * local-only mode keeps the drawn wrapper.
+ */
+export function packArt(setId: string, viaServer: boolean): { src: string; box: PackBox } | null {
+  const art = viaServer && Object.hasOwn(PACK_ART, setId) ? PACK_ART[setId] : null;
+  return art && { src: `/api/cards/pack/${encodeURIComponent(setId)}`, box: art.box };
+}
+
 export const cardImageUrl = (img: string, viaServer: boolean) =>
   viaServer ? `/api/cards/img/${encodeURIComponent(img)}` : `https://optcgapi.com/media/static/Card_Images/${encodeURIComponent(img)}`;

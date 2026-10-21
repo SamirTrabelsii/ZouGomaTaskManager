@@ -183,7 +183,7 @@ export interface LedgerEntry {
   label: string;
   at: string; // ISO
   /** Weekly bounties only: what the payout was computed from, frozen at claim time. */
-  week?: { start: string; points: number; streak: number; multiplier: number; bonus: number };
+  week?: { start: string; points: number; streak: number; multiplier: number; bonus: number; habits?: number };
 }
 
 /** A booster bought but not opened yet. Its cards are rolled at purchase, so reloading the app can't reroll them. */

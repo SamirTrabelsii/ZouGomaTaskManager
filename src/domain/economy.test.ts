@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   balance, bountyEntry, chestCoins, currentWeek, posterBounty, economyStart, goalReward, lifetimeEarned, milestoneReward, pendingBounties,
-  projectReward, streakMultiplier, weekBounty, welcomeEntry, WELCOME_GIFT,
+  habitsKept, projectReward, streakMultiplier, weekBounty, welcomeEntry, WELCOME_GIFT,
 } from './economy';
 import { emptyData, normalize } from '../data/storage';
 import type { AppData, LedgerEntry, Task, TaskSize } from './types';
@@ -116,13 +116,44 @@ describe('ledger', () => {
 });
 
 describe('project reward', () => {
-  it('pays 200 + 5 per point of its finished tasks', () => {
-    const tasks = [{ ...task('2026-10-06', 'L'), projectId: 'p' }, { ...task('2026-10-07', 'M'), projectId: 'p' }, task('2026-10-07', 'XXL')];
-    expect(projectReward({ id: 'p' }, tasks)).toEqual({ points: 12, amount: 260 });
+  it('pays a flat 200 once one of its tasks is finished, whatever the points', () => {
+    const tasks = [{ ...task('2026-10-06', 'S'), projectId: 'p' }, task('2026-10-07', 'XXL')];
+    expect(projectReward({ id: 'p' }, tasks)).toEqual({ points: 2, amount: 200 });
   });
-  it('ignores unfinished tasks, and pays nothing below 10 points', () => {
-    const tasks = [{ ...task('2026-10-06', 'L'), projectId: 'p' }, { ...task('2026-10-06', 'XL'), projectId: 'p', status: 'todo' as const }];
-    expect(projectReward({ id: 'p' }, tasks)).toEqual({ points: 8, amount: 0 });
+  it('pays nothing without a finished task', () => {
+    const tasks = [{ ...task('2026-10-06', 'XL'), projectId: 'p', status: 'todo' as const }];
+    expect(projectReward({ id: 'p' }, tasks).amount).toBe(0);
+  });
+});
+
+describe('habits kept all week', () => {
+  const habit = (id: string, frequency: 'daily' | 'weekly', target = 1, createdAt = '2026-10-01T08:00:00.000Z') =>
+    ({ id, title: id, frequency, target, archived: false, createdAt, origin: null });
+  const logs = (id: string, days: string[]) => days.map((date) => ({ id: `${id}${date}`, habitId: id, date }));
+  const week = ['2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08', '2026-10-09', '2026-10-10', '2026-10-11'];
+  it('counts daily habits logged every day and weekly habits at their target', () => {
+    const habits = [habit('a', 'daily'), habit('b', 'daily'), habit('c', 'weekly', 3), habit('d', 'weekly', 3)];
+    const l = [...logs('a', week), ...logs('b', week.slice(1)), ...logs('c', week.slice(0, 3)), ...logs('d', week.slice(0, 2))];
+    expect(habitsKept(habits, l, '2026-10-05')).toBe(2);
+  });
+  it('a habit created during the week starts counting next week', () => {
+    expect(habitsKept([habit('a', 'daily', 1, '2026-10-07T08:00:00.000Z')], logs('a', week), '2026-10-05')).toBe(0);
+  });
+  it('the week in progress counts days so far', () => {
+    expect(habitsKept([habit('a', 'daily')], logs('a', week.slice(0, 3)), '2026-10-05', '2026-10-07')).toBe(1);
+  });
+  it('each habit adds 25, even below the points minimum', () => {
+    expect(weekBounty('2026-10-05', 10, 0, 2)).toMatchObject({ qualified: false, habitBonus: 50, total: 50 });
+    expect(weekBounty('2026-10-05', 30, 0, 1).total).toBe(325);
+  });
+  it('a pending week pays its habits, and the bounty entry freezes them', () => {
+    const d = data({ ledger: [opened()], tasks: [], habits: [habit('a', 'daily')], habitLogs: logs('a', week) });
+    const [b] = pendingBounties(d, '2026-10-13');
+    expect(b).toMatchObject({ habits: 1, total: 25 });
+    const paid = bountyEntry('x', '2026-10-13T08:00:00.000Z', b);
+    expect(paid.week?.habits).toBe(1);
+    expect(paid.label).toContain('1 habit kept');
+    expect(pendingBounties({ ...d, ledger: [opened(), paid], habitLogs: [] }, '2026-10-13')).toEqual([]);
   });
 });
 

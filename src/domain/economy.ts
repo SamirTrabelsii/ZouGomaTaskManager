@@ -1,4 +1,4 @@
-import type { AppData, Goal, GoalTier, LedgerEntry, Milestone, Project, Task } from './types';
+import type { AppData, Goal, GoalTier, Habit, HabitLog, LedgerEntry, Milestone, Project, Task } from './types';
 import { addDays, diffDays, isoToDay, startOfWeek } from './dates';
 import { pointsBetween, sumPoints } from './services';
 
@@ -16,10 +16,10 @@ export const MAX_MULTIPLIER = 1.5;
 /** Paid once when the treasury is opened, worth a few packs. */
 export const WELCOME_GIFT = 450;
 
-/** A finished project pays a base plus a share of its finished tasks' points, once they reach a minimum. */
-export const PROJECT_BASE = 200;
-export const PROJECT_PER_POINT = 5;
-export const PROJECT_MIN_POINTS = 10;
+/** A finished project pays this, if at least one of its tasks is finished. */
+export const PROJECT_REWARD = 200;
+/** Each habit kept for a whole week (every day, or its weekly target) adds this to the week's bounty. */
+export const HABIT_WEEK_REWARD = 25;
 /** A reached milestone pays this, if at least one finished task is linked to it. */
 export const MILESTONE_REWARD = 50;
 /**
@@ -68,17 +68,35 @@ export interface WeekBounty {
   streak: number;
   multiplier: number;
   bonus: number;
+  /** Habits kept the whole week, each paying {@link HABIT_WEEK_REWARD}, whatever the points. */
+  habits: number;
+  habitBonus: number;
   total: number;
 }
 
-/** What a week with `points` pays, given the streak of qualifying weeks right before it. */
-export function weekBounty(start: string, points: number, streakBefore: number): WeekBounty {
+/** What a week with `points` and `habits` kept pays, given the streak of qualifying weeks right before it. */
+export function weekBounty(start: string, points: number, streakBefore: number, habits = 0): WeekBounty {
   const qualified = points >= WEEKLY_MIN;
   const streak = qualified ? streakBefore + 1 : 0;
   const multiplier = qualified ? streakMultiplier(streak) : 1;
   const bonus = points >= OVERACHIEVER_MIN ? OVERACHIEVER_BONUS : 0;
-  const total = qualified ? Math.round(points * BERRIES_PER_POINT * multiplier) + bonus : 0;
-  return { start, end: addDays(start, 6), points, qualified, streak, multiplier, bonus, total };
+  const habitBonus = habits * HABIT_WEEK_REWARD;
+  const total = (qualified ? Math.round(points * BERRIES_PER_POINT * multiplier) + bonus : 0) + habitBonus;
+  return { start, end: addDays(start, 6), points, qualified, streak, multiplier, bonus, habits, habitBonus, total };
+}
+
+/**
+ * Habits kept the week starting `weekStart`, counting days up to `until` (the week's last day once it is over).
+ * A habit counts only if it existed when the week began: daily ones need a log every day, weekly ones their target.
+ */
+export function habitsKept(habits: Habit[], logs: HabitLog[], weekStart: string, until = addDays(weekStart, 6)): number {
+  return habits.filter((h) => {
+    if (isoToDay(h.createdAt) > weekStart) return false;
+    const days = new Set(logs.filter((l) => l.habitId === h.id && l.date >= weekStart && l.date <= until).map((l) => l.date));
+    if (h.frequency === 'weekly') return days.size >= h.target;
+    for (let d = weekStart; d <= until; d = addDays(d, 1)) if (!days.has(d)) return false;
+    return true;
+  }).length;
 }
 
 /**
@@ -95,8 +113,8 @@ function walkWeeks(d: AppData, today: string): { closed: { bounty: WeekBounty; c
   for (let w = startOfWeek(start); w < current; w = addDays(w, 7)) {
     const paid = byKey.get(weekKey(w))?.week;
     const bounty = paid
-      ? { ...weekBounty(w, paid.points, 0), streak: paid.streak, multiplier: paid.multiplier, bonus: paid.bonus, total: byKey.get(weekKey(w))!.amount }
-      : weekBounty(w, pointsBetween(d.tasks, w, addDays(w, 6)), streak);
+      ? { ...weekBounty(w, paid.points, 0, paid.habits ?? 0), streak: paid.streak, multiplier: paid.multiplier, bonus: paid.bonus, total: byKey.get(weekKey(w))!.amount }
+      : weekBounty(w, pointsBetween(d.tasks, w, addDays(w, 6)), streak, habitsKept(d.habits, d.habitLogs, w));
     closed.push({ bounty, claimed: !!paid });
     streak = bounty.streak;
   }
@@ -115,7 +133,8 @@ export function pendingBounties(d: AppData, today: string): WeekBounty[] {
 export function currentWeek(d: AppData, today: string): WeekBounty & { toMinimum: number; streakBefore: number } {
   const start = startOfWeek(today);
   const { streakBefore } = walkWeeks(d, today);
-  const b = weekBounty(start, pointsBetween(d.tasks, start, today), streakBefore);
+  // habits "on track": kept every day so far, or already at their weekly target
+  const b = weekBounty(start, pointsBetween(d.tasks, start, today), streakBefore, habitsKept(d.habits, d.habitLogs, start, today));
   return { ...b, streakBefore, toMinimum: Math.max(0, WEEKLY_MIN - b.points) };
 }
 
@@ -126,17 +145,18 @@ export function welcomeEntry(id: string, at: string): LedgerEntry {
 export function bountyEntry(id: string, at: string, b: WeekBounty): LedgerEntry {
   return {
     id, key: weekKey(b.start), kind: 'weekly', amount: b.total, at,
-    label: b.qualified ? `Weekly bounty · ${b.points} pts` : `Week closed · ${b.points} pts (below ${WEEKLY_MIN})`,
-    week: { start: b.start, points: b.points, streak: b.streak, multiplier: b.multiplier, bonus: b.bonus },
+    label: (b.qualified ? `Weekly bounty · ${b.points} pts` : `Week closed · ${b.points} pts (below ${WEEKLY_MIN})`)
+      + (b.habits ? ` · ${b.habits} habit${b.habits === 1 ? '' : 's'} kept` : ''),
+    week: { start: b.start, points: b.points, streak: b.streak, multiplier: b.multiplier, bonus: b.bonus, habits: b.habits },
   };
 }
 
 /* ───────── Completion rewards: paid the moment a project, milestone or goal is finished ───────── */
 
-/** What finishing the project pays now: base + points of its finished tasks, or nothing below the minimum. */
+/** What finishing the project pays now: a flat reward once at least one of its tasks is finished. */
 export function projectReward(project: Pick<Project, 'id'>, tasks: Task[]): { points: number; amount: number } {
-  const points = sumPoints(tasks.filter((t) => t.projectId === project.id && t.status === 'done'));
-  return { points, amount: points >= PROJECT_MIN_POINTS ? PROJECT_BASE + points * PROJECT_PER_POINT : 0 };
+  const done = tasks.filter((t) => t.projectId === project.id && t.status === 'done');
+  return { points: sumPoints(done), amount: done.length ? PROJECT_REWARD : 0 };
 }
 
 export function milestoneReward(m: Pick<Milestone, 'id'>, tasks: Task[]): number {

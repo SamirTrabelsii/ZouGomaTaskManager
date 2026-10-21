@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../../state/store';
 import { useCatalog } from '../../state/catalog';
-import { cardSet, type Card, type CardSet } from '../../domain/cards';
+import { cardSet, packArt, type Card, type CardSet } from '../../domain/cards';
 import { expectedPerBox, POOL_LABEL, profileFor, type OddsProfile, type Pool } from '../../domain/odds';
 import { LOCALE } from '../../domain/dates';
 import { balance, formatBerries } from '../../domain/economy';
@@ -10,8 +10,36 @@ import { ConfirmButton, ProgressBar } from '../common/ui';
 import { CardFace, rarityText, toneOf } from './CardArt';
 import { CardModal } from './CardModal';
 
-/** A booster wrapper drawn entirely in CSS (no card art), sized with its container; the top strip tears off when opened. */
+/**
+ * A set's booster pack, sized with its container; the top strip tears off when opened. It shows Bandai's official
+ * pack picture, or a wrapper drawn in CSS for a set without one (or when the picture can't load).
+ */
 export function BoosterArt({ setId, className = '' }: { setId: string; className?: string }) {
+  const viaServer = useStore((s) => s.cloud.enabled && !!s.cloud.email);
+  const art = packArt(setId, viaServer);
+  const [failed, setFailed] = useState<string | null>(null);
+  if (art && failed !== art.src) return <RealPack setId={setId} art={art} className={className} onError={() => setFailed(art.src)} />;
+  return <DrawnPack setId={setId} className={className} />;
+}
+
+function RealPack({ setId, art, className, onError }: { setId: string; art: NonNullable<ReturnType<typeof packArt>>; className: string; onError: () => void }) {
+  const [loaded, setLoaded] = useState(false);
+  const [x0, y0, x1, y1, w, h] = art.box;
+  // the picture is scaled so the pack, not its transparent canvas, fills the box
+  const img = (
+    <img src={art.src} alt="" draggable={false} decoding="async" onLoad={() => setLoaded(true)} onError={onError}
+      style={{ width: `${(w / (x1 - x0)) * 100}%`, height: `${(h / (y1 - y0)) * 100}%`, left: `${(-x0 / (x1 - x0)) * 100}%`, top: `${(-y0 / (y1 - y0)) * 100}%` }} />
+  );
+  return (
+    <div role="img" aria-label={`${setId} ${cardSet(setId)?.name ?? ''} booster pack`}
+      className={`tcg-pack tcg-pack-real ${loaded ? '' : 'is-loading'} ${className}`} style={{ aspectRatio: `${x1 - x0} / ${y1 - y0}` }}>
+      <div className="tcg-pack-art tcg-pack-art-body">{img}</div>
+      <div className="tcg-pack-art tcg-pack-art-top">{img}</div>
+    </div>
+  );
+}
+
+function DrawnPack({ setId, className }: { setId: string; className: string }) {
   const set = cardSet(setId);
   const profile = set ? profileFor(set) : null;
   return (

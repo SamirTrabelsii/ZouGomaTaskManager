@@ -6,7 +6,7 @@ import { formatDay, relativeDay } from '../../domain/dates';
 import type { Goal, GoalTier, Project, ProjectStatus } from '../../domain/types';
 import {
   economyStart, formatBerries, goalKey, goalReward, GOAL_TIER_IDS, GOAL_TIERS, MILESTONE_REWARD, paidAmount, projectKey,
-  projectReward, PROJECT_MIN_POINTS,
+  projectReward,
 } from '../../domain/economy';
 import { resolveTemplates } from '../../domain/templates';
 import { ConfirmButton, Dialog, EmptyState, Field, ProgressBar, Segmented } from '../common/ui';
@@ -29,8 +29,8 @@ function ProjectReward({ id }: { id: string }) {
   return (
     <RewardLine>
       {r.amount
-        ? <>Worth {formatBerries(r.amount)} when complete ({r.points} pts finished)</>
-        : <>Finish {PROJECT_MIN_POINTS - r.points} more pts of its tasks to earn Berries</>}
+        ? <>Worth {formatBerries(r.amount)} when complete</>
+        : <>Finish one of its tasks to earn Berries when complete</>}
     </RewardLine>
   );
 }
