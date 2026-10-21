@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useStore } from '../../state/store';
-import { cardById, cardImageUrl, RARITY_LABEL, type Card, type Variant } from '../../domain/cards';
+import { boxStyle, cardBackArt, cardById, cardImageUrl, RARITY_LABEL, type Card, type Variant } from '../../domain/cards';
 
 /** How loud a card's reveal is: plain (C/UC), shine (R), glow (Leader/SR/foil), legend (SEC, TR and every chase print). */
 export type Tone = 'plain' | 'shine' | 'glow' | 'legend';
@@ -31,7 +31,8 @@ export function useCardImage(card: Card): string {
 
 /** Starts downloading art ahead of a reveal, so flips never show an empty frame. */
 export function preloadCards(cards: Card[], viaServer: boolean) {
-  for (const c of cards) { const img = new Image(); img.src = cardImageUrl(c.img, viaServer); }
+  const back = cardBackArt(viaServer);
+  for (const src of [...(back ? [back.src] : []), ...cards.map((c) => cardImageUrl(c.img, viaServer))]) { const img = new Image(); img.src = src; }
 }
 
 /** The card's face. While the art loads (or if it can't) it shows a framed name and rarity instead. */
@@ -56,8 +57,17 @@ export function CardFace({ card, foil = true, className = '' }: { card: Card; fo
   );
 }
 
+/** The official card back (signed in), or a drawn one in local-only mode or if the picture can't load. */
 export function CardBack({ className = '' }: { className?: string }) {
-  return <div aria-hidden className={`tcg-card tcg-back ${className}`} />;
+  const viaServer = useStore((s) => s.cloud.enabled && !!s.cloud.email);
+  const art = cardBackArt(viaServer);
+  const [failed, setFailed] = useState(false);
+  if (!art || failed) return <div aria-hidden className={`tcg-card tcg-back ${className}`} />;
+  return (
+    <div aria-hidden className={`tcg-card tcg-back-real ${className}`}>
+      <img src={art.src} alt="" draggable={false} onError={() => setFailed(true)} className="absolute max-w-none" style={boxStyle(art.box)} />
+    </div>
+  );
 }
 
 export function CardThumb({ id, isNew }: { id: string; isNew?: boolean }) {

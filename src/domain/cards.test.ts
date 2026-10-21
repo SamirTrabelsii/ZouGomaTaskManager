@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cardSets, cardById, cardImageUrl, cardSet, packArt } from './cards';
+import { cardBackArt, cardSets, cardById, cardImageUrl, cardSet, packArt } from './cards';
 
 const op01 = cardSet('OP-01')!;
 
@@ -33,5 +33,16 @@ describe('pack pictures', () => {
     expect(packArt('OP-01', false)).toBeNull();
     expect(packArt('OP-99', true)).toBeNull();
     expect(packArt('constructor', true)).toBeNull();
+  });
+});
+
+describe('card back', () => {
+  it('comes through the server proxy, cropped to the top card of the deck picture', () => {
+    expect(cardBackArt(true)).toEqual({ src: '/api/cards/back', box: [326, 0, 536, 293, 863, 427] });
+    expect(cardBackArt(false)).toBeNull();
+  });
+  it('the crop has a real card shape (63 x 88)', () => {
+    const [x0, y0, x1, y1] = cardBackArt(true)!.box;
+    expect((x1 - x0) / (y1 - y0)).toBeCloseTo(63 / 88, 2);
   });
 });

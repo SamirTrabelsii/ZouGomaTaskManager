@@ -1,5 +1,5 @@
 import op01 from '../data/cards/OP-01.json';
-import { PACK_ART, type PackBox } from '../../server/packArt';
+import { CARD_BACK, PACK_ART, type PackBox } from '../../server/packArt';
 
 /*
  * ───────── One Piece TCG catalog ─────────
@@ -78,6 +78,18 @@ export const cardById = (id: string) => byId.get(id) ?? null;
 export function packArt(setId: string, viaServer: boolean): { src: string; box: PackBox } | null {
   const art = viaServer && Object.hasOwn(PACK_ART, setId) ? PACK_ART[setId] : null;
   return art && { src: `/api/cards/pack/${encodeURIComponent(setId)}`, box: art.box };
+}
+
+/** The official card back, through the server's proxy for the same reason; null in local-only mode. */
+export const cardBackArt = (viaServer: boolean): { src: string; box: PackBox } | null =>
+  viaServer ? { src: '/api/cards/back', box: CARD_BACK.box } : null;
+
+/** Styles that scale a picture so its `box` region exactly fills a container of the box's aspect ratio. */
+export function boxStyle([x0, y0, x1, y1, w, h]: PackBox) {
+  return {
+    width: `${(w / (x1 - x0)) * 100}%`, height: `${(h / (y1 - y0)) * 100}%`,
+    left: `${(-x0 / (x1 - x0)) * 100}%`, top: `${(-y0 / (y1 - y0)) * 100}%`,
+  };
 }
 
 export const cardImageUrl = (img: string, viaServer: boolean) =>

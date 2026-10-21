@@ -12,6 +12,15 @@ const SITE = 'https://en.onepiece-cardgame.com';
 const STANDARD: PackBox = [164, 50, 506, 620, 670, 670];
 const legacy = (code: string) => `${SITE}/renewal/images/products/boosters/${code}/img_item01.webp`;
 
+/**
+ * The real card back (blue, gold compass). Bandai publishes it only inside the play guide's "Deck" picture, a face-on
+ * deck on a transparent canvas; `box` is the top card's face in it.
+ */
+export const CARD_BACK: { url: string; box: PackBox } = {
+  url: `${SITE}/renewal/images/play-guide/img_deck01.webp`,
+  box: [326, 0, 536, 293, 863, 427],
+};
+
 export const PACK_ART: Record<string, { url: string; box: PackBox }> = {
   'OP-01': { url: legacy('op01'), box: [164, 54, 506, 616, 670, 670] },
   'OP-02': { url: legacy('op02'), box: [176, 48, 494, 620, 670, 670] },

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../../state/store';
 import { useCatalog } from '../../state/catalog';
-import { cardSet, packArt, type Card, type CardSet } from '../../domain/cards';
+import { boxStyle, cardSet, packArt, type Card, type CardSet } from '../../domain/cards';
 import { expectedPerBox, POOL_LABEL, profileFor, type OddsProfile, type Pool } from '../../domain/odds';
 import { LOCALE } from '../../domain/dates';
 import { balance, formatBerries } from '../../domain/economy';
@@ -24,12 +24,9 @@ export function BoosterArt({ setId, className = '' }: { setId: string; className
 
 function RealPack({ setId, art, className, onError }: { setId: string; art: NonNullable<ReturnType<typeof packArt>>; className: string; onError: () => void }) {
   const [loaded, setLoaded] = useState(false);
-  const [x0, y0, x1, y1, w, h] = art.box;
+  const [x0, y0, x1, y1] = art.box;
   // the picture is scaled so the pack, not its transparent canvas, fills the box
-  const img = (
-    <img src={art.src} alt="" draggable={false} decoding="async" onLoad={() => setLoaded(true)} onError={onError}
-      style={{ width: `${(w / (x1 - x0)) * 100}%`, height: `${(h / (y1 - y0)) * 100}%`, left: `${(-x0 / (x1 - x0)) * 100}%`, top: `${(-y0 / (y1 - y0)) * 100}%` }} />
-  );
+  const img = <img src={art.src} alt="" draggable={false} decoding="async" onLoad={() => setLoaded(true)} onError={onError} style={boxStyle(art.box)} />;
   return (
     <div role="img" aria-label={`${setId} ${cardSet(setId)?.name ?? ''} booster pack`}
       className={`tcg-pack tcg-pack-real ${loaded ? '' : 'is-loading'} ${className}`} style={{ aspectRatio: `${x1 - x0} / ${y1 - y0}` }}>
