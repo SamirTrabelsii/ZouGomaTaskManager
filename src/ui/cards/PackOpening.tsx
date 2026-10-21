@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { RARITY_LABEL, type Rarity } from '../../domain/cards';
 import { useStore } from '../../state/store';
 import { cardSet, type Card } from '../../domain/cards';
 import { CardBack, CardFace, CardThumb, preloadCards, rarityText, toneOf } from './CardArt';
@@ -23,7 +24,9 @@ function Opening() {
   const reduce = useStore((s) => s.data.prefs.scene.reduceMotion);
   const viaServer = useStore((s) => s.cloud.enabled && !!s.cloud.email);
   const st = useStore.getState();
-  const [phase, setPhase] = useState<Phase>('sealed');
+  const quick = reveal.packs > 1;
+  // several packs at once skip the tear and the flips: straight to what came out
+  const [phase, setPhase] = useState<Phase>(quick ? 'summary' : 'sealed');
   const [index, setIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [flash, setFlash] = useState(0);
@@ -33,7 +36,7 @@ function Opening() {
   const isNew = (c: Card, i: number) => reveal.fresh.includes(c.id) && cards.findIndex((x) => x.id === c.id) === i;
   const box = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { preloadCards(cards, viaServer); }, [cards, viaServer]);
+  useEffect(() => { if (!quick) preloadCards(cards, viaServer); }, [cards, viaServer, quick]);
   useEffect(() => { box.current?.focus(); }, [phase]);
 
   const tear = useCallback(() => {
@@ -58,10 +61,12 @@ function Opening() {
   }, [phase, card, flipped, index, cards.length, tear]);
 
   const close = () => st.closeReveal();
-  const openNext = () => {
-    const next = useStore.getState().data.cards.sealed[0];
-    if (next) st.openSealedPack(next.id);
-  };
+  // the next pack of the same set first, then whatever was bought earliest
+  const sealed = useStore((s) => s.data.cards.sealed);
+  const sameSet = sealed.filter((p) => p.setId === reveal.setId);
+  const queue = sameSet.length ? sameSet : sealed;
+  const openNext = () => { if (queue[0]) st.openSealedPack(queue[0].id); };
+  const openRest = () => st.openSealedPacks(queue.map((p) => p.id));
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -127,7 +132,12 @@ function Opening() {
         </div>
       )}
 
-      {phase === 'summary' && (
+      {phase === 'summary' && quick && (
+        <QuickSummary cards={cards} fresh={reveal.fresh} packs={reveal.packs} title={set?.name ?? 'Your packs'}
+          next={queue.length > 0 ? { one: openNext, rest: openRest, left: queue.length } : null} onClose={close} />
+      )}
+
+      {phase === 'summary' && !quick && (
         <div className="scroll-thin flex max-h-full w-full max-w-3xl flex-col items-center gap-4 overflow-y-auto overflow-x-hidden px-2 py-10">
           <h2 className="font-serif text-2xl font-semibold">{set?.name ?? 'Your pack'}</h2>
           <p className="text-sm text-ink-500">
@@ -138,11 +148,52 @@ function Opening() {
             {cards.map((c, i) => <li key={`${c.id}-${i}`}><CardThumb id={c.id} isNew={isNew(c, i)} /></li>)}
           </ul>
           <div className="flex gap-2">
-            {sealedLeft > 0 && <button className="btn btn-primary" onClick={openNext} autoFocus>Open next pack ({sealedLeft} left)</button>}
+            {sealedLeft > 0 && <button className="btn btn-primary" onClick={openNext} autoFocus>Open next pack ({queue.length} left)</button>}
+            {queue.length > 1 && <button className="btn" onClick={openRest}>⚡ Open all {queue.length}</button>}
             <button className="btn" onClick={close} autoFocus={sealedLeft === 0}>Done</button>
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+const RARITY_ORDER: Rarity[] = ['TR', 'SEC', 'SR', 'L', 'R', 'UC', 'C', 'PR'];
+
+/** Many packs at once: the hits big, what was new, and a count per rarity. Everything is a tap away. */
+function QuickSummary({ cards, fresh, packs, title, next, onClose }: {
+  cards: Card[];
+  fresh: string[];
+  packs: number;
+  title: string;
+  next: { one: () => void; rest: () => void; left: number } | null;
+  onClose: () => void;
+}) {
+  const [all, setAll] = useState(false);
+  const freshSet = new Set(fresh);
+  // cards come best first; a hit pulled twice shows once
+  const hits = cards.filter((c, i) => (toneOf(c) === 'legend' || toneOf(c) === 'glow') && cards.findIndex((x) => x.id === c.id) === i);
+  const counts = RARITY_ORDER.map((r) => ({ r, n: cards.filter((c) => c.rarity === r).length })).filter((x) => x.n);
+  const shown = all ? cards : hits;
+  return (
+    <div className="scroll-thin flex max-h-full w-full max-w-4xl flex-col items-center gap-4 overflow-y-auto overflow-x-hidden px-2 py-10">
+      <h2 className="font-serif text-2xl font-semibold">{title}</h2>
+      <p className="text-center text-sm text-ink-500">
+        {packs} packs · {cards.length} cards · <b className="text-moss-400">{fresh.length} new</b> for your binder
+      </p>
+      <ul className="flex flex-wrap justify-center gap-1.5">
+        {counts.map(({ r, n }) => <li key={r} className="chip">{RARITY_LABEL[r]} <b className="tabular-nums">{n}</b></li>)}
+      </ul>
+      <h3 className="label mb-0 mt-2">{all ? 'Every card, best first' : hits.length ? `Best pulls (${hits.length})` : 'No big hits this time'}</h3>
+      <ul className="grid w-full grid-cols-3 gap-2 sm:grid-cols-5 sm:gap-3 md:grid-cols-6">
+        {shown.map((c, i) => <li key={`${c.id}-${i}`}><CardThumb id={c.id} isNew={freshSet.has(c.id) && cards.findIndex((x) => x.id === c.id) === i} /></li>)}
+      </ul>
+      {!all && <button className="text-sm text-sky-500 hover:underline" onClick={() => setAll(true)}>Show all {cards.length} cards</button>}
+      <div className="flex flex-wrap justify-center gap-2">
+        {next && <button className="btn btn-primary" onClick={next.one} autoFocus>Open next pack ({next.left} left)</button>}
+        {next && next.left > 1 && <button className="btn" onClick={next.rest}>⚡ Open all {next.left}</button>}
+        <button className="btn" onClick={onClose} autoFocus={!next}>Done</button>
+      </div>
     </div>
   );
 }

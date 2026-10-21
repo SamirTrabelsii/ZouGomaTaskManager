@@ -13,7 +13,7 @@ import {
   bountyEntry, economyStart, formatBerries, goalEntry, goalReward, milestoneEntry, milestoneReward, pendingBounties,
   projectEntry, projectReward, PROJECT_MIN_POINTS, welcomeEntry, WELCOME_GIFT,
 } from '../domain/economy';
-import { openSealed, purchase, sellCards, type OpenedPack } from '../domain/shop';
+import { openSealed, openSealedMany, purchase, sellCards, type OpenedPack } from '../domain/shop';
 
 export type TreasuryTab = 'wallet' | 'shop' | 'binder';
 
@@ -44,6 +44,10 @@ interface UIState {
   inboxOpen: boolean;
   treasuryOpen: boolean;
   treasuryTab: TreasuryTab;
+  /** The set page open in the Shop; null shows every set. */
+  shopSetId: string | null;
+  /** The set open in the Binder; null picks the newest set you own cards from. */
+  binderSetId: string | null;
   /** The pack being revealed in the opening overlay. Its cards are already in the collection. */
   packReveal: OpenedPack | null;
   toasts: Toast[];
@@ -77,6 +81,10 @@ interface Actions {
   toggleInbox(open?: boolean): void;
   toggleTreasury(open?: boolean): void;
   setTreasuryTab(tab: TreasuryTab): void;
+  /** Opens the Shop on a set's page (or on every set, for null). */
+  showShopSet(setId: string | null): void;
+  /** Opens the Binder on a set. */
+  showBinderSet(setId: string): void;
   resetCamera(): void;
   setLookAt(v: 'poster' | null): void;
   toast(text: string, kind?: Toast['kind'], action?: Toast['action']): void;
@@ -132,6 +140,8 @@ interface Actions {
   buyProduct(productId: string): boolean;
   /** Adds the pack's cards to the collection, then shows the reveal. */
   openSealedPack(packId: string): void;
+  /** Opens several sealed packs at once, straight to one summary. */
+  openSealedPacks(packIds: string[]): void;
   closeReveal(): void;
   /** Sells duplicate copies for Berries; the last copy of a card is never sold. Returns false (with a toast) if refused. */
   sellDuplicates(sales: { id: string; count: number }[]): boolean;
@@ -221,7 +231,9 @@ export const useStore = create<Store>((set, get) => {
     settingsOpen: false,
     inboxOpen: false,
     treasuryOpen: false,
-    treasuryTab: 'wallet',
+    treasuryTab: 'shop',
+    shopSetId: null,
+    binderSetId: null,
     packReveal: null,
     toasts: [],
     pulse: {},
@@ -320,6 +332,8 @@ export const useStore = create<Store>((set, get) => {
     toggleInbox: (open) => set((s) => ({ inboxOpen: open ?? !s.inboxOpen })),
     toggleTreasury: (open) => set((s) => ({ treasuryOpen: open ?? !s.treasuryOpen })),
     setTreasuryTab: (treasuryTab) => set({ treasuryTab }),
+    showShopSet: (shopSetId) => set({ treasuryOpen: true, treasuryTab: 'shop', shopSetId }),
+    showBinderSet: (binderSetId) => set({ treasuryOpen: true, treasuryTab: 'binder', binderSetId }),
     resetCamera: () => {
       commit((d) => ({ ...d, prefs: { ...d.prefs, scene: { ...d.prefs.scene, camera: null } } }));
       set((s) => ({ cameraResetKey: s.cameraResetKey + 1, lookAt: null }));
@@ -636,13 +650,25 @@ export const useStore = create<Store>((set, get) => {
       const r = purchase(get().data, productId, nowIso(), uid);
       if (!r.ok) { toast(r.error, 'error'); return false; }
       set({ data: r.data });
-      toast(r.packs.length === 1 ? 'Pack bought! Open it whenever you like.' : `${r.packs.length} packs bought!`);
+      const ids = r.packs.map((p) => p.id);
+      // the action opens exactly what was bought, if it is still sealed by then
+      const still = () => ids.filter((id) => get().data.cards.sealed.some((p) => p.id === id));
+      toast(ids.length === 1 ? 'Pack bought!' : `${ids.length} packs bought!`, 'ok', {
+        label: ids.length === 1 ? 'Open now' : 'Open all',
+        run: () => { const left = still(); if (left.length === 1) get().openSealedPack(left[0]); else if (left.length) get().openSealedPacks(left); },
+      });
       return true;
     },
     openSealedPack(packId) {
       const r = openSealed(get().data, packId);
       if (!r) return;
       // the cards are saved before the reveal starts, so closing or reloading mid-reveal loses nothing
+      set({ data: r.data, packReveal: r.opened });
+    },
+    openSealedPacks(packIds) {
+      if (packIds.length === 1) return get().openSealedPack(packIds[0]);
+      const r = openSealedMany(get().data, packIds);
+      if (!r) return;
       set({ data: r.data, packReveal: r.opened });
     },
     closeReveal() { set({ packReveal: null }); },

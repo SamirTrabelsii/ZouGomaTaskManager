@@ -1,7 +1,7 @@
 import type { AppData, LedgerEntry, SealedPack } from './types';
 import { balance, formatBerries } from './economy';
 import { cardById, cardSet, cardSets, type Card, type CardSet, type Rarity, type SetKind, type Variant } from './cards';
-import { openPack, profileFor, type Rng } from './odds';
+import { hitRank, openPack, profileFor, type Rng } from './odds';
 
 /* ───────── Card shop: spend Berries on sealed boosters, open them into the collection ───────── */
 
@@ -67,6 +67,8 @@ export interface OpenedPack {
   cards: Card[];
   /** Ids pulled for the first time by this pack (a second copy in the same pack is not new). */
   fresh: string[];
+  /** How many packs this reveal covers: more than one when several were opened at once. */
+  packs: number;
 }
 
 /** Opens a sealed pack: its cards join the collection right away, before any reveal animation. */
@@ -82,8 +84,49 @@ export function openSealed(d: AppData, packId: string): { data: AppData; opened:
   }
   return {
     data: { ...d, cards: { sealed: d.cards.sealed.filter((p) => p.id !== packId), owned } },
-    opened: { packId: pack.id, setId: pack.setId, cards, fresh },
+    opened: { packId: pack.id, setId: pack.setId, cards, fresh, packs: 1 },
   };
+}
+
+/**
+ * Opens several sealed packs at once, for a quick summary instead of one reveal per pack. The cards come back
+ * best first; `fresh` holds each card pulled for the first time once.
+ */
+export function openSealedMany(d: AppData, packIds: string[]): { data: AppData; opened: OpenedPack } | null {
+  let data = d;
+  const cards: Card[] = [];
+  const fresh: string[] = [];
+  let packs = 0;
+  for (const id of packIds) {
+    const r = openSealed(data, id);
+    if (!r) continue;
+    data = r.data;
+    cards.push(...r.opened.cards);
+    fresh.push(...r.opened.fresh);
+    packs++;
+  }
+  if (!packs) return null;
+  const setIds = new Set(packIds.map((id) => d.cards.sealed.find((p) => p.id === id)?.setId).filter(Boolean));
+  const setId = setIds.size === 1 ? [...setIds][0]! : '';
+  return {
+    data,
+    opened: { packId: packIds.join(','), setId, cards: [...cards].sort((a, b) => hitRank(b) - hitRank(a)), fresh, packs },
+  };
+}
+
+/** Sealed packs grouped by set, in the order they were bought. */
+export function sealedBySet(d: AppData): { setId: string; ids: string[] }[] {
+  const groups = new Map<string, string[]>();
+  for (const p of d.cards.sealed) groups.set(p.setId, [...(groups.get(p.setId) ?? []), p.id]);
+  return [...groups].map(([setId, ids]) => ({ setId, ids }));
+}
+
+/** The prints worth chasing in a set: the priciest on the market, then the rarest. */
+export function chaseCards(set: CardSet, n = 6): Card[] {
+  return set.cards
+    .filter((c) => c.variant !== 'promo' && c.variant !== 'reprint')
+    .sort((a, b) => (b.price ?? 0) - (a.price ?? 0) || hitRank(b) - hitRank(a) || a.id.localeCompare(b.id))
+    .slice(0, n);
 }
 
 /* ───────── Selling duplicates ───────── */
@@ -146,6 +189,19 @@ export function binderCards(setId: string): Card[] {
   return (cardSet(setId)?.cards ?? [])
     .filter((c) => c.variant !== 'promo')
     .sort((a, b) => a.number.localeCompare(b.number) || VARIANT_ORDER[a.variant] - VARIANT_ORDER[b.variant] || a.id.localeCompare(b.id));
+}
+
+/** The whole collection at a glance: distinct prints, copies, sets started, and what the duplicates would sell for. */
+export function collectionStats(d: AppData): { distinct: number; copies: number; sets: number; dupes: number; dupeValue: number } {
+  const owned = Object.entries(d.cards.owned).filter(([, n]) => n > 0);
+  const dupes = duplicates(d);
+  return {
+    distinct: owned.length,
+    copies: owned.reduce((n, [, c]) => n + c, 0),
+    sets: cardSets().filter((s) => s.cards.some((c) => d.cards.owned[c.id])).length,
+    dupes: dupes.reduce((n, x) => n + x.extra, 0),
+    dupeValue: dupes.reduce((n, x) => n + x.extra * sellValue(x.card), 0),
+  };
 }
 
 /** Distinct prints owned out of a set's pack-obtainable prints (promos excluded). */
