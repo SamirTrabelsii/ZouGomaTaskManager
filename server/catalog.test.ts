@@ -23,10 +23,11 @@ describe('parsing a set', () => {
       row('OP17-060_p1', 'Monet (Dash Pack)', 'R'),
       row('OP17-070_p2', 'Sabo (Super Alternate Art)', 'SEC'),
       row('OP17-080_p2', 'Newgate (TR)', 'TR'),
+      row('OP17-079_p2', 'Luffy (079) (Super Leader Alternate Art)', 'L'),
     ]);
     expect(Object.fromEntries(set.cards.map((c) => [c.id, c.variant]))).toEqual({
       'OP17-001': 'base', 'OP17-001_p1': 'parallel', 'OP17-010_p2': 'sp', 'OP17-020_p3': 'manga', 'OP17-030_p1': 'parallel',
-      'OP17-040_p2': 'parallel', 'OP17-050': 'special', 'OP17-060_p1': 'promo', 'OP17-070_p2': 'superParallel', 'OP17-080_p2': 'tr',
+      'OP17-040_p2': 'parallel', 'OP17-050': 'special', 'OP17-060_p1': 'promo', 'OP17-070_p2': 'superParallel', 'OP17-080_p2': 'tr', 'OP17-079_p2': 'superParallel',
     });
     expect(set.cards.find((c) => c.id === 'OP17-030_p1')!.name).toBe('Mr.2');
   });

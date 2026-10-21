@@ -61,7 +61,8 @@ function variantOf(tags: Set<string>, rarity: Rarity, id: string, kind: SetKind)
   if ([...tags].some((t) => t.includes('manga'))) return 'manga';
   if (rarity === 'TR' || has('tr')) return 'tr';
   if (has('sp', 'spr')) return 'sp';
-  if (has('super alternate art', 'red super alternate art')) return 'superParallel';
+  // "Super Alternate Art", "Red Super Alternate Art", "Super Leader Alternate Art"…
+  if ([...tags].some((t) => t.includes('super') && t.includes('alternate art'))) return 'superParallel';
   if (has('wanted poster', 'gold-stamped signature', 'pandaman art')) return 'special';
   if (kind === 'premium' && has('jolly roger foil', 'pirate foil', 'textured foil', 'full art')) return 'foil';
   if (has('reprint') || /_r\d+$/.test(id)) return 'reprint';

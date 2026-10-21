@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { binderCards, duplicates, openSealed, purchase, PACK_PRICE, BOX_PRICE, sellCards, sellValue, setProgress } from './shop';
 import { balance, welcomeEntry } from './economy';
-import { cardById, cardSet, openPack, seededRng } from './cards';
+import { cardById, cardSet } from './cards';
+import { openPack, seededRng } from './odds';
 import { emptyData, normalize } from '../data/storage';
 import type { AppData } from './types';
 

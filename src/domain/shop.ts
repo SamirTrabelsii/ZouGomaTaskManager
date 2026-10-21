@@ -1,6 +1,7 @@
 import type { AppData, LedgerEntry, SealedPack } from './types';
 import { balance, formatBerries } from './economy';
-import { cardById, cardSet, cardSets, openPack, PACK, type Card, type CardSet, type Rarity, type Rng, type Variant } from './cards';
+import { cardById, cardSet, cardSets, type Card, type CardSet, type Rarity, type SetKind, type Variant } from './cards';
+import { openPack, profileFor, type Rng } from './odds';
 
 /* ───────── Card shop: spend Berries on sealed boosters, open them into the collection ───────── */
 
@@ -16,17 +17,24 @@ export interface Product {
 export const PACK_PRICE = 150;
 /** A box is 24 packs for the price of 20. */
 export const BOX_PRICE = 3000;
+/** Per product type: a pack, and a box (about 17% off its packs). Premium packs carry foils in every pack. */
+export const PRICES: Record<SetKind, { pack: number; box: number; label: string }> = {
+  booster: { pack: PACK_PRICE, box: BOX_PRICE, label: 'Booster' },
+  extra: { pack: PACK_PRICE, box: BOX_PRICE, label: 'Extra booster' },
+  premium: { pack: 300, box: 5000, label: 'Premium booster' },
+};
 
-/** Sets the shop sells. Extra and Premium Boosters have their own pack structure and come with their odds profiles. */
-export const sellsPacks = (s: CardSet) => s.kind === 'booster';
-
-export const productsFor = (s: CardSet): Product[] => (sellsPacks(s) ? [
-  { id: `${s.id}:pack`, setId: s.id, kind: 'pack', label: 'Booster pack', packs: 1, price: PACK_PRICE },
-  { id: `${s.id}:box`, setId: s.id, kind: 'box', label: 'Booster box', packs: PACK.boxPacks, price: BOX_PRICE },
-] : []);
+/** A pack and a box of the set, priced by product type; box size comes from the set's odds profile. */
+export function productsFor(s: CardSet): Product[] {
+  const price = PRICES[s.kind];
+  return [
+    { id: `${s.id}:pack`, setId: s.id, kind: 'pack', label: `${price.label} pack`, packs: 1, price: price.pack },
+    { id: `${s.id}:box`, setId: s.id, kind: 'box', label: `${price.label} box`, packs: profileFor(s).boxPacks, price: price.box },
+  ];
+}
 
 /** Sets on sale, newest first. */
-export const shopSets = () => cardSets().filter(sellsPacks).reverse();
+export const shopSets = () => [...cardSets()].reverse();
 
 export function productById(id: string): Product | null {
   const set = cardSet(id.slice(0, id.lastIndexOf(':')));
@@ -82,6 +90,8 @@ export function openSealed(d: AppData, packId: string): { data: AppData; opened:
 
 /** Berries per US dollar of a card's market price at the last daily sync. */
 export const SELL_RATE = 1;
+/** The most one card sells for: a box. A $25,000 gold SP must not buy eight boxes at once. */
+export const SELL_CAP = BOX_PRICE;
 /** The least a card sells for, by rarity. */
 export const SELL_FLOOR: Record<Rarity, number> = { C: 1, UC: 2, PR: 2, R: 5, L: 10, SR: 15, SEC: 40, TR: 60 };
 
@@ -89,7 +99,7 @@ export const SELL_FLOOR: Record<Rarity, number> = { C: 1, UC: 2, PR: 2, R: 5, L:
  * What one copy sells for. Tied to real market prices, so a chase card is a jackpot, but low enough that a whole pack
  * resells for ~25% of its price: selling never funds the next pack on its own.
  */
-export const sellValue = (c: Card) => Math.max(SELL_FLOOR[c.rarity], Math.round((c.price ?? 0) * SELL_RATE));
+export const sellValue = (c: Card) => Math.min(SELL_CAP, Math.max(SELL_FLOOR[c.rarity], Math.round((c.price ?? 0) * SELL_RATE)));
 
 /** Copies beyond the first, per card. The first copy of every card always stays in the binder. */
 export function duplicates(d: AppData): { card: Card; extra: number }[] {
