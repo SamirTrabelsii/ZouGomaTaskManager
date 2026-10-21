@@ -164,8 +164,27 @@ export interface ExternalEvent {
   end: string;
 }
 
-/** 2: tasks gained scopes + sizes. Older app copies refuse v2 data instead of silently stripping the new fields on their next save. */
-export const DATA_VERSION = 2;
+/**
+ * One movement of Berries (฿), the app's reward currency. The ledger is append-only: the balance is the sum of all
+ * amounts, and `key` names the source ("welcome", "week:2026-10-19") so a reward can never be paid twice.
+ */
+export interface LedgerEntry {
+  id: ID;
+  key: string;
+  kind: 'welcome' | 'weekly';
+  /** Positive = earned, negative = spent. May be 0 (a week closed below the minimum is still recorded). */
+  amount: number;
+  label: string;
+  at: string; // ISO
+  /** Weekly bounties only: what the payout was computed from, frozen at claim time. */
+  week?: { start: string; points: number; streak: number; multiplier: number; bonus: number };
+}
+
+/**
+ * 2: tasks gained scopes + sizes. 3: the Berries ledger.
+ * Older app copies refuse newer data instead of silently stripping the new fields on their next save.
+ */
+export const DATA_VERSION = 3;
 
 export interface AppData {
   version: number;
@@ -179,5 +198,6 @@ export interface AppData {
   events: CalEvent[];
   reminders: Reminder[];
   notes: Note[];
+  ledger: LedgerEntry[];
   prefs: Prefs;
 }

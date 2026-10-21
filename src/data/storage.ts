@@ -17,7 +17,7 @@ export function emptyData(): AppData {
   return {
     version: DATA_VERSION,
     tasks: [], scopes: [], projects: [], milestones: [], goals: [], habits: [], habitLogs: [],
-    events: [], reminders: [], notes: [], prefs: defaultPrefs(),
+    events: [], reminders: [], notes: [], ledger: [], prefs: defaultPrefs(),
   };
 }
 
@@ -38,6 +38,16 @@ function normalizeTasks(tasks: any[], scopes: any[]): any[] {
     resumeOn: t.status === 'onhold' && typeof t.resumeOn === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(t.resumeOn) ? t.resumeOn : null,
     scopeId: typeof t.scopeId === 'string' && ids.has(t.scopeId) ? t.scopeId : null,
   }));
+}
+
+/** Keeps well-formed entries, and only the first entry per source key (a reward is never paid twice). */
+function normalizeLedger(entries: any[]): any[] {
+  const seen = new Set<string>();
+  return entries.filter((e) => {
+    if (typeof e.key !== 'string' || typeof e.amount !== 'number' || !Number.isFinite(e.amount) || seen.has(e.key)) return false;
+    seen.add(e.key);
+    return true;
+  });
 }
 
 /** Validates + migrates arbitrary JSON into AppData. Throws on anything that is clearly not LifeOS data. */
@@ -63,6 +73,7 @@ export function normalize(raw: unknown): AppData {
     events: arr(r.events),
     reminders: arr(r.reminders),
     notes: arr(r.notes),
+    ledger: normalizeLedger(arr(r.ledger)),
     prefs: {
       notifications: { ...base.prefs.notifications, ...prefs.notifications },
       templates: { ...base.prefs.templates, ...prefs.templates },
