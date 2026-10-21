@@ -5,7 +5,7 @@ import { formatDay, LOCALE } from '../domain/dates';
 import type { LedgerEntry } from '../domain/types';
 import {
   balance, BERRIES_PER_POINT, currentWeek, economyStart, formatBerries, GOAL_TIER_IDS, GOAL_TIERS, HABIT_WEEK_REWARD, lifetimeEarned,
-  MAX_MULTIPLIER, MILESTONE_REWARD, OVERACHIEVER_BONUS, OVERACHIEVER_MIN, pendingBounties, PROJECT_REWARD, STREAK_STEP,
+  MAX_MULTIPLIER, MILESTONE_REWARD, MILESTONES_PER_WEEK, OVERACHIEVER_BONUS, OVERACHIEVER_MIN, pendingBounties, PROJECT_REWARD, PROJECTS_PER_WEEK, STREAK_STEP,
   WEEKLY_MIN, WELCOME_GIFT,
 } from '../domain/economy';
 import { Dialog, Segmented } from './common/ui';
@@ -36,7 +36,7 @@ function Rules() {
       <li>🔥 Every week in a row at {WEEKLY_MIN}+ adds <b>×{STREAK_STEP}</b> to the multiplier (up to ×{MAX_MULTIPLIER}). Missing a week resets it.</li>
       <li>🏆 {OVERACHIEVER_MIN}+ points in a week adds a <b>{formatBerries(OVERACHIEVER_BONUS)}</b> bonus.</li>
       <li>🌿 Every habit kept the <b>whole week</b> (logged every day, or its weekly target met) adds <b>{formatBerries(HABIT_WEEK_REWARD)}</b> to that week's bounty, even below {WEEKLY_MIN} points. A habit counts from its first full week.</li>
-      <li>📘 A finished project pays <b>{formatBerries(PROJECT_REWARD)}</b> and a milestone <b>{formatBerries(MILESTONE_REWARD)}</b>, once at least one of their tasks is finished.</li>
+      <li>📘 A finished project pays <b>{formatBerries(PROJECT_REWARD)}</b> and a milestone <b>{formatBerries(MILESTONE_REWARD)}</b>, once at least one of their tasks is finished. Up to {PROJECTS_PER_WEEK} projects and {MILESTONES_PER_WEEK} milestones pay each week.</li>
       <li>🏺 A reached goal pays its tier, picked when you create it: {GOAL_TIER_IDS.map((t) => `${GOAL_TIERS[t].label} ${formatBerries(GOAL_TIERS[t].amount)}`).join(' · ')}. Bigger tiers pay in full only after {GOAL_TIER_IDS.filter((t) => GOAL_TIERS[t].minDays).map((t) => `${GOAL_TIERS[t].minDays}`).join(' / ')} days.</li>
       <li>📦 A week's bounty is ready from Monday. Collect it whenever you like, it never expires: unclaimed weeks wait in the Wallet. Then spend Berries on One Piece card packs in the Shop.</li>
     </ul>
@@ -281,7 +281,7 @@ function WaysToEarn() {
   const tiles = [
     { icon: '⚓', title: 'Weekly bounty', text: `${BERRIES_PER_POINT} ฿ per point from ${WEEKLY_MIN} pts, streaks up to ×${MAX_MULTIPLIER}` },
     { icon: '🌿', title: 'Habit kept all week', text: `${formatBerries(HABIT_WEEK_REWARD)} per habit, every week` },
-    { icon: '📘', title: 'Finished project', text: `${formatBerries(PROJECT_REWARD)} each · milestones ${formatBerries(MILESTONE_REWARD)}` },
+    { icon: '📘', title: 'Finished project', text: `${formatBerries(PROJECT_REWARD)} each, ${PROJECTS_PER_WEEK} a week · milestones ${formatBerries(MILESTONE_REWARD)}` },
     { icon: '🏺', title: 'Reached goal', text: `${formatBerries(GOAL_TIERS[GOAL_TIER_IDS[0]].amount)} to ${formatBerries(GOAL_TIERS[GOAL_TIER_IDS[GOAL_TIER_IDS.length - 1]].amount)} by tier` },
   ];
   return (

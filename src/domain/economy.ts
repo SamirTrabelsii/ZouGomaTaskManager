@@ -1,6 +1,6 @@
 import type { AppData, Goal, GoalTier, Habit, HabitLog, LedgerEntry, Milestone, Project, Task } from './types';
 import { addDays, diffDays, isoToDay, startOfWeek } from './dates';
-import { pointsBetween, sumPoints } from './services';
+import { sumPoints, taskPoints } from './services';
 
 /* ───────── Berries (฿): rewards earned from finished work, spent later in the card store ───────── */
 
@@ -18,6 +18,9 @@ export const WELCOME_GIFT = 450;
 
 /** A finished project pays this, if at least one of its tasks is finished. */
 export const PROJECT_REWARD = 200;
+/** At most this many projects (and milestones) pay per week (Mon–Sun), so closing throwaway projects can't print Berries. */
+export const PROJECTS_PER_WEEK = 3;
+export const MILESTONES_PER_WEEK = 5;
 /** Each habit kept for a whole week (every day, or its weekly target) adds this to the week's bounty. */
 export const HABIT_WEEK_REWARD = 25;
 /** A reached milestone pays this, if at least one finished task is linked to it. */
@@ -85,40 +88,89 @@ export function weekBounty(start: string, points: number, streakBefore: number, 
   return { start, end: addDays(start, 6), points, qualified, streak, multiplier, bonus, habits, habitBonus, total };
 }
 
-/**
- * Habits kept the week starting `weekStart`, counting days up to `until` (the week's last day once it is over).
- * A habit counts only if it existed when the week began: daily ones need a log every day, weekly ones their target.
- */
-export function habitsKept(habits: Habit[], logs: HabitLog[], weekStart: string, until = addDays(weekStart, 6)): number {
-  return habits.filter((h) => {
+/** Points finished per day and logged days per habit: built once per change of the data, then read week by week. */
+interface Activity { points: Map<string, number>; logs: Map<string, Set<string>>; habits: Habit[] }
+let activityMemo: { tasks: Task[]; habits: Habit[]; logs: HabitLog[]; value: Activity } | null = null;
+
+function activityOf(tasks: Task[], habits: Habit[], logs: HabitLog[]): Activity {
+  const m = activityMemo;
+  if (m && m.tasks === tasks && m.habits === habits && m.logs === logs) return m.value;
+  const points = new Map<string, number>();
+  for (const t of tasks) {
+    if (!t.completedAt) continue;
+    const day = isoToDay(t.completedAt);
+    points.set(day, (points.get(day) ?? 0) + taskPoints(t));
+  }
+  const byHabit = new Map<string, Set<string>>();
+  for (const l of logs) {
+    let days = byHabit.get(l.habitId);
+    if (!days) byHabit.set(l.habitId, (days = new Set()));
+    days.add(l.date);
+  }
+  const value = { points, logs: byHabit, habits };
+  activityMemo = { tasks, habits, logs, value };
+  return value;
+}
+
+function pointsIn(a: Activity, from: string, to: string): number {
+  let n = 0;
+  for (let d = from; d <= to; d = addDays(d, 1)) n += a.points.get(d) ?? 0;
+  return n;
+}
+
+function keptIn(a: Activity, weekStart: string, until: string): number {
+  return a.habits.filter((h) => {
     if (isoToDay(h.createdAt) > weekStart) return false;
-    const days = new Set(logs.filter((l) => l.habitId === h.id && l.date >= weekStart && l.date <= until).map((l) => l.date));
-    if (h.frequency === 'weekly') return days.size >= h.target;
+    const days = a.logs.get(h.id);
+    if (!days) return false;
+    if (h.frequency === 'weekly') {
+      let n = 0;
+      for (let d = weekStart; d <= until; d = addDays(d, 1)) if (days.has(d)) n++;
+      return n >= h.target;
+    }
     for (let d = weekStart; d <= until; d = addDays(d, 1)) if (!days.has(d)) return false;
     return true;
   }).length;
 }
 
 /**
- * Walks every week since the economy started. Claimed weeks keep their frozen numbers (later edits to old tasks never
- * change a paid bounty); unclaimed ones are computed from the tasks as they are now.
+ * Habits kept the week starting `weekStart`, counting days up to `until` (the week's last day once it is over).
+ * A habit counts only if it existed when the week began: daily ones need a log every day, weekly ones their target.
  */
-function walkWeeks(d: AppData, today: string): { closed: { bounty: WeekBounty; claimed: boolean }[]; streakBefore: number } {
+export function habitsKept(habits: Habit[], logs: HabitLog[], weekStart: string, until = addDays(weekStart, 6)): number {
+  return keptIn(activityOf([], habits, logs), weekStart, until);
+}
+
+type Walk = { closed: { bounty: WeekBounty; claimed: boolean }[]; streakBefore: number };
+let walkMemo: { tasks: Task[]; habits: Habit[]; logs: HabitLog[]; ledger: LedgerEntry[]; today: string; value: Walk } | null = null;
+
+/**
+ * Walks every week since the economy started. Claimed weeks keep their frozen numbers (later edits to old tasks never
+ * change a paid bounty); unclaimed ones are computed from the tasks as they are now. The header, the room and the
+ * Wallet all ask on every change, so the last answer is kept until the data or the day changes.
+ */
+function walkWeeks(d: AppData, today: string): Walk {
+  const m = walkMemo;
+  if (m && m.tasks === d.tasks && m.habits === d.habits && m.logs === d.habitLogs && m.ledger === d.ledger && m.today === today) return m.value;
   const start = economyStart(d.ledger);
-  const closed: { bounty: WeekBounty; claimed: boolean }[] = [];
+  const closed: Walk['closed'] = [];
   if (!start) return { closed, streakBefore: 0 };
+  const a = activityOf(d.tasks, d.habits, d.habitLogs);
   const current = startOfWeek(today);
   const byKey = new Map(d.ledger.map((e) => [e.key, e]));
   let streak = 0;
   for (let w = startOfWeek(start); w < current; w = addDays(w, 7)) {
     const paid = byKey.get(weekKey(w))?.week;
+    const end = addDays(w, 6);
     const bounty = paid
       ? { ...weekBounty(w, paid.points, 0, paid.habits ?? 0), streak: paid.streak, multiplier: paid.multiplier, bonus: paid.bonus, total: byKey.get(weekKey(w))!.amount }
-      : weekBounty(w, pointsBetween(d.tasks, w, addDays(w, 6)), streak, habitsKept(d.habits, d.habitLogs, w));
+      : weekBounty(w, pointsIn(a, w, end), streak, keptIn(a, w, end));
     closed.push({ bounty, claimed: !!paid });
     streak = bounty.streak;
   }
-  return { closed, streakBefore: streak };
+  const value = { closed, streakBefore: streak };
+  walkMemo = { tasks: d.tasks, habits: d.habits, logs: d.habitLogs, ledger: d.ledger, today, value };
+  return value;
 }
 
 /** Finished weeks whose bounty has not been collected yet, oldest first. Empty until the treasury is opened. */
@@ -133,8 +185,9 @@ export function pendingBounties(d: AppData, today: string): WeekBounty[] {
 export function currentWeek(d: AppData, today: string): WeekBounty & { toMinimum: number; streakBefore: number } {
   const start = startOfWeek(today);
   const { streakBefore } = walkWeeks(d, today);
+  const a = activityOf(d.tasks, d.habits, d.habitLogs);
   // habits "on track": kept every day so far, or already at their weekly target
-  const b = weekBounty(start, pointsBetween(d.tasks, start, today), streakBefore, habitsKept(d.habits, d.habitLogs, start, today));
+  const b = weekBounty(start, pointsIn(a, start, today), streakBefore, keptIn(a, start, today));
   return { ...b, streakBefore, toMinimum: Math.max(0, WEEKLY_MIN - b.points) };
 }
 
@@ -153,13 +206,25 @@ export function bountyEntry(id: string, at: string, b: WeekBounty): LedgerEntry 
 
 /* ───────── Completion rewards: paid the moment a project, milestone or goal is finished ───────── */
 
-/** What finishing the project pays now: a flat reward once at least one of its tasks is finished. */
-export function projectReward(project: Pick<Project, 'id'>, tasks: Task[]): { points: number; amount: number } {
-  const done = tasks.filter((t) => t.projectId === project.id && t.status === 'done');
-  return { points: sumPoints(done), amount: done.length ? PROJECT_REWARD : 0 };
+/** How many rewards of `kind` were paid during the week (Mon–Sun) containing `today`. */
+export function paidThisWeek(ledger: LedgerEntry[], kind: LedgerEntry['kind'], today: string): number {
+  const start = startOfWeek(today);
+  const end = addDays(start, 6);
+  return ledger.filter((e) => e.kind === kind && e.amount > 0 && isoToDay(e.at) >= start && isoToDay(e.at) <= end).length;
 }
 
-export function milestoneReward(m: Pick<Milestone, 'id'>, tasks: Task[]): number {
+/**
+ * What finishing the project pays now: a flat reward once at least one of its tasks is finished, unless this week's
+ * project rewards are used up (`capped`; it can still pay when finished again from next Monday).
+ */
+export function projectReward(project: Pick<Project, 'id'>, tasks: Task[], ledger: LedgerEntry[], today: string): { points: number; amount: number; capped: boolean } {
+  const done = tasks.filter((t) => t.projectId === project.id && t.status === 'done');
+  const capped = done.length > 0 && paidThisWeek(ledger, 'project', today) >= PROJECTS_PER_WEEK;
+  return { points: sumPoints(done), amount: done.length && !capped ? PROJECT_REWARD : 0, capped };
+}
+
+export function milestoneReward(m: Pick<Milestone, 'id'>, tasks: Task[], ledger: LedgerEntry[], today: string): number {
+  if (paidThisWeek(ledger, 'milestone', today) >= MILESTONES_PER_WEEK) return 0;
   return tasks.some((t) => t.milestoneId === m.id && t.status === 'done') ? MILESTONE_REWARD : 0;
 }
 
