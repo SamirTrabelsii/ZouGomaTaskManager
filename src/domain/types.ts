@@ -4,8 +4,10 @@ export type TaskStatus = 'todo' | 'doing' | 'blocked' | 'onhold' | 'done';
 /** T-shirt size of a task; each size is worth a fixed number of story points (see SIZE_POINTS). */
 export type TaskSize = 'XS' | 'S' | 'M' | 'L' | 'XL' | 'XXL';
 export type ProjectStatus = 'active' | 'paused' | 'done';
+/** How big a goal's Berries reward is; chosen when the goal is created, then locked (see GOAL_TIERS). */
+export type GoalTier = 'S' | 'M' | 'L' | 'XL';
 export type NoteKind = 'note' | 'idea' | 'journal' | 'reflection' | 'review' | 'lesson';
-export type SceneObjectId = 'desk' | 'bookshelf' | 'plants' | 'calendar' | 'notebook';
+export type SceneObjectId = 'desk' | 'bookshelf' | 'plants' | 'calendar' | 'notebook' | 'chest';
 export type ViewId = 'home' | 'tasks' | 'calendar' | 'insights';
 
 export interface Task {
@@ -66,6 +68,10 @@ export interface Goal {
   current: number;
   deadline: string | null;
   createdAt: string;
+  /** Reward tier; null for goals made before rewards existed (they may pick one, once). */
+  reward: GoalTier | null;
+  /** When the tier was picked (ISO). Bigger tiers only pay in full once the goal is old enough. */
+  rewardSetAt: string | null;
 }
 
 export interface Habit {
@@ -164,8 +170,42 @@ export interface ExternalEvent {
   end: string;
 }
 
-/** 2: tasks gained scopes + sizes. Older app copies refuse v2 data instead of silently stripping the new fields on their next save. */
-export const DATA_VERSION = 2;
+/**
+ * One movement of Berries (฿), the app's reward currency. The ledger is append-only: the balance is the sum of all
+ * amounts, and `key` names the source ("welcome", "week:2026-10-19") so a reward can never be paid twice.
+ */
+export interface LedgerEntry {
+  id: ID;
+  key: string;
+  kind: 'welcome' | 'weekly' | 'project' | 'milestone' | 'goal' | 'purchase' | 'sale';
+  /** Positive = earned, negative = spent. May be 0 (a week closed below the minimum is still recorded). */
+  amount: number;
+  label: string;
+  at: string; // ISO
+  /** Weekly bounties only: what the payout was computed from, frozen at claim time. */
+  week?: { start: string; points: number; streak: number; multiplier: number; bonus: number };
+}
+
+/** A booster bought but not opened yet. Its cards are rolled at purchase, so reloading the app can't reroll them. */
+export interface SealedPack {
+  id: ID;
+  setId: string;
+  boughtAt: string; // ISO
+  /** Card print ids, in reveal order (best last). */
+  cards: string[];
+}
+
+export interface CardCollection {
+  sealed: SealedPack[];
+  /** Copies owned per card print id. */
+  owned: Record<string, number>;
+}
+
+/**
+ * 2: tasks gained scopes + sizes. 3: the Berries ledger.
+ * Older app copies refuse newer data instead of silently stripping the new fields on their next save.
+ */
+export const DATA_VERSION = 3;
 
 export interface AppData {
   version: number;
@@ -179,5 +219,7 @@ export interface AppData {
   events: CalEvent[];
   reminders: Reminder[];
   notes: Note[];
+  ledger: LedgerEntry[];
+  cards: CardCollection;
   prefs: Prefs;
 }

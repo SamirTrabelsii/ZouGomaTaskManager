@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useStore } from '../state/store';
 import { useFeedSync, useReminderEngine } from '../state/hooks';
+import { useCatalogSync } from '../state/catalog';
 import { registerNotificationWorker } from '../state/notify';
 import { refreshPushTimezone } from '../state/push';
 import type { ViewId } from '../domain/types';
@@ -10,6 +11,8 @@ import { CalendarView } from './views/CalendarView';
 import { InsightsView } from './views/InsightsView';
 import { Settings } from './Settings';
 import { Inbox } from './Inbox';
+import { Treasury, WalletChip } from './Treasury';
+import { PackOpening } from './cards/PackOpening';
 import { Toasts } from './Toasts';
 import { Recovery } from './Recovery';
 import { AuthGate } from './AuthGate';
@@ -38,6 +41,7 @@ export default function App() {
   useReminderEngine(status === 'ready');
   const cloudEmail = useStore((s) => s.cloud.email);
   useFeedSync(status === 'ready' && !!cloudEmail);
+  useCatalogSync(status === 'ready' && !!cloudEmail);
   useEffect(() => { if (status === 'ready' && cloudEmail) void refreshPushTimezone(); }, [status, cloudEmail]);
   useEffect(() => { document.documentElement.dataset.reduceMotion = String(reduce); }, [reduce]);
 
@@ -60,6 +64,7 @@ export default function App() {
         </nav>
         <div className="pointer-events-auto relative flex gap-1 rounded-2xl border border-cream-300 bg-cream-50/90 p-1 shadow-soft backdrop-blur-md">
           <SyncChip />
+          <WalletChip />
           <button className="btn btn-ghost relative px-2.5" onClick={() => toggleInbox()} aria-label={`Reminders${unread ? `, ${unread} unread` : ''}`}>
             🔔{unread > 0 && <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-clay-500 px-1 text-[10px] text-white">{unread}</span>}
           </button>
@@ -91,6 +96,8 @@ export default function App() {
       </nav>
 
       {settingsOpen && <Settings />}
+      <Treasury />
+      <PackOpening />
       <ConflictDialog />
       <RecoveryCodeDialog />
       <Toasts />

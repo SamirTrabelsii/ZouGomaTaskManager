@@ -17,6 +17,7 @@ export const OBJECTS: { id: SceneObjectId; label: string; icon: string }[] = [
   { id: 'plants', label: 'Plants · Habits', icon: '🌿' },
   { id: 'calendar', label: 'Calendar', icon: '🗓️' },
   { id: 'notebook', label: 'Notebook', icon: '📓' },
+  { id: 'chest', label: 'Chest · Treasury', icon: '💰' },
 ];
 
 class SceneBoundary extends Component<{ onError: () => void; children: ReactNode }, { failed: boolean }> {
@@ -33,6 +34,7 @@ function Panel({ id }: { id: SceneObjectId }) {
     case 'plants': return <PlantsPanel />;
     case 'calendar': return <CalendarPanel />;
     case 'notebook': return <NotesPanel />;
+    case 'chest': return null; // opens the Treasury dialog instead
   }
 }
 

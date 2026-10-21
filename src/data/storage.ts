@@ -17,7 +17,7 @@ export function emptyData(): AppData {
   return {
     version: DATA_VERSION,
     tasks: [], scopes: [], projects: [], milestones: [], goals: [], habits: [], habitLogs: [],
-    events: [], reminders: [], notes: [], prefs: defaultPrefs(),
+    events: [], reminders: [], notes: [], ledger: [], cards: { sealed: [], owned: {} }, prefs: defaultPrefs(),
   };
 }
 
@@ -25,6 +25,7 @@ const arr = (v: unknown): any[] => (Array.isArray(v) ? v.filter((x) => x && type
 
 const TASK_SIZES = new Set(['XS', 'S', 'M', 'L', 'XL', 'XXL']);
 const TASK_STATUSES = new Set(['todo', 'doing', 'blocked', 'onhold', 'done']);
+const GOAL_TIERS = new Set(['S', 'M', 'L', 'XL']);
 
 /** Older data has no `scopeId`; a task pointing at a scope that no longer exists simply becomes unscoped. */
 function normalizeTasks(tasks: any[], scopes: any[]): any[] {
@@ -38,6 +39,26 @@ function normalizeTasks(tasks: any[], scopes: any[]): any[] {
     resumeOn: t.status === 'onhold' && typeof t.resumeOn === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(t.resumeOn) ? t.resumeOn : null,
     scopeId: typeof t.scopeId === 'string' && ids.has(t.scopeId) ? t.scopeId : null,
   }));
+}
+
+/** Keeps well-formed entries, and only the first entry per source key (a reward is never paid twice). */
+function normalizeLedger(entries: any[]): any[] {
+  const seen = new Set<string>();
+  return entries.filter((e) => {
+    if (typeof e.key !== 'string' || typeof e.amount !== 'number' || !Number.isFinite(e.amount) || seen.has(e.key)) return false;
+    seen.add(e.key);
+    return true;
+  });
+}
+
+function normalizeCards(raw: any): AppData['cards'] {
+  const sealed = arr(raw?.sealed).filter((p) =>
+    typeof p.setId === 'string' && Array.isArray(p.cards) && p.cards.length > 0 && p.cards.every((c: unknown) => typeof c === 'string'));
+  const owned: Record<string, number> = {};
+  if (raw?.owned && typeof raw.owned === 'object' && !Array.isArray(raw.owned)) {
+    for (const [id, n] of Object.entries(raw.owned)) if (Number.isInteger(n) && (n as number) > 0) owned[id] = n as number;
+  }
+  return { sealed, owned };
 }
 
 /** Validates + migrates arbitrary JSON into AppData. Throws on anything that is clearly not LifeOS data. */
@@ -57,12 +78,18 @@ export function normalize(raw: unknown): AppData {
     tasks: normalizeTasks(arr(r.tasks).filter((t) => typeof t.title === 'string'), scopes),
     projects: arr(r.projects).filter((t) => typeof t.title === 'string'),
     milestones: arr(r.milestones),
-    goals: arr(r.goals),
+    goals: arr(r.goals).map((g) => ({
+      ...g,
+      reward: GOAL_TIERS.has(g.reward) ? g.reward : null,
+      rewardSetAt: GOAL_TIERS.has(g.reward) && typeof g.rewardSetAt === 'string' ? g.rewardSetAt : null,
+    })),
     habits: arr(r.habits),
     habitLogs: arr(r.habitLogs),
     events: arr(r.events),
     reminders: arr(r.reminders),
     notes: arr(r.notes),
+    ledger: normalizeLedger(arr(r.ledger)),
+    cards: normalizeCards(r.cards),
     prefs: {
       notifications: { ...base.prefs.notifications, ...prefs.notifications },
       templates: { ...base.prefs.templates, ...prefs.templates },

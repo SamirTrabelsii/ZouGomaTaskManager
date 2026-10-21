@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import {
-  type AppData, type CalEvent, type Goal, type Habit, type Milestone, type Note, type Project,
+  type AppData, type CalEvent, type Goal, type LedgerEntry, type Habit, type Milestone, type Note, type Project,
   type Reminder, type SceneObjectId, type Scope, type Task, type ViewId, type Prefs,
 } from '../domain/types';
 import { showSystemNotification } from './notify';
@@ -9,6 +9,13 @@ import { TEMPLATES, templateById } from '../domain/templates';
 import { emptyData, exportJson, LocalStorageAdapter, normalize, type BackupInfo } from '../data/storage';
 import { Syncer, initialCloud, type CloudState, type StartResult } from '../data/sync';
 import { cloud as cloudApi, ApiError, type CloudBackup } from '../data/cloud';
+import {
+  bountyEntry, economyStart, formatBerries, goalEntry, goalReward, milestoneEntry, milestoneReward, pendingBounties,
+  projectEntry, projectReward, PROJECT_MIN_POINTS, welcomeEntry, WELCOME_GIFT,
+} from '../domain/economy';
+import { openSealed, purchase, sellCards, type OpenedPack } from '../domain/shop';
+
+export type TreasuryTab = 'wallet' | 'shop' | 'binder';
 
 export const storage = new LocalStorageAdapter();
 
@@ -35,6 +42,10 @@ interface UIState {
   lookAt: 'poster' | null;
   settingsOpen: boolean;
   inboxOpen: boolean;
+  treasuryOpen: boolean;
+  treasuryTab: TreasuryTab;
+  /** The pack being revealed in the opening overlay. Its cards are already in the collection. */
+  packReveal: OpenedPack | null;
   toasts: Toast[];
   pulse: Partial<Record<SceneObjectId, { key: number; celebrate: boolean }>>;
   cameraResetKey: number;
@@ -64,6 +75,8 @@ interface Actions {
   setFocus(f: UIState['focus']): void;
   toggleSettings(open?: boolean): void;
   toggleInbox(open?: boolean): void;
+  toggleTreasury(open?: boolean): void;
+  setTreasuryTab(tab: TreasuryTab): void;
   resetCamera(): void;
   setLookAt(v: 'poster' | null): void;
   toast(text: string, kind?: Toast['kind'], action?: Toast['action']): void;
@@ -109,6 +122,19 @@ interface Actions {
   addNote(input: Partial<Note>): Note;
   updateNote(id: string, patch: Partial<Note>): void;
   deleteNote(id: string): void;
+  // berries
+  /** Starts the economy with the welcome gift. Weeks before today's week never pay. No-op if already open. */
+  openTreasury(): void;
+  /** Records every finished week not yet collected (paid or not) and returns the berries earned. */
+  collectBounties(): number;
+  // card shop
+  /** Spends Berries on a product; its packs go to the sealed pile. Returns false (with a toast) when it can't. */
+  buyProduct(productId: string): boolean;
+  /** Adds the pack's cards to the collection, then shows the reveal. */
+  openSealedPack(packId: string): void;
+  closeReveal(): void;
+  /** Sells duplicate copies for Berries; the last copy of a card is never sold. Returns false (with a toast) if refused. */
+  sellDuplicates(sales: { id: string; count: number }[]): boolean;
   // prefs & data safety
   updatePrefs(fn: (p: Prefs) => Prefs): void;
   setTemplateEnabled(id: string, enabled: boolean): void;
@@ -163,6 +189,17 @@ export const useStore = create<Store>((set, get) => {
     const rem: Reminder = { id: uid(), title, at, link, deliveredAt: null, deliveredVia: null, ackedAt: null };
     return { ...d, reminders: [...d.reminders, rem] };
   };
+  /**
+   * Pays a completion reward into the ledger. Nothing is paid before the treasury is opened, for a zero amount, or for
+   * a source that was already paid. Returns whether it paid.
+   */
+  const earn = (entry: LedgerEntry): boolean => {
+    const { ledger } = get().data;
+    if (entry.amount <= 0 || !economyStart(ledger) || ledger.some((e) => e.key === entry.key)) return false;
+    commit((d) => ({ ...d, ledger: [...d.ledger, entry] }));
+    pulse('chest', true);
+    return true;
+  };
   const eventReminderAt = (e: CalEvent): string | null => {
     if (e.remindBefore == null) return null;
     const base = dateTimeOf(e.date, e.time ?? '09:00');
@@ -183,6 +220,9 @@ export const useStore = create<Store>((set, get) => {
     lookAt: null,
     settingsOpen: false,
     inboxOpen: false,
+    treasuryOpen: false,
+    treasuryTab: 'wallet',
+    packReveal: null,
     toasts: [],
     pulse: {},
     cameraResetKey: 0,
@@ -245,7 +285,7 @@ export const useStore = create<Store>((set, get) => {
     dismissRecoveryCode() { set({ recoveryCode: null }); },
     async signOut() {
       await syncer.signOut();
-      set({ status: 'signin', data: emptyData(), selected: null, settingsOpen: false, inboxOpen: false, recoveryCode: null });
+      set({ status: 'signin', data: emptyData(), selected: null, settingsOpen: false, inboxOpen: false, treasuryOpen: false, packReveal: null, recoveryCode: null });
     },
     async resolveConflict(keep) {
       const data = await syncer.resolveConflict(keep);
@@ -268,12 +308,18 @@ export const useStore = create<Store>((set, get) => {
     },
 
     setView: (view) => set({ view, selected: view === 'home' ? get().selected : null, lookAt: view === 'home' ? get().lookAt : null }),
-    select: (selected) => set({ selected, view: selected ? 'home' : get().view, focus: null, lookAt: selected ? null : get().lookAt }),
+    select: (selected) => {
+      // the treasure chest has no side panel: it opens the Treasury
+      if (selected === 'chest') { set({ treasuryOpen: true, hovered: null }); return; }
+      set({ selected, view: selected ? 'home' : get().view, focus: null, lookAt: selected ? null : get().lookAt });
+    },
     setLookAt: (lookAt) => set(lookAt ? { lookAt, selected: null, view: 'home', hovered: null } : { lookAt: null }),
     hover: (hovered) => set({ hovered }),
     setFocus: (focus) => set({ focus }),
     toggleSettings: (open) => set((s) => ({ settingsOpen: open ?? !s.settingsOpen })),
     toggleInbox: (open) => set((s) => ({ inboxOpen: open ?? !s.inboxOpen })),
+    toggleTreasury: (open) => set((s) => ({ treasuryOpen: open ?? !s.treasuryOpen })),
+    setTreasuryTab: (treasuryTab) => set({ treasuryTab }),
     resetCamera: () => {
       commit((d) => ({ ...d, prefs: { ...d.prefs, scene: { ...d.prefs.scene, camera: null } } }));
       set((s) => ({ cameraResetKey: s.cameraResetKey + 1, lookAt: null }));
@@ -361,9 +407,13 @@ export const useStore = create<Store>((set, get) => {
     updateProject(id, patch) {
       const before = get().data.projects.find((p) => p.id === id);
       commit((d) => ({ ...d, projects: d.projects.map((p) => (p.id === id ? { ...p, ...patch } : p)) }));
-      if (patch.status === 'done' && before?.status !== 'done') {
+      if (before && patch.status === 'done' && before.status !== 'done') {
         pulse('bookshelf', true);
-        toast('Project complete — nicely done.');
+        const project = { ...before, ...patch };
+        const r = projectReward(project, get().data.tasks);
+        if (earn(projectEntry(uid(), nowIso(), project, r))) toast(`Project complete! +${formatBerries(r.amount)}`);
+        else if (r.points < PROJECT_MIN_POINTS && economyStart(get().data.ledger)) toast(`Project complete. Finished tasks worth ${PROJECT_MIN_POINTS}+ points earn Berries.`);
+        else toast('Project complete — nicely done.');
       } else pulse('bookshelf');
     },
     deleteProject(id) {
@@ -390,7 +440,9 @@ export const useStore = create<Store>((set, get) => {
       const done = !m.done;
       commit((d) => ({ ...d, milestones: d.milestones.map((x) => (x.id === id ? { ...x, done, completedAt: done ? nowIso() : null } : x)) }));
       pulse('bookshelf', done);
-      if (done) toast(`Milestone reached: ${m.title}`);
+      if (!done) return;
+      const amount = milestoneReward(m, get().data.tasks);
+      toast(earn(milestoneEntry(uid(), nowIso(), m, amount)) ? `Milestone reached: ${m.title} · +${formatBerries(amount)}` : `Milestone reached: ${m.title}`);
     },
     deleteMilestone(id) {
       withUndo('Milestone deleted', () =>
@@ -403,18 +455,27 @@ export const useStore = create<Store>((set, get) => {
 
     /* ── goals ── */
     addGoal(input) {
-      const g: Goal = { id: uid(), description: '', unit: '', target: 100, current: 0, deadline: null, createdAt: nowIso(), ...input, title: input.title.trim() };
+      const g: Goal = {
+        id: uid(), description: '', unit: '', target: 100, current: 0, deadline: null, createdAt: nowIso(), ...input,
+        title: input.title.trim(), reward: input.reward ?? null, rewardSetAt: input.reward ? nowIso() : null,
+      };
       commit((d) => ({ ...d, goals: [g, ...d.goals] }));
       pulse('bookshelf');
       return g;
     },
     updateGoal(id, patch) {
       const before = get().data.goals.find((g) => g.id === id);
-      commit((d) => ({ ...d, goals: d.goals.map((g) => (g.id === id ? { ...g, ...patch } : g)) }));
-      const after = { ...before!, ...patch };
-      const reached = before && before.current < before.target && after.current >= after.target && after.target > 0;
-      pulse('bookshelf', !!reached);
-      if (reached) toast(`Goal reached: ${after.title}`);
+      if (!before) return;
+      // the reward tier is locked once picked; a goal without one may pick it once, which starts its clock
+      const { reward, rewardSetAt: _ignored, ...rest } = patch;
+      const tier = !before.reward && reward ? { reward, rewardSetAt: nowIso() } : {};
+      const after: Goal = { ...before, ...rest, ...tier };
+      commit((d) => ({ ...d, goals: d.goals.map((g) => (g.id === id ? after : g)) }));
+      const reached = before.current < before.target && after.current >= after.target && after.target > 0;
+      pulse('bookshelf', reached);
+      if (!reached) return;
+      const r = goalReward(after, todayStr());
+      toast(earn(goalEntry(uid(), nowIso(), after, r)) ? `Goal reached: ${after.title} · +${formatBerries(r.amount)}` : `Goal reached: ${after.title}`);
     },
     deleteGoal(id) {
       const g = get().data.goals.find((x) => x.id === id);
@@ -547,6 +608,50 @@ export const useStore = create<Store>((set, get) => {
       const n = get().data.notes.find((x) => x.id === id);
       withUndo(`Deleted note “${n?.title || 'Untitled'}”`, () =>
         commit((d) => ({ ...d, notes: d.notes.filter((x) => x.id !== id) })));
+    },
+
+    /* ── berries ── */
+    openTreasury() {
+      if (economyStart(get().data.ledger)) return;
+      commit((d) => ({ ...d, ledger: [...d.ledger, welcomeEntry(uid(), nowIso())] }));
+      toast(`Treasury open! ${formatBerries(WELCOME_GIFT)} welcome gift.`);
+      pulse('chest', true);
+    },
+    collectBounties() {
+      const pending = pendingBounties(get().data, todayStr());
+      if (!pending.length) return 0;
+      const at = nowIso();
+      commit((d) => {
+        const have = new Set(d.ledger.map((e) => e.key));
+        return { ...d, ledger: [...d.ledger, ...pending.map((b) => bountyEntry(uid(), at, b)).filter((e) => !have.has(e.key))] };
+      });
+      const earned = pending.reduce((n, b) => n + b.total, 0);
+      toast(earned ? `Bounty collected: ${formatBerries(earned)}` : 'Week closed. No bounty this time. Next week!', earned ? 'ok' : 'info');
+      pulse('chest', earned > 0);
+      return earned;
+    },
+
+    /* ── card shop ── */
+    buyProduct(productId) {
+      const r = purchase(get().data, productId, nowIso(), uid);
+      if (!r.ok) { toast(r.error, 'error'); return false; }
+      set({ data: r.data });
+      toast(r.packs.length === 1 ? 'Pack bought! Open it whenever you like.' : `${r.packs.length} packs bought!`);
+      return true;
+    },
+    openSealedPack(packId) {
+      const r = openSealed(get().data, packId);
+      if (!r) return;
+      // the cards are saved before the reveal starts, so closing or reloading mid-reveal loses nothing
+      set({ data: r.data, packReveal: r.opened });
+    },
+    closeReveal() { set({ packReveal: null }); },
+    sellDuplicates(sales) {
+      const r = sellCards(get().data, sales, nowIso(), uid);
+      if (!r.ok) { toast(r.error, 'error'); return false; }
+      set({ data: r.data });
+      toast(`Sold ${r.count} card${r.count === 1 ? '' : 's'} · +${formatBerries(r.earned)}`);
+      return true;
     },
 
     /* ── prefs & data safety ── */

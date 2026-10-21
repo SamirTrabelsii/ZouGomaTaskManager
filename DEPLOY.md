@@ -42,6 +42,13 @@ Free Render services sleep after ~15 minutes without traffic, which would stop p
 calendar-feed sync. Create a free cron-job.org job: `GET https://<app>.onrender.com/healthz`
 every 10 minutes. `/healthz` does not touch the database.
 
+### Card catalog
+
+Once a day the server downloads the One Piece card catalog (every set, card facts and market prices, no art) from
+optcgapi.com into the `card_sets` table: about 23 small requests, with nothing to configure. The schedule is part of
+the same scheduler, so the database can still sleep between jobs. Card art is fetched on demand through
+`/api/cards/img/` and cached in memory.
+
 ## 4. Backups
 
 Free tiers have limited restore options. Run this from time to time (or schedule it):
@@ -49,6 +56,66 @@ Free tiers have limited restore options. Run this from time to time (or schedule
 ```bash
 pg_dump "<neon-direct-connection-string>" --no-owner --no-acl > lifeos-$(date +%F).sql
 ```
+
+## 5. Staging (try big features before production)
+
+Render deploys `main` automatically, so a big feature is built on its own integration branch (e.g.
+`feat/gamification`) and its PRs merge there, not into `main`. Before it ships, try it on a staging
+copy that runs that branch against a **copy of your real data**. This matters most when a feature
+raises the data version (`DATA_VERSION` in `src/domain/types.ts`). Once production has saved your
+data in the new format, an older deploy refuses to open it, so it can't simply be rolled back.
+
+```
+ feat/gamification ──auto-deploy──> Render "lifeos-staging" ──> Neon branch "staging" (copy of production)
+ main              ──auto-deploy──> Render "lifeos"         ──> Neon branch "production"
+```
+
+### Database copy (Neon branch)
+
+1. Neon console → project LifeOS → **Branches → New branch**. Parent: `production`, name: `staging`,
+   include data up to now. It is an instant copy-on-write snapshot: nothing you do on it touches
+   production.
+2. **Stop duplicate reminders.** The copy includes production's push subscriptions and push keys, so a
+   staging server would send your phone every reminder a second time. On the `staging` branch, open the
+   SQL editor and run:
+
+   ```sql
+   DELETE FROM push_subscriptions;
+   ```
+
+   Don't turn on notifications on the staging site.
+3. Copy the `staging` branch's **pooled** connection string (Connect → branch `staging`). Drop
+   `&channel_binding=require` and keep `?sslmode=require`, as for production.
+
+### App (second Render service)
+
+Render dashboard → **New → Web Service** → this repo:
+
+| Setting | Value |
+|---|---|
+| Name | `lifeos-staging` |
+| Branch | `feat/gamification` (the feature's integration branch) |
+| Runtime / plan / region | Docker · Free · Frankfurt |
+| Health check path | `/healthz` |
+| `DATABASE_URL` | the `staging` branch's pooled string |
+| `COOKIE_SECURE` / `TRUST_PROXY` | `1` / `1` |
+| `ALLOW_REGISTRATION` | `0` |
+| `FEED_SYNC_MINUTES` | `60` |
+
+Leave the `VAPID_*` keys unset. Sign in with your normal account: it was copied with the data.
+
+- **No keep-alive job for staging.** Letting it sleep keeps the free hours (shared with other Render
+  services) for production. The first visit after a sleep takes ~1 minute.
+- When you're not testing, **Suspend** the service in Render settings, and resume it the next time.
+- Want fresher data? On the Neon `staging` branch, use **Reset from parent**, then run the `DELETE`
+  from step 2 again.
+
+### Shipping to production
+
+1. Everything for the feature is merged into the integration branch and works on staging.
+2. Take a backup: Settings → cloud backups in the app, plus the `pg_dump` from section 4.
+3. Open one PR from the integration branch into `main`, then merge it. Render deploys production.
+4. Suspend `lifeos-staging`, or point it at the next integration branch.
 
 ## Environment variables
 

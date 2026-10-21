@@ -6,6 +6,8 @@ import { isValidTimeZone } from './time';
 import type { Sender } from './push';
 import { feedRouter } from './feeds';
 import { safeFetchText, type FeedFetcher } from './feedFetch';
+import { cardImageRouter, fetchImage, type ImageFetcher } from './cardImages';
+import { catalogRouter } from './catalog';
 
 const COOKIE = 'lifeos_session';
 const SESSION_DAYS = 30;
@@ -26,6 +28,8 @@ export interface AppOptions {
   push?: { publicKey: string; send: Sender };
   /** How calendar feeds are downloaded. Defaults to the SSRF-safe fetcher; tests inject their own. */
   fetchFeed?: FeedFetcher;
+  /** How card art is downloaded from optcgapi.com. Tests inject their own. */
+  fetchCardImage?: ImageFetcher;
   /** Number of reverse-proxy hops to trust for req.ip (rate limiting). Set to 1 behind Render/Fly/etc. */
   trustProxy?: number;
   /** Called after any successful write to data, push subscriptions or feeds, so a sleeping scheduler can re-plan. */
@@ -437,6 +441,8 @@ export function createApp(opts: AppOptions) {
 
   /* ── calendar feeds (read-only iCal subscriptions) ── */
   app.use('/api/feeds', feedRouter(pool, requireAuth, (req) => (req as Authed).userId, opts.fetchFeed ?? safeFetchText));
+  app.use('/api/cards', cardImageRouter(requireAuth, opts.fetchCardImage ?? fetchImage));
+  app.use('/api/cards', catalogRouter(pool, requireAuth));
 
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));
 

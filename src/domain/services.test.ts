@@ -72,7 +72,7 @@ describe('progress', () => {
     expect(r.ratio).toBe(0.5);
   });
   it('goal progress is clamped', () => {
-    expect(goalProgress({ id: 'g', title: '', description: '', unit: '', target: 10, current: 25, deadline: null, createdAt: '' })).toBe(1);
+    expect(goalProgress({ id: 'g', title: '', description: '', unit: '', target: 10, current: 25, deadline: null, createdAt: '', reward: null, rewardSetAt: null })).toBe(1);
   });
   it('weekly summary only counts the given week', () => {
     const d = emptyData();
@@ -157,8 +157,8 @@ describe('story points', () => {
 
 describe('data version', () => {
   it('upgrades v1 data and refuses data from a newer app', () => {
-    expect(normalize({ version: 1, tasks: [{ id: 'a', title: 'A' }] }).version).toBe(2);
-    expect(() => normalize({ version: 3, tasks: [] })).toThrow(/newer LifeOS/);
+    expect(normalize({ version: 1, tasks: [{ id: 'a', title: 'A' }] }).version).toBe(3);
+    expect(() => normalize({ version: 4, tasks: [] })).toThrow(/newer LifeOS/);
   });
 });
 

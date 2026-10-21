@@ -5,9 +5,10 @@ import { dailyProgress, habitCompletionToday, nextUp } from '../domain/services'
 import { useExternalItems } from '../state/feeds';
 import { relativeDay } from '../domain/dates';
 import type { SceneObjectId } from '../domain/types';
+import { balance, economyStart, formatBerries, pendingBounties } from '../domain/economy';
 
 export const PIN_ICON: Record<SceneObjectId, string> = {
-  desk: '✓', bookshelf: '📖', plants: '🌿', calendar: '📅', notebook: '✎',
+  desk: '✓', bookshelf: '📖', plants: '🌿', calendar: '📅', notebook: '✎', chest: '฿',
 };
 
 /** True when the user has no data at all — the room then guides them with prompts. */
@@ -52,6 +53,13 @@ export function useRoomInfo(id: SceneObjectId): { summary: string; prompt: strin
       }
       case 'notebook':
         return { summary: `${data.notes.length} note${data.notes.length === 1 ? '' : 's'}`, prompt: data.notes.length ? null : 'Write your first note' };
+      case 'chest': {
+        if (!economyStart(data.ledger)) return { summary: 'Earn Berries from your work', prompt: 'Open the treasure chest' };
+        const ready = pendingBounties(data, today).length;
+        const sealed = data.cards.sealed.length;
+        const extra = ready ? 'bounty ready!' : sealed ? `${sealed} sealed pack${sealed === 1 ? '' : 's'}` : `${Object.keys(data.cards.owned).length} cards`;
+        return { summary: `${formatBerries(balance(data.ledger))} · ${extra}`, prompt: null };
+      }
     }
   }, [id, data, today, imported]);
 }
