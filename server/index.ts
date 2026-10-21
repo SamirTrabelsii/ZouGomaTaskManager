@@ -6,6 +6,7 @@ import { createPool, migrate } from './db';
 import { safeFetchText } from './feedFetch';
 import { loadVapid, makeWebPushSender } from './push';
 import { startScheduler } from './scheduler';
+import { fetchJson } from './catalog';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const dist = path.resolve(here, '../dist');
@@ -24,6 +25,6 @@ const app = createApp({
   push: { publicKey: vapid.publicKey, send },
   onChange: () => poke(),
 });
-poke = startScheduler(pool, send, safeFetchText).poke;
+poke = startScheduler(pool, send, safeFetchText, { fetchCatalog: fetchJson }).poke;
 const port = Number(process.env.PORT ?? 3001);
 app.listen(port, () => console.log(`LifeOS API listening on http://localhost:${port}`));

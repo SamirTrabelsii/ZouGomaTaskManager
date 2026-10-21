@@ -1,35 +1,42 @@
 import { useState } from 'react';
 import { useStore } from '../../state/store';
-import { cardById, cardImageUrl, RARITY_LABEL, type Card } from '../../domain/cards';
+import { cardById, cardImageUrl, RARITY_LABEL, type Card, type Variant } from '../../domain/cards';
 
-/** How loud a card's reveal is: plain (C/UC), shine (R), glow (Leader/SR), legend (SEC and every alternate art). */
+/** How loud a card's reveal is: plain (C/UC), shine (R), glow (Leader/SR/foil), legend (SEC, TR and every chase print). */
 export type Tone = 'plain' | 'shine' | 'glow' | 'legend';
+const REGULAR = new Set<Variant>(['base', 'reprint', 'promo']);
 export function toneOf(c: Card): Tone {
-  if (c.variant !== 'base' || c.rarity === 'SEC') return 'legend';
-  if (c.rarity === 'SR' || c.rarity === 'L') return 'glow';
+  if (!REGULAR.has(c.variant) && c.variant !== 'foil') return 'legend';
+  if (c.rarity === 'SEC' || c.rarity === 'TR') return 'legend';
+  if (c.variant === 'foil' || c.rarity === 'SR' || c.rarity === 'L') return 'glow';
   if (c.rarity === 'R') return 'shine';
   return 'plain';
 }
 
+const VARIANT_LABEL: Record<Variant, string> = {
+  base: '', parallel: 'Parallel', superParallel: 'Super Parallel', sp: 'SP', manga: 'Manga', tr: 'Treasure',
+  special: 'Special', foil: 'Foil', reprint: 'Reprint', promo: 'Promo',
+};
+
 export function rarityText(c: Card): string {
-  const variant = c.variant === 'manga' ? ' · Manga' : c.variant === 'parallel' ? ' · Parallel' : c.variant === 'boxTopper' ? ' · Box topper' : '';
-  return RARITY_LABEL[c.rarity] + variant;
+  const variant = c.rarity === 'TR' && c.variant === 'tr' ? '' : VARIANT_LABEL[c.variant];
+  return RARITY_LABEL[c.rarity] + (variant ? ` · ${variant}` : '');
 }
 
 /** Signed in, art comes through the server's cache; local-only mode loads it from optcgapi.com directly. */
-export function useCardImage(id: string): string {
+export function useCardImage(card: Card): string {
   const viaServer = useStore((s) => s.cloud.enabled && !!s.cloud.email);
-  return cardImageUrl(id, viaServer);
+  return cardImageUrl(card.img, viaServer);
 }
 
 /** Starts downloading art ahead of a reveal, so flips never show an empty frame. */
-export function preloadCards(ids: string[], viaServer: boolean) {
-  for (const id of ids) { const img = new Image(); img.src = cardImageUrl(id, viaServer); }
+export function preloadCards(cards: Card[], viaServer: boolean) {
+  for (const c of cards) { const img = new Image(); img.src = cardImageUrl(c.img, viaServer); }
 }
 
 /** The card's face. While the art loads (or if it can't) it shows a framed name and rarity instead. */
 export function CardFace({ card, foil = true, className = '' }: { card: Card; foil?: boolean; className?: string }) {
-  const src = useCardImage(card.id);
+  const src = useCardImage(card);
   const [state, setState] = useState<'loading' | 'ok' | 'error'>('loading');
   const tone = toneOf(card);
   const foilClass = foil && tone !== 'plain' ? `tcg-foil ${tone === 'legend' ? 'tcg-foil-legend' : ''}` : '';

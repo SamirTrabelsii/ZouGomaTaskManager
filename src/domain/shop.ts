@@ -1,6 +1,6 @@
 import type { AppData, LedgerEntry, SealedPack } from './types';
 import { balance, formatBerries } from './economy';
-import { cardById, cardSet, openPack, PACK, type Card, type Rarity, type Rng } from './cards';
+import { cardById, cardSet, cardSets, openPack, PACK, type Card, type CardSet, type Rarity, type Rng, type Variant } from './cards';
 
 /* ───────── Card shop: spend Berries on sealed boosters, open them into the collection ───────── */
 
@@ -17,11 +17,21 @@ export const PACK_PRICE = 150;
 /** A box is 24 packs for the price of 20. */
 export const BOX_PRICE = 3000;
 
-export const PRODUCTS: Product[] = [
-  { id: 'OP-01:pack', setId: 'OP-01', kind: 'pack', label: 'Booster pack', packs: 1, price: PACK_PRICE },
-  { id: 'OP-01:box', setId: 'OP-01', kind: 'box', label: 'Booster box', packs: PACK.boxPacks, price: BOX_PRICE },
-];
-export const productById = (id: string) => PRODUCTS.find((p) => p.id === id) ?? null;
+/** Sets the shop sells. Extra and Premium Boosters have their own pack structure and come with their odds profiles. */
+export const sellsPacks = (s: CardSet) => s.kind === 'booster';
+
+export const productsFor = (s: CardSet): Product[] => (sellsPacks(s) ? [
+  { id: `${s.id}:pack`, setId: s.id, kind: 'pack', label: 'Booster pack', packs: 1, price: PACK_PRICE },
+  { id: `${s.id}:box`, setId: s.id, kind: 'box', label: 'Booster box', packs: PACK.boxPacks, price: BOX_PRICE },
+] : []);
+
+/** Sets on sale, newest first. */
+export const shopSets = () => cardSets().filter(sellsPacks).reverse();
+
+export function productById(id: string): Product | null {
+  const set = cardSet(id.slice(0, id.lastIndexOf(':')));
+  return (set && productsFor(set).find((p) => p.id === id)) ?? null;
+}
 
 export type PurchaseResult = { ok: true; data: AppData; packs: SealedPack[] } | { ok: false; error: string };
 
@@ -70,10 +80,10 @@ export function openSealed(d: AppData, packId: string): { data: AppData; opened:
 
 /* ───────── Selling duplicates ───────── */
 
-/** Berries per US dollar of a card's market price when it was snapshotted. */
+/** Berries per US dollar of a card's market price at the last daily sync. */
 export const SELL_RATE = 1;
 /** The least a card sells for, by rarity. */
-export const SELL_FLOOR: Record<Rarity, number> = { C: 1, UC: 2, R: 5, L: 10, SR: 15, SEC: 40 };
+export const SELL_FLOOR: Record<Rarity, number> = { C: 1, UC: 2, PR: 2, R: 5, L: 10, SR: 15, SEC: 40, TR: 60 };
 
 /**
  * What one copy sells for. Tied to real market prices, so a chase card is a jackpot, but low enough that a whole pack
@@ -117,17 +127,19 @@ export function sellCards(d: AppData, sales: { id: string; count: number }[], at
 
 /* ───────── Binder ───────── */
 
-const VARIANT_ORDER = { base: 0, parallel: 1, manga: 2, boxTopper: 3 } as const;
+const VARIANT_ORDER: Record<Variant, number> = {
+  base: 0, reprint: 1, foil: 2, parallel: 3, special: 4, superParallel: 5, sp: 6, tr: 7, manga: 8, promo: 9,
+};
 
-/** A set's binder pages: every print you can pull, by card number, alternate arts right after their base card. */
+/** A set's binder pages: every print that comes in packs, by card number, alternate arts right after their base card. */
 export function binderCards(setId: string): Card[] {
   return (cardSet(setId)?.cards ?? [])
-    .filter((c) => c.variant !== 'boxTopper')
+    .filter((c) => c.variant !== 'promo')
     .sort((a, b) => a.number.localeCompare(b.number) || VARIANT_ORDER[a.variant] - VARIANT_ORDER[b.variant] || a.id.localeCompare(b.id));
 }
 
-/** Distinct prints owned out of a set's pack-obtainable prints (box toppers excluded). */
+/** Distinct prints owned out of a set's pack-obtainable prints (promos excluded). */
 export function setProgress(d: AppData, setId: string): { owned: number; total: number } {
-  const cards = cardSet(setId)?.cards.filter((c) => c.variant !== 'boxTopper') ?? [];
+  const cards = cardSet(setId)?.cards.filter((c) => c.variant !== 'promo') ?? [];
   return { owned: cards.filter((c) => d.cards.owned[c.id]).length, total: cards.length };
 }

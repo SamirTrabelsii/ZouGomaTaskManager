@@ -1,11 +1,12 @@
 {
  "id": "OP-01",
  "name": "Romance Dawn",
- "source": "optcgapi.com",
- "snapshotAt": "2026-10-21",
+ "kind": "booster",
+ "position": 0,
  "cards": [
   {
    "id": "OP01-001",
+   "img": "OP01-001.jpg",
    "number": "OP01-001",
    "name": "Roronoa Zoro",
    "rarity": "L",
@@ -16,6 +17,7 @@
   },
   {
    "id": "OP01-001_p1",
+   "img": "OP01-001_p1.jpg",
    "number": "OP01-001",
    "name": "Roronoa Zoro",
    "rarity": "L",
@@ -26,6 +28,7 @@
   },
   {
    "id": "OP01-002",
+   "img": "OP01-002.jpg",
    "number": "OP01-002",
    "name": "Trafalgar Law",
    "rarity": "L",
@@ -36,6 +39,7 @@
   },
   {
    "id": "OP01-002_p1",
+   "img": "OP01-002_p1.jpg",
    "number": "OP01-002",
    "name": "Trafalgar Law",
    "rarity": "L",
@@ -46,6 +50,7 @@
   },
   {
    "id": "OP01-003",
+   "img": "OP01-003.jpg",
    "number": "OP01-003",
    "name": "Monkey.D.Luffy",
    "rarity": "L",
@@ -56,6 +61,7 @@
   },
   {
    "id": "OP01-003_p1",
+   "img": "OP01-003_p1.jpg",
    "number": "OP01-003",
    "name": "Monkey.D.Luffy",
    "rarity": "L",
@@ -66,6 +72,7 @@
   },
   {
    "id": "OP01-004",
+   "img": "OP01-004.jpg",
    "number": "OP01-004",
    "name": "Usopp",
    "rarity": "R",
@@ -76,6 +83,7 @@
   },
   {
    "id": "OP01-005",
+   "img": "OP01-005.jpg",
    "number": "OP01-005",
    "name": "Uta",
    "rarity": "R",
@@ -86,6 +94,7 @@
   },
   {
    "id": "OP01-006",
+   "img": "OP01-006.jpg",
    "number": "OP01-006",
    "name": "Otama",
    "rarity": "UC",
@@ -96,6 +105,7 @@
   },
   {
    "id": "OP01-007",
+   "img": "OP01-007.jpg",
    "number": "OP01-007",
    "name": "Caribou",
    "rarity": "C",
@@ -106,6 +116,7 @@
   },
   {
    "id": "OP01-008",
+   "img": "OP01-008.jpg",
    "number": "OP01-008",
    "name": "Cavendish",
    "rarity": "C",
@@ -116,16 +127,18 @@
   },
   {
    "id": "OP01-008_p1",
+   "img": "OP01-008_p1.jpg",
    "number": "OP01-008",
    "name": "Cavendish",
    "rarity": "C",
-   "variant": "boxTopper",
+   "variant": "promo",
    "color": "Red",
    "type": "Character",
    "price": 3.12
   },
   {
    "id": "OP01-009",
+   "img": "OP01-009.jpg",
    "number": "OP01-009",
    "name": "Carrot",
    "rarity": "C",
@@ -136,6 +149,7 @@
   },
   {
    "id": "OP01-010",
+   "img": "OP01-010.jpg",
    "number": "OP01-010",
    "name": "Komachiyo",
    "rarity": "C",
@@ -146,6 +160,7 @@
   },
   {
    "id": "OP01-011",
+   "img": "OP01-011.jpg",
    "number": "OP01-011",
    "name": "Gordon",
    "rarity": "UC",
@@ -156,6 +171,7 @@
   },
   {
    "id": "OP01-012",
+   "img": "OP01-012.jpg",
    "number": "OP01-012",
    "name": "Sai",
    "rarity": "C",
@@ -166,6 +182,7 @@
   },
   {
    "id": "OP01-013",
+   "img": "OP01-013.jpg",
    "number": "OP01-013",
    "name": "Sanji",
    "rarity": "R",
@@ -176,6 +193,7 @@
   },
   {
    "id": "OP01-013_p1",
+   "img": "OP01-013_p1.jpg",
    "number": "OP01-013",
    "name": "Sanji",
    "rarity": "R",
@@ -186,6 +204,7 @@
   },
   {
    "id": "OP01-014",
+   "img": "OP01-014.jpg",
    "number": "OP01-014",
    "name": "Jinbe",
    "rarity": "UC",
@@ -196,6 +215,7 @@
   },
   {
    "id": "OP01-015",
+   "img": "OP01-015.jpg",
    "number": "OP01-015",
    "name": "Tony Tony.Chopper",
    "rarity": "UC",
@@ -206,6 +226,7 @@
   },
   {
    "id": "OP01-016",
+   "img": "OP01-016.jpg",
    "number": "OP01-016",
    "name": "Nami",
    "rarity": "R",
@@ -216,6 +237,7 @@
   },
   {
    "id": "OP01-016_p1",
+   "img": "OP01-016_p1.jpg",
    "number": "OP01-016",
    "name": "Nami",
    "rarity": "R",
@@ -226,6 +248,7 @@
   },
   {
    "id": "OP01-017",
+   "img": "OP01-017.jpg",
    "number": "OP01-017",
    "name": "Nico Robin",
    "rarity": "R",
@@ -236,6 +259,7 @@
   },
   {
    "id": "OP01-018",
+   "img": "OP01-018.jpg",
    "number": "OP01-018",
    "name": "Hajrudin",
    "rarity": "C",
@@ -246,6 +270,7 @@
   },
   {
    "id": "OP01-019",
+   "img": "OP01-019.jpg",
    "number": "OP01-019",
    "name": "Bartolomeo",
    "rarity": "C",
@@ -256,6 +281,7 @@
   },
   {
    "id": "OP01-020",
+   "img": "OP01-020.jpg",
    "number": "OP01-020",
    "name": "Hyogoro",
    "rarity": "C",
@@ -266,6 +292,7 @@
   },
   {
    "id": "OP01-021",
+   "img": "OP01-021.jpg",
    "number": "OP01-021",
    "name": "Franky",
    "rarity": "UC",
@@ -276,6 +303,7 @@
   },
   {
    "id": "OP01-022",
+   "img": "OP01-022.jpg",
    "number": "OP01-022",
    "name": "Brook",
    "rarity": "UC",
@@ -286,6 +314,7 @@
   },
   {
    "id": "OP01-023",
+   "img": "OP01-023.jpg",
    "number": "OP01-023",
    "name": "Marco",
    "rarity": "C",
@@ -296,6 +325,7 @@
   },
   {
    "id": "OP01-024",
+   "img": "OP01-024.jpg",
    "number": "OP01-024",
    "name": "Monkey.D.Luffy",
    "rarity": "SR",
@@ -306,6 +336,7 @@
   },
   {
    "id": "OP01-024_p1",
+   "img": "OP01-024_p1.jpg",
    "number": "OP01-024",
    "name": "Monkey.D.Luffy",
    "rarity": "SR",
@@ -316,6 +347,7 @@
   },
   {
    "id": "OP01-025",
+   "img": "OP01-025.jpg",
    "number": "OP01-025",
    "name": "Roronoa Zoro",
    "rarity": "SR",
@@ -326,6 +358,7 @@
   },
   {
    "id": "OP01-025_p1",
+   "img": "OP01-025_p1.jpg",
    "number": "OP01-025",
    "name": "Roronoa Zoro",
    "rarity": "SR",
@@ -336,6 +369,7 @@
   },
   {
    "id": "OP01-026",
+   "img": "OP01-026.jpg",
    "number": "OP01-026",
    "name": "Gum-Gum Fire-Fist Pistol Red Hawk",
    "rarity": "R",
@@ -346,6 +380,7 @@
   },
   {
    "id": "OP01-027",
+   "img": "OP01-027.jpg",
    "number": "OP01-027",
    "name": "Round Table",
    "rarity": "C",
@@ -356,6 +391,7 @@
   },
   {
    "id": "OP01-028",
+   "img": "OP01-028.jpg",
    "number": "OP01-028",
    "name": "Green Star Rafflesia",
    "rarity": "C",
@@ -366,6 +402,7 @@
   },
   {
    "id": "OP01-029",
+   "img": "OP01-029.jpg",
    "number": "OP01-029",
    "name": "Radical Beam!!",
    "rarity": "UC",
@@ -376,6 +413,7 @@
   },
   {
    "id": "OP01-030",
+   "img": "OP01-030.jpg",
    "number": "OP01-030",
    "name": "In Two Years!! At the Sabaody Archipelago!!",
    "rarity": "UC",
@@ -386,6 +424,7 @@
   },
   {
    "id": "OP01-031",
+   "img": "OP01-031.jpg",
    "number": "OP01-031",
    "name": "Kouzuki Oden",
    "rarity": "L",
@@ -396,6 +435,7 @@
   },
   {
    "id": "OP01-031_p1",
+   "img": "OP01-031_p1.jpg",
    "number": "OP01-031",
    "name": "Kouzuki Oden",
    "rarity": "L",
@@ -406,6 +446,7 @@
   },
   {
    "id": "OP01-032",
+   "img": "OP01-032.jpg",
    "number": "OP01-032",
    "name": "Ashura Doji",
    "rarity": "UC",
@@ -416,6 +457,7 @@
   },
   {
    "id": "OP01-033",
+   "img": "OP01-033.jpg",
    "number": "OP01-033",
    "name": "Izo",
    "rarity": "UC",
@@ -426,6 +468,7 @@
   },
   {
    "id": "OP01-034",
+   "img": "OP01-034.jpg",
    "number": "OP01-034",
    "name": "Inuarashi",
    "rarity": "C",
@@ -436,16 +479,18 @@
   },
   {
    "id": "OP01-034_p1",
+   "img": "OP01-034_p1.jpg",
    "number": "OP01-034",
    "name": "Inuarashi",
    "rarity": "C",
-   "variant": "boxTopper",
+   "variant": "promo",
    "color": "Green",
    "type": "Character",
    "price": 3.03
   },
   {
    "id": "OP01-035",
+   "img": "OP01-035.jpg",
    "number": "OP01-035",
    "name": "Okiku",
    "rarity": "R",
@@ -456,6 +501,7 @@
   },
   {
    "id": "OP01-036",
+   "img": "OP01-036.jpg",
    "number": "OP01-036",
    "name": "Otsuru",
    "rarity": "C",
@@ -466,6 +512,7 @@
   },
   {
    "id": "OP01-037",
+   "img": "OP01-037.jpg",
    "number": "OP01-037",
    "name": "Kawamatsu",
    "rarity": "C",
@@ -476,6 +523,7 @@
   },
   {
    "id": "OP01-038",
+   "img": "OP01-038.jpg",
    "number": "OP01-038",
    "name": "Kanjuro",
    "rarity": "C",
@@ -486,6 +534,7 @@
   },
   {
    "id": "OP01-039",
+   "img": "OP01-039.jpg",
    "number": "OP01-039",
    "name": "Killer",
    "rarity": "UC",
@@ -496,6 +545,7 @@
   },
   {
    "id": "OP01-040",
+   "img": "OP01-040.jpg",
    "number": "OP01-040",
    "name": "Kin'emon",
    "rarity": "SR",
@@ -506,6 +556,7 @@
   },
   {
    "id": "OP01-040_p1",
+   "img": "OP01-040_p1.jpg",
    "number": "OP01-040",
    "name": "Kin'emon",
    "rarity": "SR",
@@ -516,6 +567,7 @@
   },
   {
    "id": "OP01-041",
+   "img": "OP01-041.jpg",
    "number": "OP01-041",
    "name": "Kouzuki Momonosuke",
    "rarity": "R",
@@ -526,6 +578,7 @@
   },
   {
    "id": "OP01-042",
+   "img": "OP01-042.jpg",
    "number": "OP01-042",
    "name": "Komurasaki",
    "rarity": "UC",
@@ -536,6 +589,7 @@
   },
   {
    "id": "OP01-043",
+   "img": "OP01-043.jpg",
    "number": "OP01-043",
    "name": "Shinobu",
    "rarity": "C",
@@ -546,6 +600,7 @@
   },
   {
    "id": "OP01-044",
+   "img": "OP01-044.jpg",
    "number": "OP01-044",
    "name": "Shachi",
    "rarity": "C",
@@ -556,6 +611,7 @@
   },
   {
    "id": "OP01-045",
+   "img": "OP01-045.jpg",
    "number": "OP01-045",
    "name": "Jean Bart",
    "rarity": "C",
@@ -566,6 +622,7 @@
   },
   {
    "id": "OP01-046",
+   "img": "OP01-046.jpg",
    "number": "OP01-046",
    "name": "Denjiro",
    "rarity": "R",
@@ -576,6 +633,7 @@
   },
   {
    "id": "OP01-047",
+   "img": "OP01-047.jpg",
    "number": "OP01-047",
    "name": "Trafalgar Law",
    "rarity": "SR",
@@ -586,6 +644,7 @@
   },
   {
    "id": "OP01-047_p1",
+   "img": "OP01-047_p1.jpg",
    "number": "OP01-047",
    "name": "Trafalgar Law",
    "rarity": "SR",
@@ -596,6 +655,7 @@
   },
   {
    "id": "OP01-048",
+   "img": "OP01-048.jpg",
    "number": "OP01-048",
    "name": "Nekomamushi",
    "rarity": "C",
@@ -606,16 +666,18 @@
   },
   {
    "id": "OP01-048_p1",
+   "img": "OP01-048_p1.jpg",
    "number": "OP01-048",
    "name": "Nekomamushi",
    "rarity": "C",
-   "variant": "boxTopper",
+   "variant": "promo",
    "color": "Green",
    "type": "Character",
    "price": 2.82
   },
   {
    "id": "OP01-049",
+   "img": "OP01-049.jpg",
    "number": "OP01-049",
    "name": "Bepo",
    "rarity": "R",
@@ -626,6 +688,7 @@
   },
   {
    "id": "OP01-050",
+   "img": "OP01-050.jpg",
    "number": "OP01-050",
    "name": "Penguin",
    "rarity": "C",
@@ -636,6 +699,7 @@
   },
   {
    "id": "OP01-051",
+   "img": "OP01-051.jpg",
    "number": "OP01-051",
    "name": "Eustass\"Captain\"Kid",
    "rarity": "SR",
@@ -646,6 +710,7 @@
   },
   {
    "id": "OP01-051_p1",
+   "img": "OP01-051_p1.jpg",
    "number": "OP01-051",
    "name": "Eustass\"Captain\"Kid",
    "rarity": "SR",
@@ -656,6 +721,7 @@
   },
   {
    "id": "OP01-052",
+   "img": "OP01-052.jpg",
    "number": "OP01-052",
    "name": "Raizo",
    "rarity": "UC",
@@ -666,6 +732,7 @@
   },
   {
    "id": "OP01-053",
+   "img": "OP01-053.jpg",
    "number": "OP01-053",
    "name": "Wire",
    "rarity": "C",
@@ -676,6 +743,7 @@
   },
   {
    "id": "OP01-054",
+   "img": "OP01-054.jpg",
    "number": "OP01-054",
    "name": "X.Drake",
    "rarity": "R",
@@ -686,6 +754,7 @@
   },
   {
    "id": "OP01-055",
+   "img": "OP01-055.jpg",
    "number": "OP01-055",
    "name": "You Can Be My Samurai!!",
    "rarity": "C",
@@ -696,6 +765,7 @@
   },
   {
    "id": "OP01-056",
+   "img": "OP01-056.jpg",
    "number": "OP01-056",
    "name": "Demon Face",
    "rarity": "UC",
@@ -706,6 +776,7 @@
   },
   {
    "id": "OP01-057",
+   "img": "OP01-057.jpg",
    "number": "OP01-057",
    "name": "Paradise Waterfall",
    "rarity": "UC",
@@ -716,6 +787,7 @@
   },
   {
    "id": "OP01-058",
+   "img": "OP01-058.jpg",
    "number": "OP01-058",
    "name": "Punk Gibson",
    "rarity": "R",
@@ -726,6 +798,7 @@
   },
   {
    "id": "OP01-059",
+   "img": "OP01-059.jpg",
    "number": "OP01-059",
    "name": "BE-BENG!!",
    "rarity": "C",
@@ -736,6 +809,7 @@
   },
   {
    "id": "OP01-060",
+   "img": "OP01-060.jpg",
    "number": "OP01-060",
    "name": "Donquixote Doflamingo",
    "rarity": "L",
@@ -746,6 +820,7 @@
   },
   {
    "id": "OP01-060_p1",
+   "img": "OP01-060_p1.jpg",
    "number": "OP01-060",
    "name": "Donquixote Doflamingo",
    "rarity": "L",
@@ -756,6 +831,7 @@
   },
   {
    "id": "OP01-061",
+   "img": "OP01-061.jpg",
    "number": "OP01-061",
    "name": "Kaido",
    "rarity": "L",
@@ -766,6 +842,7 @@
   },
   {
    "id": "OP01-061_p1",
+   "img": "OP01-061_p1.jpg",
    "number": "OP01-061",
    "name": "Kaido",
    "rarity": "L",
@@ -776,6 +853,7 @@
   },
   {
    "id": "OP01-062",
+   "img": "OP01-062.jpg",
    "number": "OP01-062",
    "name": "Crocodile",
    "rarity": "L",
@@ -786,6 +864,7 @@
   },
   {
    "id": "OP01-062_p1",
+   "img": "OP01-062_p1.jpg",
    "number": "OP01-062",
    "name": "Crocodile",
    "rarity": "L",
@@ -796,6 +875,7 @@
   },
   {
    "id": "OP01-063",
+   "img": "OP01-063.jpg",
    "number": "OP01-063",
    "name": "Arlong",
    "rarity": "UC",
@@ -806,6 +886,7 @@
   },
   {
    "id": "OP01-064",
+   "img": "OP01-064.jpg",
    "number": "OP01-064",
    "name": "Alvida",
    "rarity": "C",
@@ -816,16 +897,18 @@
   },
   {
    "id": "OP01-064_p1",
+   "img": "OP01-064_p1.jpg",
    "number": "OP01-064",
    "name": "Alvida",
    "rarity": "C",
-   "variant": "boxTopper",
+   "variant": "promo",
    "color": "Blue",
    "type": "Character",
    "price": 5.77
   },
   {
    "id": "OP01-065",
+   "img": "OP01-065.jpg",
    "number": "OP01-065",
    "name": "Vergo",
    "rarity": "C",
@@ -836,6 +919,7 @@
   },
   {
    "id": "OP01-066",
+   "img": "OP01-066.jpg",
    "number": "OP01-066",
    "name": "Krieg",
    "rarity": "C",
@@ -846,6 +930,7 @@
   },
   {
    "id": "OP01-067",
+   "img": "OP01-067.jpg",
    "number": "OP01-067",
    "name": "Crocodile",
    "rarity": "SR",
@@ -856,6 +941,7 @@
   },
   {
    "id": "OP01-067_p1",
+   "img": "OP01-067_p1.jpg",
    "number": "OP01-067",
    "name": "Crocodile",
    "rarity": "SR",
@@ -866,6 +952,7 @@
   },
   {
    "id": "OP01-068",
+   "img": "OP01-068.jpg",
    "number": "OP01-068",
    "name": "Gecko Moria",
    "rarity": "R",
@@ -876,6 +963,7 @@
   },
   {
    "id": "OP01-069",
+   "img": "OP01-069.jpg",
    "number": "OP01-069",
    "name": "Caesar Clown",
    "rarity": "R",
@@ -886,6 +974,7 @@
   },
   {
    "id": "OP01-070",
+   "img": "OP01-070.jpg",
    "number": "OP01-070",
    "name": "Dracule Mihawk",
    "rarity": "SR",
@@ -896,6 +985,7 @@
   },
   {
    "id": "OP01-070_p1",
+   "img": "OP01-070_p1.jpg",
    "number": "OP01-070",
    "name": "Dracule Mihawk",
    "rarity": "SR",
@@ -906,6 +996,7 @@
   },
   {
    "id": "OP01-071",
+   "img": "OP01-071.jpg",
    "number": "OP01-071",
    "name": "Jinbe",
    "rarity": "R",
@@ -916,6 +1007,7 @@
   },
   {
    "id": "OP01-072",
+   "img": "OP01-072.jpg",
    "number": "OP01-072",
    "name": "Smiley",
    "rarity": "C",
@@ -926,6 +1018,7 @@
   },
   {
    "id": "OP01-073",
+   "img": "OP01-073.jpg",
    "number": "OP01-073",
    "name": "Donquixote Doflamingo",
    "rarity": "R",
@@ -936,6 +1029,7 @@
   },
   {
    "id": "OP01-073_p1",
+   "img": "OP01-073_p1.jpg",
    "number": "OP01-073",
    "name": "Donquixote Doflamingo",
    "rarity": "R",
@@ -946,6 +1040,7 @@
   },
   {
    "id": "OP01-074",
+   "img": "OP01-074.jpg",
    "number": "OP01-074",
    "name": "Bartholomew Kuma",
    "rarity": "R",
@@ -956,6 +1051,7 @@
   },
   {
    "id": "OP01-075",
+   "img": "OP01-075.jpg",
    "number": "OP01-075",
    "name": "Pacifista",
    "rarity": "C",
@@ -966,6 +1062,7 @@
   },
   {
    "id": "OP01-076",
+   "img": "OP01-076.jpg",
    "number": "OP01-076",
    "name": "Bellamy",
    "rarity": "C",
@@ -976,6 +1073,7 @@
   },
   {
    "id": "OP01-077",
+   "img": "OP01-077.jpg",
    "number": "OP01-077",
    "name": "Perona",
    "rarity": "UC",
@@ -986,16 +1084,18 @@
   },
   {
    "id": "OP01-077_p1",
+   "img": "OP01-077_p1.jpg",
    "number": "OP01-077",
    "name": "Perona",
    "rarity": "UC",
-   "variant": "boxTopper",
+   "variant": "promo",
    "color": "Blue",
    "type": "Character",
    "price": 27.72
   },
   {
    "id": "OP01-078",
+   "img": "OP01-078.jpg",
    "number": "OP01-078",
    "name": "Boa Hancock",
    "rarity": "SR",
@@ -1006,6 +1106,7 @@
   },
   {
    "id": "OP01-078_p1",
+   "img": "OP01-078_p1.jpg",
    "number": "OP01-078",
    "name": "Boa Hancock",
    "rarity": "SR",
@@ -1016,6 +1117,7 @@
   },
   {
    "id": "OP01-079",
+   "img": "OP01-079.jpg",
    "number": "OP01-079",
    "name": "Ms. All Sunday",
    "rarity": "R",
@@ -1026,6 +1128,7 @@
   },
   {
    "id": "OP01-080",
+   "img": "OP01-080.jpg",
    "number": "OP01-080",
    "name": "Miss Doublefinger",
    "rarity": "C",
@@ -1036,6 +1139,7 @@
   },
   {
    "id": "OP01-081",
+   "img": "OP01-081.jpg",
    "number": "OP01-081",
    "name": "Mocha",
    "rarity": "C",
@@ -1046,6 +1150,7 @@
   },
   {
    "id": "OP01-082",
+   "img": "OP01-082.jpg",
    "number": "OP01-082",
    "name": "Monet",
    "rarity": "C",
@@ -1056,6 +1161,7 @@
   },
   {
    "id": "OP01-083",
+   "img": "OP01-083.jpg",
    "number": "OP01-083",
    "name": "Mr.1",
    "rarity": "UC",
@@ -1066,6 +1172,7 @@
   },
   {
    "id": "OP01-084",
+   "img": "OP01-084.jpg",
    "number": "OP01-084",
    "name": "Mr.2.Bon.Kurei",
    "rarity": "UC",
@@ -1076,6 +1183,7 @@
   },
   {
    "id": "OP01-085",
+   "img": "OP01-085.jpg",
    "number": "OP01-085",
    "name": "Mr.3",
    "rarity": "UC",
@@ -1086,6 +1194,7 @@
   },
   {
    "id": "OP01-086",
+   "img": "OP01-086.jpg",
    "number": "OP01-086",
    "name": "Overheat",
    "rarity": "R",
@@ -1096,6 +1205,7 @@
   },
   {
    "id": "OP01-087",
+   "img": "OP01-087.jpg",
    "number": "OP01-087",
    "name": "Officer Agents",
    "rarity": "C",
@@ -1106,6 +1216,7 @@
   },
   {
    "id": "OP01-088",
+   "img": "OP01-088.jpg",
    "number": "OP01-088",
    "name": "Desert Spada",
    "rarity": "UC",
@@ -1116,6 +1227,7 @@
   },
   {
    "id": "OP01-089",
+   "img": "OP01-089.jpg",
    "number": "OP01-089",
    "name": "Crescent Cutlass",
    "rarity": "C",
@@ -1126,6 +1238,7 @@
   },
   {
    "id": "OP01-090",
+   "img": "OP01-090.jpg",
    "number": "OP01-090",
    "name": "Baroque Works",
    "rarity": "UC",
@@ -1136,6 +1249,7 @@
   },
   {
    "id": "OP01-091",
+   "img": "OP01-091.jpg",
    "number": "OP01-091",
    "name": "King",
    "rarity": "L",
@@ -1146,6 +1260,7 @@
   },
   {
    "id": "OP01-091_p1",
+   "img": "OP01-091_p1.jpg",
    "number": "OP01-091",
    "name": "King",
    "rarity": "L",
@@ -1156,6 +1271,7 @@
   },
   {
    "id": "OP01-092",
+   "img": "OP01-092.jpg",
    "number": "OP01-092",
    "name": "Urashima",
    "rarity": "C",
@@ -1166,6 +1282,7 @@
   },
   {
    "id": "OP01-093",
+   "img": "OP01-093.jpg",
    "number": "OP01-093",
    "name": "Ulti",
    "rarity": "R",
@@ -1176,6 +1293,7 @@
   },
   {
    "id": "OP01-093_p1",
+   "img": "OP01-093_p1.jpg",
    "number": "OP01-093",
    "name": "Ulti",
    "rarity": "R",
@@ -1186,6 +1304,7 @@
   },
   {
    "id": "OP01-094",
+   "img": "OP01-094.jpg",
    "number": "OP01-094",
    "name": "Kaido",
    "rarity": "SR",
@@ -1196,6 +1315,7 @@
   },
   {
    "id": "OP01-094_p1",
+   "img": "OP01-094_p1.jpg",
    "number": "OP01-094",
    "name": "Kaido",
    "rarity": "SR",
@@ -1206,6 +1326,7 @@
   },
   {
    "id": "OP01-095",
+   "img": "OP01-095.jpg",
    "number": "OP01-095",
    "name": "Kyoshirou",
    "rarity": "UC",
@@ -1216,6 +1337,7 @@
   },
   {
    "id": "OP01-096",
+   "img": "OP01-096.jpg",
    "number": "OP01-096",
    "name": "King",
    "rarity": "SR",
@@ -1226,6 +1348,7 @@
   },
   {
    "id": "OP01-096_p1",
+   "img": "OP01-096_p1.jpg",
    "number": "OP01-096",
    "name": "King",
    "rarity": "SR",
@@ -1236,6 +1359,7 @@
   },
   {
    "id": "OP01-097",
+   "img": "OP01-097.jpg",
    "number": "OP01-097",
    "name": "Queen",
    "rarity": "R",
@@ -1246,6 +1370,7 @@
   },
   {
    "id": "OP01-097_p1",
+   "img": "OP01-097_p1.jpg",
    "number": "OP01-097",
    "name": "Queen",
    "rarity": "R",
@@ -1256,6 +1381,7 @@
   },
   {
    "id": "OP01-098",
+   "img": "OP01-098.jpg",
    "number": "OP01-098",
    "name": "Kurozumi Orochi",
    "rarity": "UC",
@@ -1266,6 +1392,7 @@
   },
   {
    "id": "OP01-099",
+   "img": "OP01-099.jpg",
    "number": "OP01-099",
    "name": "Kurozumi Semimaru",
    "rarity": "C",
@@ -1276,6 +1403,7 @@
   },
   {
    "id": "OP01-100",
+   "img": "OP01-100.jpg",
    "number": "OP01-100",
    "name": "Kurozumi Higurashi",
    "rarity": "C",
@@ -1286,6 +1414,7 @@
   },
   {
    "id": "OP01-101",
+   "img": "OP01-101.jpg",
    "number": "OP01-101",
    "name": "Sasaki",
    "rarity": "UC",
@@ -1296,6 +1425,7 @@
   },
   {
    "id": "OP01-102",
+   "img": "OP01-102.jpg",
    "number": "OP01-102",
    "name": "Jack",
    "rarity": "R",
@@ -1306,6 +1436,7 @@
   },
   {
    "id": "OP01-102_p1",
+   "img": "OP01-102_p1.jpg",
    "number": "OP01-102",
    "name": "Jack",
    "rarity": "R",
@@ -1316,6 +1447,7 @@
   },
   {
    "id": "OP01-103",
+   "img": "OP01-103.jpg",
    "number": "OP01-103",
    "name": "Scratchmen Apoo",
    "rarity": "C",
@@ -1326,6 +1458,7 @@
   },
   {
    "id": "OP01-104",
+   "img": "OP01-104.jpg",
    "number": "OP01-104",
    "name": "Speed",
    "rarity": "C",
@@ -1336,6 +1469,7 @@
   },
   {
    "id": "OP01-105",
+   "img": "OP01-105.jpg",
    "number": "OP01-105",
    "name": "Bao Huang",
    "rarity": "C",
@@ -1346,6 +1480,7 @@
   },
   {
    "id": "OP01-106",
+   "img": "OP01-106.jpg",
    "number": "OP01-106",
    "name": "Basil Hawkins",
    "rarity": "UC",
@@ -1356,6 +1491,7 @@
   },
   {
    "id": "OP01-107",
+   "img": "OP01-107.jpg",
    "number": "OP01-107",
    "name": "Babanuki",
    "rarity": "C",
@@ -1366,6 +1502,7 @@
   },
   {
    "id": "OP01-108",
+   "img": "OP01-108.jpg",
    "number": "OP01-108",
    "name": "Hitokiri Kamazo",
    "rarity": "UC",
@@ -1376,6 +1513,7 @@
   },
   {
    "id": "OP01-109",
+   "img": "OP01-109.jpg",
    "number": "OP01-109",
    "name": "Who's.Who",
    "rarity": "UC",
@@ -1386,16 +1524,18 @@
   },
   {
    "id": "OP01-109_p1",
+   "img": "OP01-109_p1.jpg",
    "number": "OP01-109",
    "name": "Who's.Who",
    "rarity": "UC",
-   "variant": "boxTopper",
+   "variant": "promo",
    "color": "Purple",
    "type": "Character",
    "price": 2.72
   },
   {
    "id": "OP01-110",
+   "img": "OP01-110.jpg",
    "number": "OP01-110",
    "name": "Fukurokuju",
    "rarity": "C",
@@ -1406,6 +1546,7 @@
   },
   {
    "id": "OP01-111",
+   "img": "OP01-111.jpg",
    "number": "OP01-111",
    "name": "Black Maria",
    "rarity": "R",
@@ -1416,6 +1557,7 @@
   },
   {
    "id": "OP01-112",
+   "img": "OP01-112.jpg",
    "number": "OP01-112",
    "name": "Page One",
    "rarity": "R",
@@ -1426,6 +1568,7 @@
   },
   {
    "id": "OP01-113",
+   "img": "OP01-113.jpg",
    "number": "OP01-113",
    "name": "Holedem",
    "rarity": "C",
@@ -1436,6 +1579,7 @@
   },
   {
    "id": "OP01-114",
+   "img": "OP01-114.jpg",
    "number": "OP01-114",
    "name": "X.Drake",
    "rarity": "R",
@@ -1446,6 +1590,7 @@
   },
   {
    "id": "OP01-115",
+   "img": "OP01-115.jpg",
    "number": "OP01-115",
    "name": "Elephant's Marchoo",
    "rarity": "C",
@@ -1456,6 +1601,7 @@
   },
   {
    "id": "OP01-116",
+   "img": "OP01-116.jpg",
    "number": "OP01-116",
    "name": "Artificial Devil Fruit SMILE",
    "rarity": "UC",
@@ -1466,6 +1612,7 @@
   },
   {
    "id": "OP01-117",
+   "img": "OP01-117.jpg",
    "number": "OP01-117",
    "name": "Sheep's Horn",
    "rarity": "C",
@@ -1476,6 +1623,7 @@
   },
   {
    "id": "OP01-118",
+   "img": "OP01-118.jpg",
    "number": "OP01-118",
    "name": "Ulti-Mortar",
    "rarity": "UC",
@@ -1486,6 +1634,7 @@
   },
   {
    "id": "OP01-119",
+   "img": "OP01-119.jpg",
    "number": "OP01-119",
    "name": "Thunder Bagua",
    "rarity": "R",
@@ -1496,6 +1645,7 @@
   },
   {
    "id": "OP01-120",
+   "img": "OP01-120.jpg",
    "number": "OP01-120",
    "name": "Shanks",
    "rarity": "SEC",
@@ -1506,6 +1656,7 @@
   },
   {
    "id": "OP01-120_p1",
+   "img": "OP01-120_p1.jpg",
    "number": "OP01-120",
    "name": "Shanks",
    "rarity": "SEC",
@@ -1516,6 +1667,7 @@
   },
   {
    "id": "OP01-120_p2",
+   "img": "OP01-120_p2.jpg",
    "number": "OP01-120",
    "name": "Shanks",
    "rarity": "SEC",
@@ -1526,6 +1678,7 @@
   },
   {
    "id": "OP01-121",
+   "img": "OP01-121.jpg",
    "number": "OP01-121",
    "name": "Yamato",
    "rarity": "SEC",
@@ -1536,6 +1689,7 @@
   },
   {
    "id": "OP01-121_p1",
+   "img": "OP01-121_p1.jpg",
    "number": "OP01-121",
    "name": "Yamato",
    "rarity": "SEC",
@@ -1544,5 +1698,7 @@
    "type": "Character",
    "price": 114.83
   }
- ]
+ ],
+ "source": "optcgapi.com",
+ "snapshotAt": "2026-10-21"
 }

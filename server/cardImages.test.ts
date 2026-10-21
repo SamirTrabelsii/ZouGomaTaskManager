@@ -31,19 +31,19 @@ describe('card image proxy', () => {
   it('serves the image with a long private cache, fetching upstream only once', async () => {
     const { calls, fetcher } = fakeFetcher();
     const get = start(fetcher);
-    const a = await get('/api/cards/img/OP01-120_p2');
+    const a = await get('/api/cards/img/OP01-120_p2.jpg');
     expect(a.status).toBe(200);
     expect(a.headers.get('content-type')).toBe('image/jpeg');
     expect(a.headers.get('cache-control')).toContain('max-age=31536000');
     expect((await a.arrayBuffer()).byteLength).toBe(100);
-    await get('/api/cards/img/OP01-120_p2');
-    expect(calls).toEqual([imageSourceUrl('OP01-120_p2')]);
+    await get('/api/cards/img/OP01-120_p2.jpg');
+    expect(calls).toEqual([imageSourceUrl('OP01-120_p2.jpg')]);
   });
 
-  it('only accepts card ids, so it can never be pointed at another URL', async () => {
+  it('only accepts plain image file names, so it can never be pointed at another URL', async () => {
     const { calls, fetcher } = fakeFetcher();
     const get = start(fetcher);
-    for (const bad of ['..%2F..%2Fetc', 'OP01-001.jpg', 'http%3A%2F%2Fevil.test', 'op01-001', 'OP01-001_p1x']) {
+    for (const bad of ['..%2F..%2Fetc.jpg', 'OP01-001', 'http%3A%2F%2Fevil.test%2Fa.jpg', 'a.jpg', 'OP01-001.exe', '.jpg']) {
       expect((await get(`/api/cards/img/${bad}`)).status).toBe(400);
     }
     expect(calls).toEqual([]);
@@ -51,27 +51,27 @@ describe('card image proxy', () => {
 
   it('needs a signed-in user', async () => {
     const { calls, fetcher } = fakeFetcher();
-    expect((await start(fetcher, { signedIn: false })('/api/cards/img/OP01-001')).status).toBe(401);
+    expect((await start(fetcher, { signedIn: false })('/api/cards/img/OP01-001.jpg')).status).toBe(401);
     expect(calls).toEqual([]);
   });
 
   it('passes on a missing card as 404 and does not cache failures', async () => {
     const { calls, fetcher } = fakeFetcher();
     const get = start(fetcher);
-    expect((await get('/api/cards/img/OP99-001')).status).toBe(404);
-    expect((await get('/api/cards/img/OP99-001')).status).toBe(404);
+    expect((await get('/api/cards/img/OP99-001.jpg')).status).toBe(404);
+    expect((await get('/api/cards/img/OP99-001.jpg')).status).toBe(404);
     expect(calls).toHaveLength(2);
   });
 
   it('drops the least recently used images when the cache is full', async () => {
     const { calls, fetcher } = fakeFetcher();
     const get = start(fetcher, { maxBytes: 250 }); // room for two 100-byte images
-    await get('/api/cards/img/OP01-001');
-    await get('/api/cards/img/OP01-002');
-    await get('/api/cards/img/OP01-001'); // now most recent
-    await get('/api/cards/img/OP01-003'); // evicts OP01-002
-    await get('/api/cards/img/OP01-001');
-    await get('/api/cards/img/OP01-002');
+    await get('/api/cards/img/OP01-001.jpg');
+    await get('/api/cards/img/OP01-002.jpg');
+    await get('/api/cards/img/OP01-001.jpg'); // now most recent
+    await get('/api/cards/img/OP01-003.jpg'); // evicts OP01-002
+    await get('/api/cards/img/OP01-001.jpg');
+    await get('/api/cards/img/OP01-002.jpg');
     expect(calls.map((u) => u.match(/OP01-\d+/)![0])).toEqual(['OP01-001', 'OP01-002', 'OP01-003', 'OP01-002']);
   });
 });

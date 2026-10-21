@@ -33,7 +33,7 @@ function Opening() {
   const isNew = (c: Card, i: number) => reveal.fresh.includes(c.id) && cards.findIndex((x) => x.id === c.id) === i;
   const box = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { preloadCards(cards.map((c) => c.id), viaServer); }, [cards, viaServer]);
+  useEffect(() => { preloadCards(cards, viaServer); }, [cards, viaServer]);
   useEffect(() => { box.current?.focus(); }, [phase]);
 
   const tear = useCallback(() => {

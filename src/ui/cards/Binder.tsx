@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../../state/store';
-import { CARD_SETS, RARITY_LABEL, type Card, type Rarity } from '../../domain/cards';
+import { useCatalog } from '../../state/catalog';
+import { cardSets, RARITY_LABEL, type Card, type Rarity } from '../../domain/cards';
 import { formatBerries } from '../../domain/economy';
 import { binderCards, duplicates, sellValue, setProgress } from '../../domain/shop';
 import { ConfirmButton, EmptyState, ProgressBar, Segmented } from '../common/ui';
@@ -14,18 +15,22 @@ export function BinderTab() {
   const data = useStore((s) => s.data);
   const owned = data.cards.owned;
   const st = useStore.getState();
-  const [setId, setSetId] = useState(CARD_SETS[0].id);
+  const version = useCatalog((c) => c.version); // re-render when a newer catalog arrives
+  const sets = [...cardSets()].reverse(); // newest first
+  // start on the newest set you own cards from
+  const [picked, setSetId] = useState<string | null>(() => sets.find((x) => x.cards.some((c) => owned[c.id]))?.id ?? null);
+  const setId = sets.some((x) => x.id === picked) ? picked! : sets[0].id;
   const [show, setShow] = useState<Show>('all');
   const [rarity, setRarity] = useState<RarityFilter>('any');
   const [openId, setOpenId] = useState<string | null>(null);
 
-  const all = useMemo(() => binderCards(setId), [setId]);
+  const all = useMemo(() => binderCards(setId), [setId, version]);
   const shown = all.filter((c) => {
     const n = owned[c.id] ?? 0;
     if (show === 'owned' && !n) return false;
     if (show === 'missing' && n) return false;
     if (show === 'dupes' && n < 2) return false;
-    if (rarity === 'alt') return c.variant !== 'base';
+    if (rarity === 'alt') return c.variant !== 'base' && c.variant !== 'reprint';
     return rarity === 'any' || (c.rarity === rarity && c.variant === 'base');
   });
   const progress = setProgress(data, setId);
@@ -48,12 +53,12 @@ export function BinderTab() {
     <div className="space-y-3">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          {CARD_SETS.length > 1 ? (
-            <select className="input w-auto py-1 font-serif text-lg" aria-label="Card set" value={setId} onChange={(e) => setSetId(e.target.value)}>
-              {CARD_SETS.map((s) => <option key={s.id} value={s.id}>{s.id} {s.name}</option>)}
+          {sets.length > 1 ? (
+            <select className="input w-auto max-w-full py-1 font-serif text-lg" aria-label="Card set" value={setId} onChange={(e) => { setSetId(e.target.value); setOpenId(null); }}>
+              {sets.map((x) => <option key={x.id} value={x.id}>{x.id} · {x.name}</option>)}
             </select>
-          ) : <h3 className="font-serif text-lg font-semibold">{CARD_SETS[0].name} <span className="text-sm font-normal text-ink-500">{setId}</span></h3>}
-          <p className="text-xs text-ink-500">{progress.owned} of {progress.total} cards · {Math.round((progress.owned / progress.total) * 100)}% complete</p>
+          ) : <h3 className="font-serif text-lg font-semibold">{sets[0].name} <span className="text-sm font-normal text-ink-500">{setId}</span></h3>}
+          <p className="text-xs text-ink-500">{progress.owned} of {progress.total} cards · {progress.total ? Math.round((progress.owned / progress.total) * 100) : 0}% complete</p>
         </div>
         {dupeCount > 0 && (
           <ConfirmButton className="btn" confirmLabel={`Sell ${dupeCount} for ${formatBerries(dupeValue)}?`}
@@ -62,15 +67,15 @@ export function BinderTab() {
           </ConfirmButton>
         )}
       </div>
-      <ProgressBar value={progress.owned / progress.total} label={`${setId} completion`} />
+      <ProgressBar value={progress.total ? progress.owned / progress.total : 0} label={`${setId} completion`} />
 
       <div className="flex flex-wrap items-center gap-2">
         <Segmented label="Show" value={show} onChange={setShow}
           options={[{ value: 'all', label: 'All' }, { value: 'owned', label: 'Owned' }, { value: 'missing', label: 'Missing' }, { value: 'dupes', label: 'Duplicates' }]} />
         <select className="input w-auto py-1 text-xs" aria-label="Rarity" value={rarity} onChange={(e) => setRarity(e.target.value as RarityFilter)}>
           <option value="any">Any rarity</option>
-          {(['L', 'C', 'UC', 'R', 'SR', 'SEC'] as Rarity[]).map((r) => <option key={r} value={r}>{RARITY_LABEL[r]}</option>)}
-          <option value="alt">Alternate arts</option>
+          {(['L', 'C', 'UC', 'R', 'SR', 'SEC', 'TR'] as Rarity[]).map((r) => <option key={r} value={r}>{RARITY_LABEL[r]}</option>)}
+          <option value="alt">Alt arts &amp; chase prints</option>
         </select>
       </div>
 

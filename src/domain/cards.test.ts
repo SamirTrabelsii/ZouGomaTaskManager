@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CARD_SETS, cardById, cardImageUrl, cardSet, hitRank, openPack, PACK, seededRng, type Card } from './cards';
+import { cardSets, cardById, cardImageUrl, cardSet, hitRank, openPack, PACK, seededRng, type Card } from './cards';
 
 const op01 = cardSet('OP-01')!;
 
@@ -11,7 +11,7 @@ describe('OP-01 catalog', () => {
     expect([count('L'), count('C'), count('UC'), count('R'), count('SR'), count('SEC')]).toEqual([8, 45, 30, 26, 10, 2]);
   });
   it('every print has a unique id, a card number and a name', () => {
-    const ids = CARD_SETS.flatMap((s) => s.cards.map((c) => c.id));
+    const ids = cardSets().flatMap((s) => s.cards.map((c) => c.id));
     expect(new Set(ids).size).toBe(ids.length);
     for (const c of op01.cards) {
       expect(c.id.startsWith(c.number)).toBe(true);
@@ -20,8 +20,8 @@ describe('OP-01 catalog', () => {
   });
   it('finds cards by id and builds image urls', () => {
     expect(cardById('OP01-120_p2')).toMatchObject({ name: 'Shanks', variant: 'manga', rarity: 'SEC' });
-    expect(cardImageUrl('OP01-001', true)).toBe('/api/cards/img/OP01-001');
-    expect(cardImageUrl('OP01-001', false)).toBe('https://optcgapi.com/media/static/Card_Images/OP01-001.jpg');
+    expect(cardImageUrl('OP16-011_l76oKss.jpg', true)).toBe('/api/cards/img/OP16-011_l76oKss.jpg');
+    expect(cardImageUrl('OP01-001.jpg', false)).toBe('https://optcgapi.com/media/static/Card_Images/OP01-001.jpg');
   });
 });
 
@@ -33,7 +33,7 @@ describe('opening a pack', () => {
       expect(p).toHaveLength(PACK.size);
       expect(p.filter((c) => c.rarity === 'UC' && c.variant === 'base')).toHaveLength(3);
       expect(p.filter((c) => c.rarity === 'C' && c.variant === 'base').length).toBeGreaterThanOrEqual(7);
-      expect(p.some((c) => c.variant === 'boxTopper')).toBe(false);
+      expect(p.some((c) => c.variant === 'promo')).toBe(false);
     }
   });
   it('never repeats a common or uncommon within one pack', () => {

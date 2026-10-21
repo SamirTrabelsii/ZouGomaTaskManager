@@ -1,19 +1,20 @@
 import { Router, type RequestHandler } from 'express';
+import { IMAGE_FILE } from './catalog';
 
 /**
- * Card art proxy: GET /api/cards/img/:id serves one One Piece TCG card image, fetched once from optcgapi.com and then
- * kept in memory. Browsers may cache the answer for a year, so a device asks at most once per card.
+ * Card art proxy: GET /api/cards/img/:file serves one One Piece TCG card image (the catalog's `img`, e.g.
+ * "OP16-011_l76oKss.jpg"), fetched once from optcgapi.com and then kept in memory. Browsers may cache the answer for a
+ * year, so a device asks at most once per card.
  *
- * It is not an open proxy: the id must look like a card print id ("OP01-120", "OP01-120_p2"), and the only URL it
- * ever fetches is that card's image on optcgapi.com.
+ * It is not an open proxy: the name must be a plain image file name, and the only place it ever fetches from is
+ * optcgapi.com's card-image folder.
  */
 
 export type ImageFetcher = (url: string) => Promise<{ type: string; body: Buffer }>;
 
-const ID = /^[A-Z]{2,3}\d{2}-\d{3}(?:_p\d{1,2})?$/;
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 const TIMEOUT_MS = 15_000;
-export const imageSourceUrl = (id: string) => `https://optcgapi.com/media/static/Card_Images/${id}.jpg`;
+export const imageSourceUrl = (file: string) => `https://optcgapi.com/media/static/Card_Images/${file}`;
 
 export const fetchImage: ImageFetcher = async (url) => {
   const res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS), redirect: 'error' });
@@ -58,9 +59,9 @@ export function cardImageRouter(auth: RequestHandler, fetcher: ImageFetcher = fe
   };
 
   const router = Router();
-  router.get('/img/:id', auth, async (req, res) => {
-    const id = String(req.params.id);
-    if (!ID.test(id)) return res.status(400).json({ error: 'Unknown card' });
+  router.get('/img/:file', auth, async (req, res) => {
+    const id = String(req.params.file);
+    if (!IMAGE_FILE.test(id)) return res.status(400).json({ error: 'Unknown card' });
     try {
       const img = await load(id);
       res.set('Cache-Control', 'private, max-age=31536000, immutable').type(img.type).send(img.body);
