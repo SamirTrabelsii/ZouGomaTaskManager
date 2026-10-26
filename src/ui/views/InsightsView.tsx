@@ -4,6 +4,7 @@ import { addDays, formatDay, LOCALE, startOfWeek, parseDay } from '../../domain/
 import { completedByDay, consistency, goalProgress, habitRatioByDay, plantGrowth, pointsByDay, projectProgress, streaks, sumPoints, weeklySummary } from '../../domain/services';
 import { EmptyState, ProgressBar } from '../common/ui';
 import { ScopeBadge } from '../common/icons';
+import { BerriesBySource, PullHistory } from './BerriesInsights';
 
 function Bars({ values, labels, label, max }: { values: number[]; labels: string[]; label: string; max?: number }) {
   const m = Math.max(max ?? 0, ...values, 1);
@@ -148,6 +149,9 @@ export function InsightsView() {
             </ul>
           )}
         </section>
+
+        <BerriesBySource />
+        <PullHistory />
       </div>
     </div>
   );

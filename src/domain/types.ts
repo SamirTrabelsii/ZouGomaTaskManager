@@ -229,6 +229,15 @@ export interface CardCollection {
   sealed: SealedPack[];
   /** Copies owned per card print id. */
   owned: Record<string, number>;
+  /** The big pulls (Super Rare and up), newest first, kept for the history in Insights. */
+  pulls?: Pull[];
+}
+
+/** A big card you got, when, and how: from a pack (or box) or bought on the market. */
+export interface Pull {
+  id: string;
+  at: string; // ISO
+  via: 'pack' | 'market';
 }
 
 /**

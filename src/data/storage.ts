@@ -82,7 +82,10 @@ function normalizeCards(raw: any): AppData['cards'] {
   if (raw?.owned && typeof raw.owned === 'object' && !Array.isArray(raw.owned)) {
     for (const [id, n] of Object.entries(raw.owned)) if (Number.isInteger(n) && (n as number) > 0) owned[id] = n as number;
   }
-  return { sealed, owned };
+  const pulls = (Array.isArray(raw?.pulls) ? raw.pulls : [])
+    .filter((p: any) => p && typeof p.id === 'string' && typeof p.at === 'string' && (p.via === 'pack' || p.via === 'market'))
+    .map((p: any) => ({ id: p.id, at: p.at, via: p.via }));
+  return { sealed, owned, pulls };
 }
 
 /** Validates + migrates arbitrary JSON into AppData. Throws on anything that is clearly not LifeOS data. */

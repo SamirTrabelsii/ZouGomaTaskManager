@@ -1,8 +1,8 @@
-import type { AppData, LedgerEntry, SealedPack } from './types';
-import { economyStart } from './economy';
-import { balance, formatBerries } from './economy';
+import type { AppData, CardCollection, LedgerEntry, Pull, SealedPack } from './types';
+import { balance, economyStart, formatBerries } from './economy';
 import { cardById, cardSet, cardSets, type Card, type CardSet, type Rarity, type SetKind, type Variant } from './cards';
 import { hitRank, openPack, profileFor, type Rng } from './odds';
+import { isBigPull } from './reveal';
 
 /* ───────── Card shop: spend Berries on sealed boosters, open them into the collection ───────── */
 
@@ -75,8 +75,17 @@ export interface OpenedPack {
   completed?: LedgerEntry[];
 }
 
+/** How many big pulls the history keeps. */
+export const PULL_HISTORY = 50;
+
+/** Adds the big cards among `cards` to the pull history, best first, newest on top. */
+export function withPulls(c: CardCollection, cards: Card[], at: string, via: Pull['via']): CardCollection {
+  const big = cards.filter(isBigPull).sort((a, b) => hitRank(b) - hitRank(a)).map((x) => ({ id: x.id, at, via }));
+  return big.length ? { ...c, pulls: [...big, ...(c.pulls ?? [])].slice(0, PULL_HISTORY) } : c;
+}
+
 /** Opens a sealed pack: its cards join the collection right away, before any reveal animation. */
-export function openSealed(d: AppData, packId: string): { data: AppData; opened: OpenedPack } | null {
+export function openSealed(d: AppData, packId: string, at = new Date().toISOString()): { data: AppData; opened: OpenedPack } | null {
   const pack = d.cards.sealed.find((p) => p.id === packId);
   if (!pack) return null;
   const owned = { ...d.cards.owned };
@@ -87,7 +96,7 @@ export function openSealed(d: AppData, packId: string): { data: AppData; opened:
     owned[c.id] = (owned[c.id] ?? 0) + 1;
   }
   return {
-    data: { ...d, cards: { sealed: d.cards.sealed.filter((p) => p.id !== packId), owned } },
+    data: { ...d, cards: withPulls({ ...d.cards, sealed: d.cards.sealed.filter((p) => p.id !== packId), owned }, cards, at, 'pack') },
     opened: { packId: pack.id, setId: pack.setId, cards, fresh, packs: 1 },
   };
 }
@@ -251,7 +260,7 @@ export function buySingle(d: AppData, cardId: string, at: string, newId: () => s
   if (short > 0) return { ok: false, error: `You need ${formatBerries(short)} more.` };
   const id = newId();
   const entry: LedgerEntry = { id, key: `single:${id}`, kind: 'purchase', amount: -price, at, label: `Bought ${card.name} (${card.number})` };
-  return { ok: true, card, price, data: { ...d, ledger: [...d.ledger, entry], cards: { ...d.cards, owned: { ...d.cards.owned, [card.id]: 1 } } } };
+  return { ok: true, card, price, data: { ...d, ledger: [...d.ledger, entry], cards: withPulls({ ...d.cards, owned: { ...d.cards.owned, [card.id]: 1 } }, [card], at, 'market') } };
 }
 
 /* ───────── Completed sets ───────── */

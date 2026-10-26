@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bestInPack, binderCards, buySingle, completionRewards, MARKET_CAP, marketPrice, MASTER_REWARD, SET_REWARD, setCompletion, showcaseCard, chaseCards, sealedGroups, sellBreakdown, collectionStats, duplicates, openSealed, openSealedMany, purchase, sealedBySet, PACK_PRICE, BOX_PRICE, sellCards, sellValue, setProgress } from './shop';
+import { bestInPack, binderCards, buySingle, PULL_HISTORY, withPulls, completionRewards, MARKET_CAP, marketPrice, MASTER_REWARD, SET_REWARD, setCompletion, showcaseCard, chaseCards, sealedGroups, sellBreakdown, collectionStats, duplicates, openSealed, openSealedMany, purchase, sealedBySet, PACK_PRICE, BOX_PRICE, sellCards, sellValue, setProgress } from './shop';
 import { balance, welcomeEntry } from './economy';
 import { cardById, cardSet } from './cards';
 import { openPack, seededRng } from './odds';
@@ -207,6 +207,36 @@ describe('completed sets', () => {
   });
 });
 
+describe('pull history', () => {
+  it('keeps the big cards of each opened pack, best first, newest on top', () => {
+    const r = purchase(withBerries(3000), 'OP-01:box', '', newId, seededRng(5));
+    if (!r.ok) throw new Error(r.error);
+    let d = r.data;
+    for (const p of d.cards.sealed.slice(0, 6)) d = openSealed(d, p.id)!.data;
+    const pulls = d.cards.pulls ?? [];
+    expect(pulls.length).toBeGreaterThan(0);
+    for (const p of pulls) {
+      const c = cardById(p.id)!;
+      expect(c.rarity === 'SR' || c.rarity === 'SEC' || c.rarity === 'TR' || !['base', 'reprint', 'promo', 'foil'].includes(c.variant)).toBe(true);
+      expect(p.via).toBe('pack');
+    }
+  });
+  it('records market buys, and keeps only the last few dozen', () => {
+    const sr = cardSet('OP-01')!.cards.find((c) => c.rarity === 'SR' && c.variant === 'base')!;
+    const r = buySingle(withBerries(5000), sr.id, '2026-10-26T10:00:00.000Z', newId);
+    if (!r.ok) throw new Error(r.error);
+    expect(r.data.cards.pulls?.[0]).toEqual({ id: sr.id, at: '2026-10-26T10:00:00.000Z', via: 'market' });
+    let c = { sealed: [], owned: {} } as AppData['cards'];
+    for (let i = 0; i < PULL_HISTORY + 5; i++) c = withPulls(c, [sr], `t${i}`, 'pack');
+    expect(c.pulls).toHaveLength(PULL_HISTORY);
+    expect(c.pulls![0].at).toBe(`t${PULL_HISTORY + 4}`);
+  });
+  it('a common pack leaves the history alone', () => {
+    const c = { sealed: [], owned: {} } as AppData['cards'];
+    expect(withPulls(c, [cardById('OP01-007')!], 't', 'pack')).toBe(c);
+  });
+});
+
 describe('shop shelf', () => {
   it('chase cards are the priciest prints, never promos or reprints', () => {
     const set = cardSet('OP-01')!;
@@ -284,7 +314,7 @@ describe('saved collection', () => {
     expect(normalize({ version: 3, prefs: { scene: { sound: false } } }).prefs.scene.sound).toBe(false);
   });
   it('older data starts with an empty collection', () => {
-    expect(normalize({ version: 2 }).cards).toEqual({ sealed: [], owned: {} });
+    expect(normalize({ version: 2 }).cards).toEqual({ sealed: [], owned: {}, pulls: [] });
   });
   it('drops malformed packs and counts', () => {
     const d = normalize({

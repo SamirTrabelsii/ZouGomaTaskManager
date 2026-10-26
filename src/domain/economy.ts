@@ -264,6 +264,58 @@ export function certEntry(id: string, at: string, c: Pick<Certification, 'id' | 
   return { id, key: certKey(c.id), kind: 'cert', amount: CERT_REWARD[c.level], at, label: `Certified · ${c.title}` };
 }
 
+/* ───────── Where the Berries came from ───────── */
+
+export type EarningSource = 'weekly' | 'habits' | 'projects' | 'goals' | 'sets';
+/** In the order the chart stacks them (and colors them). */
+export const EARNING_SOURCES: { id: EarningSource; label: string }[] = [
+  { id: 'weekly', label: 'Weekly bounty' },
+  { id: 'habits', label: 'Habits' },
+  { id: 'projects', label: 'Projects & milestones' },
+  { id: 'goals', label: 'Goals & certifications' },
+  { id: 'sets', label: 'Completed sets' },
+];
+
+/** Which source a ledger entry's Berries count under; a week's habit bonus is split out of its bounty. */
+export function earningParts(e: LedgerEntry): Partial<Record<EarningSource, number>> {
+  if (e.amount <= 0) return {};
+  switch (e.kind) {
+    case 'weekly': {
+      const habits = Math.min(e.amount, (e.week?.habits ?? 0) * HABIT_WEEK_REWARD);
+      return { weekly: e.amount - habits, habits };
+    }
+    case 'project': case 'milestone': return { projects: e.amount };
+    case 'goal': case 'cert': return { goals: e.amount };
+    case 'collection': return { sets: e.amount };
+    default: return {}; // the welcome gift and card sales aren't earned by work
+  }
+}
+
+const emptySources = (): Record<EarningSource, number> => ({ weekly: 0, habits: 0, projects: 0, goals: 0, sets: 0 });
+
+/** Berries earned per source for each of the last `weeks` weeks (Mon–Sun, oldest first), by when they were paid. */
+export function earningsByWeek(ledger: LedgerEntry[], today: string, weeks: number): { start: string; by: Record<EarningSource, number>; total: number }[] {
+  const first = addDays(startOfWeek(today), -7 * (weeks - 1));
+  const rows = Array.from({ length: weeks }, (_, i) => ({ start: addDays(first, i * 7), by: emptySources(), total: 0 }));
+  for (const e of ledger) {
+    const i = Math.floor(diffDays(first, isoToDay(e.at)) / 7);
+    if (i < 0 || i >= weeks) continue;
+    for (const [k, v] of Object.entries(earningParts(e)) as [EarningSource, number][]) { rows[i].by[k] += v; rows[i].total += v; }
+  }
+  return rows;
+}
+
+/** All-time Berries per source, plus what selling duplicates brought in. */
+export function earningTotals(ledger: LedgerEntry[]): { by: Record<EarningSource, number>; total: number; sales: number } {
+  const by = emptySources();
+  let total = 0, sales = 0;
+  for (const e of ledger) {
+    if (e.kind === 'sale') sales += e.amount;
+    for (const [k, v] of Object.entries(earningParts(e)) as [EarningSource, number][]) { by[k] += v; total += v; }
+  }
+  return { by, total, sales };
+}
+
 /* ───────── In the room ───────── */
 
 /** Coins piled in the room's treasure chest: none when empty, then growing with the balance (a few per doubling), up to 40. */
