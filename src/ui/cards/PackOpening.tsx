@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProp
 import { RARITY_LABEL, type Rarity } from '../../domain/cards';
 import { useStore } from '../../state/store';
 import { cardSet, type Card } from '../../domain/cards';
+import type { LedgerEntry } from '../../domain/types';
 import { holoPattern, REVEAL_TIMING, revealTier, type RevealTier } from '../../domain/reveal';
 import { formatBerries } from '../../domain/economy';
 import { sellValue, setProgress } from '../../domain/shop';
@@ -179,12 +180,12 @@ function Opening() {
       </div>
 
       {phase === 'summary' && quick && (
-        <QuickSummary cards={cards} fresh={reveal.fresh} packs={reveal.packs} title={set?.name ?? 'Your packs'}
+        <QuickSummary cards={cards} fresh={reveal.fresh} packs={reveal.packs} title={set?.name ?? 'Your packs'} completed={reveal.completed ?? []}
           next={queue.length > 0 ? { one: openNext, rest: openRest, left: queue.length } : null} onClose={close} />
       )}
 
       {phase === 'summary' && !quick && (
-        <PackSummary cards={cards} setId={reveal.setId} fresh={reveal.fresh} isNew={isNew} reduce={reduce} sfx={sfx}>
+        <PackSummary cards={cards} setId={reveal.setId} fresh={reveal.fresh} isNew={isNew} reduce={reduce} sfx={sfx} completed={reveal.completed ?? []}>
           {sealedLeft > 0 && <button className="btn btn-primary" onClick={openNext} autoFocus>Open next pack ({queue.length} left)</button>}
           {queue.length > 1 && <button className="btn" onClick={openRest}>⚡ Open all {queue.length}</button>}
           <button className="btn" onClick={close} autoFocus={sealedLeft === 0}>Done</button>
@@ -338,9 +339,9 @@ const FLY_STEP = 90;
  * One pack's summary: the cards fly in from a pile, fan out and settle into a grid; the best pull is shown big with
  * the pack's resale value; then each new card flies into the binder and the set's progress bar fills up.
  */
-function PackSummary({ cards, setId, fresh, isNew, reduce, sfx, children }: {
+function PackSummary({ cards, setId, fresh, isNew, reduce, sfx, completed, children }: {
   cards: Card[]; setId: string; fresh: string[]; isNew: (c: Card, i: number) => boolean; reduce: boolean;
-  sfx: (s: Sfx) => void; children: ReactNode;
+  sfx: (s: Sfx) => void; completed: LedgerEntry[]; children: ReactNode;
 }) {
   const data = useStore((s) => s.data);
   const set = cardSet(setId);
@@ -406,7 +407,8 @@ function PackSummary({ cards, setId, fresh, isNew, reduce, sfx, children }: {
   }, []);
 
   return (
-    <div className="scroll-thin relative z-10 flex max-h-full w-full max-w-3xl flex-col items-center gap-5 overflow-y-auto overflow-x-hidden px-2 py-8">
+    <div ref={useTopOnOpen()} className="scroll-thin relative z-10 flex max-h-full w-full max-w-3xl flex-col items-center gap-5 overflow-y-auto overflow-x-hidden px-2 py-8">
+      <Completed entries={completed} reduce={reduce} />
       <div className={`flex flex-col items-center gap-4 sm:flex-row sm:items-end ${reduce ? '' : 'tcg-rise'}`}>
         <div className="w-36 sm:w-44"><ShowcaseCard card={best} reduce={reduce} /></div>
         <div className="space-y-1 text-center sm:text-left">
@@ -443,6 +445,30 @@ function PackSummary({ cards, setId, fresh, isNew, reduce, sfx, children }: {
   );
 }
 
+/** The summary's buttons take focus (for the keyboard), which would scroll it to the bottom: start at the top instead. */
+function useTopOnOpen() {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => { const id = requestAnimationFrame(() => ref.current?.scrollTo({ top: 0 })); return () => cancelAnimationFrame(id); }, []);
+  return ref;
+}
+
+/** A banner for each set these cards completed, and what it paid. */
+function Completed({ entries, reduce }: { entries: LedgerEntry[]; reduce: boolean }) {
+  if (!entries.length) return null;
+  return (
+    <div className="flex w-full flex-col items-center gap-2">
+      {entries.map((e) => (
+        <div key={e.key} className={`relative w-full max-w-md rounded-2xl border border-moss-500/60 bg-moss-600/15 px-4 py-3 text-center shadow-[0_0_40px_-10px_rgba(255,180,80,.8)] ${reduce ? '' : 'tcg-rise'}`}>
+          {!reduce && <Burst kind={e.key.startsWith('master:') ? 'rainbow' : 'gold'} count={26} x={50} y={50} spread={190} />}
+          <div className="font-serif text-xl font-semibold">{e.key.startsWith('master:') ? '★ Master set!' : '🏁 Set complete!'}</div>
+          <div className="text-sm text-ink-700">{e.label.replace(/^[^·]*· /, '')}</div>
+          <div className="mt-1 font-serif text-2xl font-semibold tabular-nums text-moss-400">+{formatBerries(e.amount)}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** A number that counts up to its new value. */
 function CountUp({ value }: { value: number }) {
   const [shown, setShown] = useState(value);
@@ -465,11 +491,12 @@ function CountUp({ value }: { value: number }) {
 const RARITY_ORDER: Rarity[] = ['TR', 'SEC', 'SR', 'L', 'R', 'UC', 'C', 'PR'];
 
 /** Many packs at once: the hits big, what was new, and a count per rarity. Everything is a tap away. */
-function QuickSummary({ cards, fresh, packs, title, next, onClose }: {
+function QuickSummary({ cards, fresh, packs, title, next, onClose, completed }: {
   cards: Card[];
   fresh: string[];
   packs: number;
   title: string;
+  completed: LedgerEntry[];
   next: { one: () => void; rest: () => void; left: number } | null;
   onClose: () => void;
 }) {
@@ -480,7 +507,8 @@ function QuickSummary({ cards, fresh, packs, title, next, onClose }: {
   const counts = RARITY_ORDER.map((r) => ({ r, n: cards.filter((c) => c.rarity === r).length })).filter((x) => x.n);
   const shown = all ? cards : hits;
   return (
-    <div className="scroll-thin flex max-h-full w-full max-w-4xl flex-col items-center gap-4 overflow-y-auto overflow-x-hidden px-2 py-10">
+    <div ref={useTopOnOpen()} className="scroll-thin flex max-h-full w-full max-w-4xl flex-col items-center gap-4 overflow-y-auto overflow-x-hidden px-2 py-10">
+      <Completed entries={completed} reduce={false} />
       <h2 className="font-serif text-2xl font-semibold">{title}</h2>
       <p className="text-center text-sm text-ink-500">
         {packs} packs · {cards.length} cards · <b className="text-moss-400">{fresh.length} new</b> for your binder

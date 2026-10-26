@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bestInPack, binderCards, showcaseCard, chaseCards, sealedGroups, sellBreakdown, collectionStats, duplicates, openSealed, openSealedMany, purchase, sealedBySet, PACK_PRICE, BOX_PRICE, sellCards, sellValue, setProgress } from './shop';
+import { bestInPack, binderCards, buySingle, completionRewards, MARKET_CAP, marketPrice, MASTER_REWARD, SET_REWARD, setCompletion, showcaseCard, chaseCards, sealedGroups, sellBreakdown, collectionStats, duplicates, openSealed, openSealedMany, purchase, sealedBySet, PACK_PRICE, BOX_PRICE, sellCards, sellValue, setProgress } from './shop';
 import { balance, welcomeEntry } from './economy';
 import { cardById, cardSet } from './cards';
 import { openPack, seededRng } from './odds';
@@ -154,6 +154,56 @@ describe('room showcase', () => {
   it('shows the card you picked, while you still own it', () => {
     expect(showcaseCard(owning(['OP01-001', 'OP01-120'], 'OP01-001'))?.id).toBe('OP01-001');
     expect(showcaseCard(owning(['OP01-120'], 'OP01-001'))?.id).toBe('OP01-120');
+  });
+});
+
+describe('card market', () => {
+  it('a single costs 5x its sale value, between a floor per rarity and a cap', () => {
+    const card = (rarity: 'C' | 'L' | 'SEC', price: number | null) => ({ ...cardById('OP01-001')!, rarity, price });
+    expect(marketPrice(card('C', 0.1))).toBe(20);
+    expect(marketPrice(card('L', 0.1))).toBe(120);
+    expect(marketPrice(card('SEC', 300))).toBe(1500);
+    expect(marketPrice(card('SEC', 25000))).toBe(MARKET_CAP);
+    // never cheaper to buy than to sell, so buying and selling back can't make Berries
+    for (const c of cardSet('OP-01')!.cards) expect(marketPrice(c)).toBeGreaterThan(sellValue(c));
+  });
+  it('buys a missing card into the binder, recorded in the ledger', () => {
+    const c = cardById('OP01-007')!;
+    const r = buySingle(withBerries(5000), c.id, '2026-10-26T10:00:00.000Z', newId);
+    if (!r.ok) throw new Error(r.error);
+    expect(r.data.cards.owned[c.id]).toBe(1);
+    expect(balance(r.data.ledger)).toBe(5000 - marketPrice(c));
+    expect(r.data.ledger.at(-1)).toMatchObject({ kind: 'purchase', amount: -marketPrice(c), label: `Bought ${c.name} (${c.number})` });
+  });
+  it('refuses cards you have, unknown cards, and short balances', () => {
+    const d = { ...withBerries(5000), cards: { sealed: [], owned: { 'OP01-007': 1 } } };
+    expect(buySingle(d, 'OP01-007', '', newId).ok).toBe(false);
+    expect(buySingle(d, 'OP99-001', '', newId).ok).toBe(false);
+    expect(buySingle(withBerries(10), 'OP01-120', '', newId)).toMatchObject({ ok: false });
+  });
+});
+
+describe('completed sets', () => {
+  const op01 = cardSet('OP-01')!;
+  const owning = (ids: string[], opened = true) => {
+    const d = opened ? withBerries(0) : { ...withBerries(0), ledger: [] };
+    return { ...d, cards: { sealed: [], owned: Object.fromEntries(ids.map((id) => [id, 1])) } };
+  };
+  const base = op01.cards.filter((c) => c.variant === 'base').map((c) => c.id);
+  const all = op01.cards.filter((c) => c.variant !== 'promo').map((c) => c.id);
+  it('knows when the base set and the master set are complete', () => {
+    expect(setCompletion(owning(base.slice(1)), 'OP-01')).toEqual({ base: false, master: false });
+    expect(setCompletion(owning(base), 'OP-01')).toEqual({ base: true, master: false });
+    expect(setCompletion(owning(all), 'OP-01')).toEqual({ base: true, master: true });
+  });
+  it('pays each completion once', () => {
+    const d = owning(all);
+    const first = completionRewards(d, '', newId);
+    expect(first.map((e) => [e.key, e.amount])).toEqual([['set:OP-01', SET_REWARD], ['master:OP-01', MASTER_REWARD]]);
+    expect(completionRewards({ ...d, ledger: [...d.ledger, ...first] }, '', newId)).toEqual([]);
+  });
+  it('pays nothing before the treasury is opened', () => {
+    expect(completionRewards(owning(all, false), '', newId)).toEqual([]);
   });
 });
 

@@ -53,7 +53,7 @@ export const paidAmount = (ledger: LedgerEntry[], key: string): number | null =>
 export const balance = (ledger: LedgerEntry[]) => ledger.reduce((n, e) => n + e.amount, 0);
 /** Everything ever earned from work (rewards and bounties), ignoring spending and card sales. */
 export const lifetimeEarned = (ledger: LedgerEntry[]) =>
-  ledger.reduce((n, e) => n + (e.kind === 'sale' ? 0 : Math.max(0, e.amount)), 0);
+  ledger.reduce((n, e) => n + (e.kind === 'sale' || e.kind === 'collection' ? 0 : Math.max(0, e.amount)), 0);
 export const formatBerries = (n: number) => `฿${Math.round(n).toLocaleString('en-US')}`;
 
 /** The day the economy started (the welcome gift), or null while the treasury is still closed. */

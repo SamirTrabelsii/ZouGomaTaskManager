@@ -8,7 +8,7 @@ import { balance, formatBerries } from '../../domain/economy';
 import { chaseCards, PRICES, productsFor, sealedBySet, sealedGroups, sellValue, setProgress, shopSets, type Product } from '../../domain/shop';
 import { ConfirmButton, ProgressBar } from '../common/ui';
 import { CardFace, rarityText, toneOf } from './CardArt';
-import { CardModal, SellNote } from './CardModal';
+import { BuySingle, CardModal, SellNote, SetBadge } from './CardModal';
 
 /**
  * A set's booster pack, sized with its container; the top strip tears off when opened. It shows Bandai's official
@@ -112,6 +112,7 @@ function SetTile({ set, newest, sealed }: { set: CardSet; newest: boolean; seale
         <BoosterArt setId={set.id} />
         {newest && <span className="absolute left-1.5 top-[18%] rounded-full bg-clay-500 px-1.5 py-0.5 text-[10px] font-bold text-white shadow">NEW</span>}
         {sealed > 0 && <span className="absolute right-1.5 top-[18%] rounded-full bg-black/75 px-1.5 py-0.5 text-[10px] font-bold text-white">📦 {sealed}</span>}
+        <SetBadge setId={set.id} className="absolute bottom-[6%] left-1/2 -translate-x-1/2 whitespace-nowrap" />
       </div>
       <div className="mt-1.5 flex items-baseline justify-between gap-1 text-xs">
         <span className="font-semibold">{set.id}</span>
@@ -330,6 +331,7 @@ function SetPage({ set }: { set: CardSet }) {
             <div className="card py-2"><dt className="label mb-0">Sells for</dt><dd className="text-lg font-semibold">{formatBerries(sellValue(zoomed))}</dd></div>
           </dl>
           <SellNote card={zoomed} />
+          {!data.cards.owned[zoomed.id] && <BuySingle card={zoomed} />}
         </CardModal>
       )}
     </div>

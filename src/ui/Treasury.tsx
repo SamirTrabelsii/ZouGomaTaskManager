@@ -9,6 +9,7 @@ import {
   WEEKLY_MIN, WELCOME_GIFT,
 } from '../domain/economy';
 import { CERT_LEVEL_IDS, CERT_LEVELS } from '../domain/certs';
+import { MASTER_REWARD, SET_REWARD } from '../domain/shop';
 import { Dialog, Segmented } from './common/ui';
 import { ShopPage } from './cards/Shop';
 import { BinderPage } from './cards/Binder';
@@ -40,6 +41,7 @@ function Rules() {
       <li>📘 A finished project pays <b>{formatBerries(PROJECT_REWARD)}</b> and a milestone <b>{formatBerries(MILESTONE_REWARD)}</b>, once at least one of their tasks is finished. Up to {PROJECTS_PER_WEEK} projects and {MILESTONES_PER_WEEK} milestones pay each week.</li>
       <li>🏺 A reached goal pays its tier, picked when you create it: {GOAL_TIER_IDS.map((t) => `${GOAL_TIERS[t].label} ${formatBerries(GOAL_TIERS[t].amount)}`).join(' · ')}. Bigger tiers pay in full only after {GOAL_TIER_IDS.filter((t) => GOAL_TIERS[t].minDays).map((t) => `${GOAL_TIERS[t].minDays}`).join(' / ')} days.</li>
       <li>🎓 An earned certification pays its level once: {CERT_LEVEL_IDS.map((l) => `${CERT_LEVELS[l].label} ${formatBerries(CERT_REWARD[l])}`).join(' · ')}.</li>
+      <li>🏁 Own every base card of a set: <b>{formatBerries(SET_REWARD)}</b>. Every print, alternate arts included (the master set): <b>{formatBerries(MASTER_REWARD)}</b>. Missing cards can be bought one by one on the market, from the binder.</li>
       <li>📦 A week's bounty is ready from Monday. Collect it whenever you like, it never expires: unclaimed weeks wait in the Wallet. Then spend Berries on One Piece card packs in the Shop.</li>
     </ul>
   );
@@ -152,7 +154,7 @@ function TreasuryPage() {
 /* ───────── Wallet ───────── */
 
 const KIND_ICON: Record<LedgerEntry['kind'], string> = {
-  welcome: '🎁', weekly: '⚓', project: '📘', milestone: '🚩', goal: '🏺', cert: '🎓', purchase: '🃏', sale: '💱',
+  welcome: '🎁', weekly: '⚓', project: '📘', milestone: '🚩', goal: '🏺', cert: '🎓', purchase: '🃏', sale: '💱', collection: '🏁',
 };
 type HistoryFilter = 'all' | 'in' | 'out';
 
