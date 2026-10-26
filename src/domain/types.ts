@@ -219,6 +219,8 @@ export interface SealedPack {
   boughtAt: string; // ISO
   /** Card print ids, in reveal order (best last). */
   cards: string[];
+  /** Set on every pack of a box bought whole, so the box can be opened as one. */
+  boxId?: ID;
 }
 
 export interface CardCollection {

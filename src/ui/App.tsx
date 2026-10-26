@@ -13,6 +13,7 @@ import { Settings } from './Settings';
 import { Inbox } from './Inbox';
 import { Treasury, WalletChip } from './Treasury';
 import { PackOpening } from './cards/PackOpening';
+import { BoxOpening } from './cards/BoxOpening';
 import { Toasts } from './Toasts';
 import { Recovery } from './Recovery';
 import { AuthGate } from './AuthGate';
@@ -97,6 +98,7 @@ export default function App() {
 
       {settingsOpen && <Settings />}
       <Treasury />
+      <BoxOpening />
       <PackOpening />
       <ConflictDialog />
       <RecoveryCodeDialog />

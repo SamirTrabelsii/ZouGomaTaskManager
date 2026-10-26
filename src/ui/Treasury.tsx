@@ -49,7 +49,7 @@ export function Treasury() {
   const open = useStore((s) => s.treasuryOpen);
   const started = useStore((s) => !!economyStart(s.data.ledger));
   // steps aside while a pack is revealed, then comes back where it was
-  const revealing = useStore((s) => !!s.packReveal);
+  const revealing = useStore((s) => !!s.packReveal || !!s.boxReveal);
   if (!open || revealing) return null;
   return started ? <TreasuryPage /> : <Welcome />;
 }

@@ -5,7 +5,7 @@ import { boxStyle, cardSet, packArt, type Card, type CardSet } from '../../domai
 import { expectedPerBox, POOL_LABEL, profileFor, type OddsProfile, type Pool } from '../../domain/odds';
 import { LOCALE } from '../../domain/dates';
 import { balance, formatBerries } from '../../domain/economy';
-import { chaseCards, PRICES, productsFor, sealedBySet, sellValue, setProgress, shopSets, type Product } from '../../domain/shop';
+import { chaseCards, PRICES, productsFor, sealedBySet, sealedGroups, sellValue, setProgress, shopSets, type Product } from '../../domain/shop';
 import { ConfirmButton, ProgressBar } from '../common/ui';
 import { CardFace, rarityText, toneOf } from './CardArt';
 import { CardModal, SellNote } from './CardModal';
@@ -123,11 +123,11 @@ function SetTile({ set, newest, sealed }: { set: CardSet; newest: boolean; seale
   );
 }
 
-/** Sealed packs waiting, grouped by set, each openable one by one or all at once. */
+/** Sealed packs waiting: each box bought whole on its own (opened as a box), loose packs grouped by set. */
 function Inventory({ setId }: { setId?: string }) {
   const data = useStore((s) => s.data);
   const st = useStore.getState();
-  const groups = sealedBySet(data).filter((g) => !setId || g.setId === setId);
+  const groups = sealedGroups(data).filter((g) => !setId || g.setId === setId);
   const total = groups.reduce((n, g) => n + g.ids.length, 0);
   if (!total) return null;
   const all = groups.flatMap((g) => g.ids);
@@ -137,21 +137,30 @@ function Inventory({ setId }: { setId?: string }) {
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="font-serif text-lg font-semibold">{total} pack{total === 1 ? '' : 's'} ready to open</h2>
-          <p className="text-xs text-ink-500">One at a time for the full reveal, or all at once for a quick summary.</p>
+          <p className="text-xs text-ink-500">Open a box to pick its packs, one pack for the full reveal, or everything at once for a quick summary.</p>
         </div>
         {!setId && groups.length > 1 && <button className="btn" onClick={() => st.openSealedPacks(all)}>⚡ Open all {total}</button>}
       </div>
       <ul className="flex gap-3 overflow-x-auto pb-1 scroll-thin">
         {groups.map((g) => (
-          <li key={g.setId} className="flex shrink-0 items-center gap-3 rounded-xl bg-cream-50/70 p-2 pr-3">
-            <div className="relative w-14">
-              <BoosterArt setId={g.setId} />
-              {g.ids.length > 1 && <span className="absolute -right-1.5 -top-1.5 rounded-full bg-clay-500 px-1.5 text-[11px] font-bold text-white shadow">×{g.ids.length}</span>}
-            </div>
+          <li key={g.boxId ?? g.setId} className="flex shrink-0 items-center gap-3 rounded-xl bg-cream-50/70 p-2 pr-3">
+            {g.boxId ? (
+              <button className="tcg-box-mini relative w-20" onClick={() => st.openBox(g.boxId!)} aria-label={`Open the ${g.setId} box`}>
+                <div className="flex gap-0.5">{[0, 1, 2].map((k) => <div key={k} className="w-1/3"><BoosterArt setId={g.setId} /></div>)}</div>
+                <span className="absolute -right-1.5 -top-1.5 rounded-full bg-clay-500 px-1.5 text-[11px] font-bold text-white shadow">{g.ids.length}</span>
+              </button>
+            ) : (
+              <div className="relative w-14">
+                <BoosterArt setId={g.setId} />
+                {g.ids.length > 1 && <span className="absolute -right-1.5 -top-1.5 rounded-full bg-clay-500 px-1.5 text-[11px] font-bold text-white shadow">×{g.ids.length}</span>}
+              </div>
+            )}
             <div className="space-y-1.5">
-              <div className="text-sm font-medium">{g.setId} <span className="font-normal text-ink-500">{cardSet(g.setId)?.name}</span></div>
+              <div className="text-sm font-medium">{g.boxId ? '📦 Box · ' : ''}{g.setId} <span className="font-normal text-ink-500">{cardSet(g.setId)?.name}</span></div>
               <div className="flex gap-1.5">
-                <button className="btn btn-primary py-1" onClick={() => st.openSealedPack(g.ids[0])}>Open</button>
+                {g.boxId
+                  ? <button className="btn btn-primary py-1" onClick={() => st.openBox(g.boxId!)}>Open the box</button>
+                  : <button className="btn btn-primary py-1" onClick={() => st.openSealedPack(g.ids[0])}>Open</button>}
                 {g.ids.length > 1 && <button className="btn py-1" onClick={() => st.openSealedPacks(g.ids)} title="Skip the reveals and see every card at once">⚡ All {g.ids.length}</button>}
               </div>
             </div>

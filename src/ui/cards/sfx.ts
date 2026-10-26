@@ -6,7 +6,7 @@ import { useStore } from '../../state/store';
  * The audio context starts on the first sound, which always follows a tap or a key press, so browsers allow it.
  */
 
-export type Sfx = 'tear' | 'slide' | 'flip' | 'deal' | 'charge' | 'super' | 'secret' | 'chase' | 'new' | 'fly' | 'fill';
+export type Sfx = 'tear' | 'rip' | 'lid' | 'slide' | 'flip' | 'deal' | 'charge' | 'super' | 'secret' | 'chase' | 'new' | 'fly' | 'fill';
 
 let ctx: AudioContext | null = null;
 let out: GainNode | null = null;
@@ -79,6 +79,12 @@ export function playSfx(s: Sfx) {
       // a few ragged rips, then the strip coming free
       for (let i = 0; i < 5; i++) hiss(a, t + i * 0.06, 0.09, { freq: 2600 - i * 300, q: 0.8, gain: 0.5 });
       hiss(a, t + 0.3, 0.35, { freq: 1800, sweep: 500, q: 0.7, gain: 0.45 });
+      break;
+    case 'rip': hiss(a, t, 0.1, { freq: 2400, sweep: 900, q: 0.9, gain: 0.22 }); break;
+    case 'lid':
+      // cardboard sliding up, then a soft thud as the lid tips back
+      hiss(a, t, 0.55, { type: 'lowpass', freq: 500, sweep: 1600, q: 0.7, gain: 0.35 });
+      note(a, t + 0.5, 95, 0.25, { type: 'sine', gain: 0.45, glide: 60 });
       break;
     case 'slide': hiss(a, t, 0.2, { type: 'highpass', freq: 2200, sweep: 5000, gain: 0.35 }); break;
     case 'flip': hiss(a, t, 0.05, { freq: 3000, q: 2, gain: 0.4 }); note(a, t, 150, 0.09, { type: 'sine', gain: 0.4, glide: 90 }); break;
