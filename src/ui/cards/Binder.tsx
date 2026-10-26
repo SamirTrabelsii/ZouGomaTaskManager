@@ -3,7 +3,7 @@ import { useStore } from '../../state/store';
 import { useCatalog } from '../../state/catalog';
 import { cardSet, cardSets, type Card, type Rarity } from '../../domain/cards';
 import { formatBerries } from '../../domain/economy';
-import { binderCards, collectionStats, duplicates, sellValue, setProgress } from '../../domain/shop';
+import { binderCards, collectionStats, duplicates, sellValue, setProgress, showcaseCard } from '../../domain/shop';
 import { ConfirmButton, EmptyState, ProgressBar, Segmented } from '../common/ui';
 import { CardFace, rarityText, toneOf } from './CardArt';
 import { CardModal, SellNote } from './CardModal';
@@ -223,8 +223,17 @@ function OwnedDetail({ card, count }: { card: Card; count: number }) {
   const st = useStore.getState();
   const value = sellValue(card);
   const extra = Math.max(0, count - 1);
+  const onWall = useStore((s) => showcaseCard(s.data)?.id === card.id);
+  const picked = useStore((s) => s.data.prefs.scene.showcase === card.id);
+  const setShowcase = (id: string | null) => st.updatePrefs((p) => ({ ...p, scene: { ...p.scene, showcase: id } }));
   return (
     <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        {onWall
+          ? <span className="chip border-moss-500/50 text-moss-400">🖼 On the wall in your room{picked ? '' : ' (your most valuable card)'}</span>
+          : <button className="btn" onClick={() => setShowcase(card.id)}>🖼 Show it in the room</button>}
+        {picked && <button className="text-xs text-sky-500 hover:underline" onClick={() => setShowcase(null)}>Show my most valuable card instead</button>}
+      </div>
       <dl className="grid grid-cols-2 gap-2 text-sm">
         <div className="card py-2"><dt className="label mb-0">You own</dt><dd className="text-lg font-semibold">{count}</dd></div>
         <div className="card py-2"><dt className="label mb-0">Sells for</dt><dd className="text-lg font-semibold">{formatBerries(value)}</dd></div>

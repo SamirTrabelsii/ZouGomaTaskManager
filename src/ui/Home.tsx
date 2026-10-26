@@ -2,6 +2,9 @@ import { Component, lazy, Suspense, useEffect, useState, type ReactNode } from '
 import { useStore } from '../state/store';
 import { useNight, webglAvailable } from '../state/hooks';
 import type { SceneObjectId } from '../domain/types';
+import { cardSets } from '../domain/cards';
+import { rarityText } from './cards/CardArt';
+import { showcaseCard } from '../domain/shop';
 import { Overview } from './Overview';
 import { DeskPanel } from './panels/DeskPanel';
 import { BookshelfPanel } from './panels/BookshelfPanel';
@@ -57,6 +60,31 @@ function Dock({ big }: { big?: boolean }) {
         </button>
       ))}
     </nav>
+  );
+}
+
+/** Under the framed card's close-up: which card it is. */
+function ShowcaseCaption() {
+  const card = useStore((s) => showcaseCard(s.data));
+  const picked = useStore((s) => !!s.data.prefs.scene.showcase);
+  if (!card) return null;
+  return (
+    <div className="pointer-events-auto rounded-xl border border-cream-300 bg-cream-50/90 px-3 py-1.5 text-center text-sm shadow-soft backdrop-blur-md">
+      <b className="font-serif">{card.name}</b> <span className="text-ink-500">· {rarityText(card)} · {card.number}</span>
+      <div className="text-[11px] text-ink-500">{picked ? 'Your pick for the wall' : 'Your most valuable card'}</div>
+    </div>
+  );
+}
+
+/** Opens the binder on the framed card's set, where any card can be put on the wall. */
+function ChangeShowcase() {
+  const card = useStore((s) => showcaseCard(s.data));
+  if (!card) return null;
+  const setId = cardSets().find((x) => x.cards.some((c) => c.id === card.id))?.id;
+  return (
+    <button className="btn pointer-events-auto bg-cream-50/90 shadow-soft" onClick={() => { const st = useStore.getState(); st.setLookAt(null); if (setId) st.showBinderSet(setId); else st.setTreasuryTab('binder'); }}>
+      🖼 Change card
+    </button>
   );
 }
 
@@ -123,8 +151,12 @@ export function Home() {
           </>
         )}
         {lookAt && (
-          <div className="absolute bottom-32 left-1/2 -translate-x-1/2 md:bottom-20">
-            <button className="btn btn-primary pointer-events-auto shadow-soft" onClick={() => st.setLookAt(null)} autoFocus>← Back to the room <span className="ml-1 text-xs opacity-70">Esc</span></button>
+          <div className="absolute bottom-32 left-1/2 flex -translate-x-1/2 flex-col items-center gap-2 md:bottom-20">
+            {lookAt === 'showcase' && <ShowcaseCaption />}
+            <div className="flex gap-2">
+              <button className="btn btn-primary pointer-events-auto shadow-soft" onClick={() => st.setLookAt(null)} autoFocus>← Back to the room <span className="ml-1 text-xs opacity-70">Esc</span></button>
+              {lookAt === 'showcase' && <ChangeShowcase />}
+            </div>
           </div>
         )}
         {selected && <Panel id={selected} />}

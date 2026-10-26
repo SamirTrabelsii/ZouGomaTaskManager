@@ -140,6 +140,22 @@ export function sealedGroups(d: AppData): { setId: string; boxId: string | null;
 /** A sealed pack's best card (packs are rolled at purchase, best last), for the box's fast "open all". */
 export const bestInPack = (p: SealedPack): Card | null => cardById(p.cards[p.cards.length - 1]);
 
+/**
+ * The card framed in the room: the one you picked while you still own it, else your most valuable card (by sale
+ * value, then rarity). Null while the collection is empty.
+ */
+export function showcaseCard(d: AppData): Card | null {
+  const picked = d.prefs.scene.showcase;
+  if (picked && d.cards.owned[picked]) { const c = cardById(picked); if (c) return c; }
+  let best: Card | null = null;
+  for (const id of Object.keys(d.cards.owned)) {
+    const c = cardById(id);
+    if (!c) continue;
+    if (!best || sellValue(c) > sellValue(best) || (sellValue(c) === sellValue(best) && hitRank(c) > hitRank(best))) best = c;
+  }
+  return best;
+}
+
 /** The prints worth chasing in a set: the priciest on the market, then the rarest. */
 export function chaseCards(set: CardSet, n = 6): Card[] {
   return set.cards

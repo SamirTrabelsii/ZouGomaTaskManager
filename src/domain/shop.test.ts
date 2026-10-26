@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bestInPack, binderCards, chaseCards, sealedGroups, sellBreakdown, collectionStats, duplicates, openSealed, openSealedMany, purchase, sealedBySet, PACK_PRICE, BOX_PRICE, sellCards, sellValue, setProgress } from './shop';
+import { bestInPack, binderCards, showcaseCard, chaseCards, sealedGroups, sellBreakdown, collectionStats, duplicates, openSealed, openSealedMany, purchase, sealedBySet, PACK_PRICE, BOX_PRICE, sellCards, sellValue, setProgress } from './shop';
 import { balance, welcomeEntry } from './economy';
 import { cardById, cardSet } from './cards';
 import { openPack, seededRng } from './odds';
@@ -138,6 +138,25 @@ describe('boxes', () => {
   });
 });
 
+describe('room showcase', () => {
+  const owning = (ids: string[], showcase: string | null = null): AppData => {
+    const d = withBerries(0);
+    return { ...d, cards: { sealed: [], owned: Object.fromEntries(ids.map((id) => [id, 1])) }, prefs: { ...d.prefs, scene: { ...d.prefs.scene, showcase } } };
+  };
+  it('shows nothing for an empty collection', () => {
+    expect(showcaseCard(owning([]))).toBeNull();
+  });
+  it('defaults to the most valuable card you own', () => {
+    const ids = ['OP01-001', 'OP01-120', 'OP01-007'];
+    const best = [...ids].map((id) => cardById(id)!).sort((a, b) => sellValue(b) - sellValue(a))[0];
+    expect(showcaseCard(owning(ids))?.id).toBe(best.id);
+  });
+  it('shows the card you picked, while you still own it', () => {
+    expect(showcaseCard(owning(['OP01-001', 'OP01-120'], 'OP01-001'))?.id).toBe('OP01-001');
+    expect(showcaseCard(owning(['OP01-120'], 'OP01-001'))?.id).toBe('OP01-120');
+  });
+});
+
 describe('shop shelf', () => {
   it('chase cards are the priciest prints, never promos or reprints', () => {
     const set = cardSet('OP-01')!;
@@ -211,7 +230,7 @@ describe('binder', () => {
 
 describe('saved collection', () => {
   it('older saved settings get pack sounds turned on', () => {
-    expect(normalize({ version: 3, prefs: { scene: { reduceMotion: true } } }).prefs.scene).toMatchObject({ reduceMotion: true, sound: true });
+    expect(normalize({ version: 3, prefs: { scene: { reduceMotion: true } } }).prefs.scene).toMatchObject({ reduceMotion: true, sound: true, showcase: null });
     expect(normalize({ version: 3, prefs: { scene: { sound: false } } }).prefs.scene.sound).toBe(false);
   });
   it('older data starts with an empty collection', () => {
