@@ -10,7 +10,7 @@ export function defaultPrefs(): Prefs {
     templates: Object.fromEntries(
       TEMPLATES.map((t) => [t.id, { enabled: t.id === 'personal' || t.id === 'habits', version: t.version }]),
     ),
-    scene: { layoutVersion: 2, theme: 'evening', weather: 'clear', quality: 'auto', reduceMotion: false, sound: true, mode: 'auto', camera: null },
+    scene: { layoutVersion: 2, theme: 'evening', weather: 'clear', quality: 'auto', reduceMotion: false, sound: true, showcase: null, mode: 'auto', camera: null },
   };
 }
 

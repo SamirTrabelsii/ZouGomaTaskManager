@@ -12,6 +12,7 @@ import { Lighting, RoomShell } from './Room';
 import { Bookshelf, Desk, Notebook, Plants, WallCalendar } from './objects';
 import { Decor } from './decor';
 import { TreasureChestSpot } from './onepiece';
+import { CardShowcase, SHOWCASE_SPOT } from './showcase';
 
 const DEFAULT_POS: [number, number, number] = [11.8, 10.8, 11.9]; // isometric-style diagonal view
 const DEFAULT_TARGET: [number, number, number] = [0.2, 0.8, 0.3];
@@ -30,10 +31,13 @@ const FOCUS: Record<SceneObjectId, { target: [number, number, number]; dist: num
 
 /** Reading view for the wall poster: as close and as square-on as the orbit limits allow. */
 const POSTER_VIEW = { target: [-3.97, 2.2, 1.35] as [number, number, number], offset: [5.0, 1.0, 1.1] as [number, number, number] };
+/** The framed card on the back wall, nearly face-on and close enough to read (the orbit limits allow 2 m in close-ups). */
+const SHOWCASE_VIEW = { target: SHOWCASE_SPOT, offset: [0.5, 0.57, 2.49] as [number, number, number] };
+const LOOK_VIEWS = { poster: POSTER_VIEW, showcase: SHOWCASE_VIEW };
 
 interface Goal { pos: THREE.Vector3; target: THREE.Vector3 }
 
-function CameraRig({ selected, lookAt, reduceMotion }: { selected: SceneObjectId | null; lookAt: 'poster' | null; reduceMotion: boolean }) {
+function CameraRig({ selected, lookAt, reduceMotion }: { selected: SceneObjectId | null; lookAt: 'poster' | 'showcase' | null; reduceMotion: boolean }) {
   const controls = useRef<OrbitControlsImpl>(null);
   const { camera, size, invalidate } = useThree();
   const resetKey = useStore((s) => s.cameraResetKey);
@@ -82,8 +86,9 @@ function CameraRig({ selected, lookAt, reduceMotion }: { selected: SceneObjectId
     if (!c) return;
     if (selected || lookAt) {
       if (!home.current) home.current = { pos: camera.position.clone(), target: c.target.clone() };
-      const target = new THREE.Vector3(...(selected ? FOCUS[selected].target : POSTER_VIEW.target));
-      goal.current = { target, pos: selected ? target.clone().addScaledVector(ISO_DIR, FOCUS[selected].dist) : target.clone().add(new THREE.Vector3(...POSTER_VIEW.offset)) };
+      const view = lookAt ? LOOK_VIEWS[lookAt] : POSTER_VIEW;
+      const target = new THREE.Vector3(...(selected ? FOCUS[selected].target : view.target));
+      goal.current = { target, pos: selected ? target.clone().addScaledVector(ISO_DIR, FOCUS[selected].dist) : target.clone().add(new THREE.Vector3(...view.offset)) };
     } else if (home.current) {
       goal.current = home.current;
       home.current = null;
@@ -135,7 +140,7 @@ function CameraRig({ selected, lookAt, reduceMotion }: { selected: SceneObjectId
     <OrbitControls
       ref={controls as never}
       enablePan={false} enableDamping dampingFactor={0.08} rotateSpeed={0.45} zoomSpeed={0.6}
-      minDistance={5} maxDistance={26}
+      minDistance={lookAt ? 2 : 5} maxDistance={26}
       minPolarAngle={0.75} maxPolarAngle={1.5}
       minAzimuthAngle={0.2} maxAzimuthAngle={1.35}
       onStart={() => { goal.current = null; useStore.getState().hover(null); }}
@@ -189,6 +194,7 @@ export default function Scene({ onContextLost }: { onContextLost?: () => void })
       <Plants reduceMotion={scene.reduceMotion} />
       <WallCalendar reduceMotion={scene.reduceMotion} />
       <TreasureChestSpot evening={evening} reduceMotion={scene.reduceMotion} />
+      <CardShowcase reduceMotion={scene.reduceMotion} />
       {q !== 'low' && (
         <EffectComposer multisampling={0}>
           <Bloom intensity={evening ? 0.8 : 0.25} luminanceThreshold={0.92} luminanceSmoothing={0.25} mipmapBlur />

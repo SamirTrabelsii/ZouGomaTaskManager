@@ -162,6 +162,8 @@ export interface Prefs {
     reduceMotion: boolean;
     /** Sound effects when opening card packs. */
     sound: boolean;
+    /** The card framed on the room's wall; null shows your most valuable card. */
+    showcase: string | null;
     mode: 'auto' | '3d' | '2d';
     camera: { position: [number, number, number]; target: [number, number, number] } | null;
   };

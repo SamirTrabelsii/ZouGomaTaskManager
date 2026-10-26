@@ -40,7 +40,7 @@ interface UIState {
   selected: SceneObjectId | null;
   hovered: SceneObjectId | null;
   /** UI-only camera close-up on a decoration (not a panel). */
-  lookAt: 'poster' | null;
+  lookAt: 'poster' | 'showcase' | null;
   settingsOpen: boolean;
   inboxOpen: boolean;
   treasuryOpen: boolean;
@@ -89,7 +89,7 @@ interface Actions {
   /** Opens the Binder on a set. */
   showBinderSet(setId: string): void;
   resetCamera(): void;
-  setLookAt(v: 'poster' | null): void;
+  setLookAt(v: 'poster' | 'showcase' | null): void;
   toast(text: string, kind?: Toast['kind'], action?: Toast['action']): void;
   dismissToast(id: number): void;
   // tasks
