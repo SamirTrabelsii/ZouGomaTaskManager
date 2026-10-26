@@ -49,6 +49,24 @@ describe('completion rewards', () => {
   };
   const ledger = () => useStore.getState().data.ledger.filter((e) => e.kind !== 'welcome');
 
+  it('buying the last missing base card of a set completes it and pays the set reward once', async () => {
+    const { cardSet } = await import('../domain/cards');
+    const { marketPrice, SET_REWARD } = await import('../domain/shop');
+    const base = cardSet('OP-01')!.cards.filter((c) => c.variant === 'base');
+    const last = base[base.length - 1];
+    open();
+    useStore.setState((s) => ({ data: {
+      ...s.data,
+      ledger: [...s.data.ledger, { id: 'x', key: 'test-funds', kind: 'weekly' as const, amount: 5000, at: s.data.ledger[0].at, label: 'funds' }],
+      cards: { sealed: [], owned: Object.fromEntries(base.slice(0, -1).map((c) => [c.id, 1])) },
+    } }));
+    expect(useStore.getState().buyCard(last.id)).toBe(true);
+    const kinds = ledger().filter((e) => e.key !== 'test-funds').map((e) => [e.kind, e.amount]);
+    expect(kinds).toEqual([['purchase', -marketPrice(last)], ['collection', SET_REWARD]]);
+    expect(useStore.getState().buyCard(last.id)).toBe(false);
+    expect(ledger().filter((e) => e.kind === 'collection')).toHaveLength(1);
+  });
+
   it('pay nothing before the treasury is opened', () => {
     useStore.setState({ data: emptyData(), toasts: [] });
     const { addGoal, updateGoal } = useStore.getState();

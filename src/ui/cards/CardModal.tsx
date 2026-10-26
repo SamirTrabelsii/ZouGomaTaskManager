@@ -1,8 +1,46 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { RARITY_LABEL, type Card } from '../../domain/cards';
-import { formatBerries } from '../../domain/economy';
-import { SELL_CAP, SELL_RATE, sellBreakdown } from '../../domain/shop';
+import { balance, economyStart, formatBerries } from '../../domain/economy';
+import { MARKET_FLOOR, MARKET_MULT, marketPrice, SELL_CAP, SELL_RATE, sellBreakdown, setCompletion } from '../../domain/shop';
+import { useStore } from '../../state/store';
+import { ConfirmButton, ProgressBar } from '../common/ui';
 import { CardFace, rarityText, toneOf } from './CardArt';
+
+/** Buys a card you're missing on the market (5× its sale value), or shows how far you are from it. */
+export function BuySingle({ card }: { card: Card }) {
+  const money = useStore((s) => balance(s.data.ledger));
+  const started = useStore((s) => !!economyStart(s.data.ledger));
+  const price = marketPrice(card);
+  const short = price - money;
+  const buy = () => useStore.getState().buyCard(card.id);
+  if (!started) return null;
+  return (
+    <div className="rounded-xl border border-moss-500/40 bg-moss-600/10 p-3">
+      <div className="mb-2 flex items-baseline justify-between gap-2">
+        <span className="text-sm font-semibold">🛒 On the market</span>
+        <span className="font-serif text-lg font-semibold tabular-nums text-moss-400">{formatBerries(price)}</span>
+      </div>
+      {short > 0 ? (
+        <div>
+          <ProgressBar value={money / price} label="Saved toward this card" className="[&>div]:h-1.5" />
+          <p className="mt-1 text-xs text-ink-500">{formatBerries(short)} to go.</p>
+        </div>
+      ) : price >= 500
+        ? <ConfirmButton className="btn btn-primary w-full" confirmLabel={`Spend ${formatBerries(price)}?`} onConfirm={buy}>Buy this card · {formatBerries(price)}</ConfirmButton>
+        : <button className="btn btn-primary w-full" onClick={buy}>Buy this card · {formatBerries(price)}</button>}
+      <p className="mt-2 text-[11px] text-ink-500">A single costs {MARKET_MULT}× what it sells for, at least {formatBerries(MARKET_FLOOR[card.rarity])} for a {RARITY_LABEL[card.rarity]}.</p>
+    </div>
+  );
+}
+
+/** "✓ Complete" once you own every base card of a set, "★ Master" once you own every print. */
+export function SetBadge({ setId, className = '' }: { setId: string; className?: string }) {
+  const done = useStore((s) => setCompletion(s.data, setId));
+  if (!done.base) return null;
+  return done.master
+    ? <span className={`rounded-full bg-[linear-gradient(90deg,#ff5f6d,#ffc371,#47c8f9,#b347f9)] px-1.5 py-0.5 text-[10px] font-bold text-white shadow ${className}`}>★ Master</span>
+    : <span className={`rounded-full bg-moss-600 px-1.5 py-0.5 text-[10px] font-bold text-white shadow ${className}`}>✓ Complete</span>;
+}
 
 /** One line on how a card's sale price was worked out: market price, its rarity's minimum, or the cap. */
 export function SellNote({ card }: { card: Card }) {

@@ -6,7 +6,7 @@ import { formatBerries } from '../../domain/economy';
 import { binderCards, collectionStats, duplicates, sellValue, setProgress, showcaseCard } from '../../domain/shop';
 import { ConfirmButton, EmptyState, ProgressBar, Segmented } from '../common/ui';
 import { CardFace, rarityText, toneOf } from './CardArt';
-import { CardModal, SellNote } from './CardModal';
+import { BuySingle, CardModal, SellNote, SetBadge } from './CardModal';
 import { BoosterArt } from './Shop';
 
 type Show = 'all' | 'owned' | 'missing' | 'dupes';
@@ -60,7 +60,7 @@ export function BinderPage() {
                     className={`w-full rounded-lg px-2 py-1.5 text-left transition ${active ? 'bg-moss-600/20 ring-1 ring-moss-500/50' : 'hover:bg-cream-200'}`}>
                     <div className="flex items-baseline justify-between gap-2 text-sm">
                       <span className="truncate"><b className="font-semibold">{x.id}</b> <span className="text-ink-500">{x.name}</span></span>
-                      <span className="shrink-0 text-xs tabular-nums text-ink-500">{p.owned ? `${pct(p)}%` : '–'}</span>
+                      <span className="flex shrink-0 items-center gap-1 text-xs tabular-nums text-ink-500"><SetBadge setId={x.id} />{p.owned ? `${pct(p)}%` : '–'}</span>
                     </div>
                     {p.owned > 0 && <ProgressBar value={p.owned / p.total} label={`${x.id} completion`} className="mt-1 [&>div]:h-1" />}
                   </button>
@@ -137,7 +137,7 @@ function SetBinder({ setId }: { setId: string }) {
       <header className="flex flex-wrap items-center gap-4">
         <div className="w-14 shrink-0"><BoosterArt setId={setId} /></div>
         <div className="min-w-0 flex-1">
-          <h2 className="font-serif text-2xl font-semibold leading-tight">{set.name} <span className="text-base font-normal text-ink-500">{setId}</span></h2>
+          <h2 className="font-serif text-2xl font-semibold leading-tight">{set.name} <span className="text-base font-normal text-ink-500">{setId}</span> <SetBadge setId={setId} className="align-middle" /></h2>
           <div className="mt-1 flex items-center gap-3">
             <ProgressBar value={progress.total ? progress.owned / progress.total : 0} label={`${setId} completion`} className="max-w-xs flex-1" />
             <span className="shrink-0 text-xs tabular-nums text-ink-500">{progress.owned} / {progress.total} · {pct(progress)}%</span>
@@ -209,8 +209,9 @@ function SetBinder({ setId }: { setId: string }) {
           next={i < shown.length - 1 ? () => setOpenId(shown[i + 1].id) : undefined}>
           {owned[open.id] ? <OwnedDetail card={open} count={owned[open.id]} /> : (
             <div className="space-y-2">
-              <p className="text-sm">Not in your binder yet. It comes in {setId} packs.</p>
-              <button className="btn btn-primary" onClick={() => { setOpenId(null); st.showShopSet(setId); }}>Buy {setId} packs</button>
+              <p className="text-sm">Not in your binder yet. It comes in {setId} packs, or buy it on its own.</p>
+              <BuySingle card={open} />
+              <button className="btn" onClick={() => { setOpenId(null); st.showShopSet(setId); }}>Buy {setId} packs</button>
             </div>
           )}
         </CardModal>

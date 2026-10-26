@@ -1,4 +1,5 @@
 import type { AppData, LedgerEntry, SealedPack } from './types';
+import { economyStart } from './economy';
 import { balance, formatBerries } from './economy';
 import { cardById, cardSet, cardSets, type Card, type CardSet, type Rarity, type SetKind, type Variant } from './cards';
 import { hitRank, openPack, profileFor, type Rng } from './odds';
@@ -70,6 +71,8 @@ export interface OpenedPack {
   fresh: string[];
   /** How many packs this reveal covers: more than one when several were opened at once. */
   packs: number;
+  /** Sets these cards completed, and what that paid (shown with the summary, not before the reveal). */
+  completed?: LedgerEntry[];
 }
 
 /** Opens a sealed pack: its cards join the collection right away, before any reveal animation. */
@@ -223,6 +226,67 @@ export function sellCards(d: AppData, sales: { id: string; count: number }[], at
     label: only ? `Sold ${count > 1 ? `${count}× ` : ''}${only.name} (${only.number})` : `Sold ${count} duplicate cards`,
   };
   return { ok: true, earned, count, data: { ...d, ledger: [...d.ledger, entry], cards: { ...d.cards, owned } } };
+}
+
+/* ───────── Card market: buy the one card you're missing ───────── */
+
+/** A single costs this many times what it would sell for, so buying one is a choice, never a way around packs. */
+export const MARKET_MULT = 5;
+/** The most a single costs: five times the sale cap. */
+export const MARKET_CAP = SELL_CAP * MARKET_MULT;
+/** The least a single costs, by rarity (a common is still worth chasing a little). */
+export const MARKET_FLOOR: Record<Rarity, number> = { C: 20, UC: 30, PR: 30, R: 60, L: 120, SR: 200, SEC: 600, TR: 900 };
+
+export const marketPrice = (c: Card) => Math.min(MARKET_CAP, Math.max(MARKET_FLOOR[c.rarity], sellValue(c) * MARKET_MULT));
+
+export type MarketResult = { ok: true; data: AppData; card: Card; price: number } | { ok: false; error: string };
+
+/** Buys one copy of a card you don't have yet. Only prints that come in packs are sold. */
+export function buySingle(d: AppData, cardId: string, at: string, newId: () => string): MarketResult {
+  const card = cardById(cardId);
+  if (!card || card.variant === 'promo') return { ok: false, error: 'That card is not on the market.' };
+  if (d.cards.owned[card.id]) return { ok: false, error: `You already have ${card.name}.` };
+  const price = marketPrice(card);
+  const short = price - balance(d.ledger);
+  if (short > 0) return { ok: false, error: `You need ${formatBerries(short)} more.` };
+  const id = newId();
+  const entry: LedgerEntry = { id, key: `single:${id}`, kind: 'purchase', amount: -price, at, label: `Bought ${card.name} (${card.number})` };
+  return { ok: true, card, price, data: { ...d, ledger: [...d.ledger, entry], cards: { ...d.cards, owned: { ...d.cards.owned, [card.id]: 1 } } } };
+}
+
+/* ───────── Completed sets ───────── */
+
+/** Paid once per set when you own every base card of it, and again when you own every print (the master set). */
+export const SET_REWARD = 1000;
+export const MASTER_REWARD = 5000;
+export const setKey = (setId: string) => `set:${setId}`;
+export const masterKey = (setId: string) => `master:${setId}`;
+
+/** Whether you own every base card of the set, and every print that comes in packs. */
+export function setCompletion(d: AppData, setId: string): { base: boolean; master: boolean } {
+  const cards = cardSet(setId)?.cards.filter((c) => c.variant !== 'promo') ?? [];
+  const base = cards.filter((c) => c.variant === 'base');
+  const has = (c: Card) => !!d.cards.owned[c.id];
+  return { base: base.length > 0 && base.every(has), master: cards.length > 0 && cards.every(has) };
+}
+
+/** Rewards for sets completed and not paid yet. Nothing is paid before the treasury is opened. */
+export function completionRewards(d: AppData, at: string, newId: () => string): LedgerEntry[] {
+  if (!economyStart(d.ledger)) return [];
+  const paid = new Set(d.ledger.map((e) => e.key));
+  const out: LedgerEntry[] = [];
+  for (const s of cardSets()) {
+    const done = setCompletion(d, s.id);
+    if (done.base && !paid.has(setKey(s.id))) {
+      const id = newId();
+      out.push({ id, key: setKey(s.id), kind: 'collection', amount: SET_REWARD, at, label: `Set complete · ${s.id} ${s.name}` });
+    }
+    if (done.master && !paid.has(masterKey(s.id))) {
+      const id = newId();
+      out.push({ id, key: masterKey(s.id), kind: 'collection', amount: MASTER_REWARD, at, label: `Master set · ${s.id} ${s.name}` });
+    }
+  }
+  return out;
 }
 
 /* ───────── Binder ───────── */

@@ -14,7 +14,7 @@ import {
   projectEntry, projectReward, PROJECTS_PER_WEEK, CERT_REWARD, welcomeEntry, WELCOME_GIFT,
 } from '../domain/economy';
 import { certReminderAt, certReminderTitle, DEFAULT_CERT_LEVEL, DEFAULT_REMIND_BEFORE, safeUrl } from '../domain/certs';
-import { openSealed, openSealedMany, purchase, sellCards, type OpenedPack } from '../domain/shop';
+import { buySingle, completionRewards, type OpenedPack, openSealed, openSealedMany, purchase, sellCards } from '../domain/shop';
 
 export type TreasuryTab = 'wallet' | 'shop' | 'binder';
 
@@ -150,6 +150,8 @@ interface Actions {
   /** Opens several sealed packs at once, straight to one summary. */
   openSealedPacks(packIds: string[]): void;
   closeReveal(): void;
+  /** Buys one missing card on the market. Returns false (with a toast) when it can't. */
+  buyCard(cardId: string): boolean;
   /** Shows a box bought whole: lift the lid, pick its packs one by one, or rip them all at once. */
   openBox(boxId: string): void;
   closeBox(): void;
@@ -717,14 +719,29 @@ export const useStore = create<Store>((set, get) => {
     openSealedPack(packId) {
       const r = openSealed(get().data, packId);
       if (!r) return;
-      // the cards are saved before the reveal starts, so closing or reloading mid-reveal loses nothing
-      set({ data: r.data, packReveal: r.opened });
+      // the cards are saved before the reveal starts, so closing or reloading mid-reveal loses nothing; a set they
+      // complete is paid now too, and celebrated in the summary
+      const completed = completionRewards(r.data, nowIso(), uid);
+      set({ data: { ...r.data, ledger: [...r.data.ledger, ...completed] }, packReveal: { ...r.opened, completed } });
+      if (completed.length) pulse('chest', true);
     },
     openSealedPacks(packIds) {
       if (packIds.length === 1) return get().openSealedPack(packIds[0]);
       const r = openSealedMany(get().data, packIds);
       if (!r) return;
-      set({ data: r.data, packReveal: r.opened });
+      const completed = completionRewards(r.data, nowIso(), uid);
+      set({ data: { ...r.data, ledger: [...r.data.ledger, ...completed] }, packReveal: { ...r.opened, completed } });
+      if (completed.length) pulse('chest', true);
+    },
+    buyCard(cardId) {
+      const r = buySingle(get().data, cardId, nowIso(), uid);
+      if (!r.ok) { toast(r.error, 'error'); return false; }
+      const completed = completionRewards(r.data, nowIso(), uid);
+      set({ data: { ...r.data, ledger: [...r.data.ledger, ...completed] } });
+      toast(`${r.card.name} is in your binder · bought for ${formatBerries(r.price)}`);
+      for (const e of completed) toast(`🏁 ${e.label} · +${formatBerries(e.amount)}`);
+      if (completed.length) pulse('chest', true);
+      return true;
     },
     closeReveal() { set({ packReveal: null }); },
     openBox(boxId) {
