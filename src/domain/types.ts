@@ -160,6 +160,8 @@ export interface Prefs {
     weather: 'clear' | 'rain';
     quality: Quality;
     reduceMotion: boolean;
+    /** Sound effects when opening card packs. */
+    sound: boolean;
     mode: 'auto' | '3d' | '2d';
     camera: { position: [number, number, number]; target: [number, number, number] } | null;
   };

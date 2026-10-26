@@ -224,6 +224,7 @@ export function Settings() {
               </select>
             </div>
             <label className="flex items-center gap-2 self-end text-sm"><input type="checkbox" className="h-4 w-4 accent-moss-600" checked={prefs.scene.reduceMotion} onChange={(e) => scene({ reduceMotion: e.target.checked })} /> Reduce motion (no sway, pulses or sparkles)</label>
+            <label className="flex items-center gap-2 self-end text-sm"><input type="checkbox" className="h-4 w-4 accent-moss-600" checked={prefs.scene.sound} onChange={(e) => scene({ sound: e.target.checked })} /> Sounds when opening card packs</label>
           </div>
         </section>
 

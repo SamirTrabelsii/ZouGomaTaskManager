@@ -180,6 +180,10 @@ describe('binder', () => {
 });
 
 describe('saved collection', () => {
+  it('older saved settings get pack sounds turned on', () => {
+    expect(normalize({ version: 3, prefs: { scene: { reduceMotion: true } } }).prefs.scene).toMatchObject({ reduceMotion: true, sound: true });
+    expect(normalize({ version: 3, prefs: { scene: { sound: false } } }).prefs.scene.sound).toBe(false);
+  });
   it('older data starts with an empty collection', () => {
     expect(normalize({ version: 2 }).cards).toEqual({ sealed: [], owned: {} });
   });
