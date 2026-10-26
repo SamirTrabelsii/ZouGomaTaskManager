@@ -23,7 +23,7 @@ export const PROJECTS_PER_WEEK = 3;
 export const MILESTONES_PER_WEEK = 5;
 /** Each habit kept for a whole week (every day, or its weekly target) adds this to the week's bounty. */
 export const HABIT_WEEK_REWARD = 25;
-/** A reached milestone pays this, if at least one finished task is linked to it. */
+/** A reached milestone pays this. */
 export const MILESTONE_REWARD = 50;
 /**
  * Goal tiers. `minDays` is how long the goal must have had its tier before the tier pays in full; a goal reached
@@ -226,9 +226,9 @@ export function projectReward(project: Pick<Project, 'id'>, tasks: Task[], ledge
   return { points: sumPoints(done), amount: done.length && !capped ? PROJECT_REWARD : 0, capped };
 }
 
-export function milestoneReward(m: Pick<Milestone, 'id'>, tasks: Task[], ledger: LedgerEntry[], today: string): number {
-  if (paidThisWeek(ledger, 'milestone', today) >= MILESTONES_PER_WEEK) return 0;
-  return tasks.some((t) => t.milestoneId === m.id && t.status === 'done') ? MILESTONE_REWARD : 0;
+/** Reaching a milestone pays a flat reward, no linked task needed, unless this week's milestone rewards are used up. */
+export function milestoneReward(ledger: LedgerEntry[], today: string): number {
+  return paidThisWeek(ledger, 'milestone', today) >= MILESTONES_PER_WEEK ? 0 : MILESTONE_REWARD;
 }
 
 /**

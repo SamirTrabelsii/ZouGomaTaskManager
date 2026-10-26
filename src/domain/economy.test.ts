@@ -178,17 +178,14 @@ describe('habits kept all week', () => {
 });
 
 describe('milestone reward', () => {
-  it('pays 50 only when a finished task is linked to it', () => {
-    expect(milestoneReward({ id: 'm' }, [{ ...task('2026-10-06', 'XS'), milestoneId: 'm' }], [], '2026-10-21')).toBe(50);
-    expect(milestoneReward({ id: 'm' }, [{ ...task('2026-10-06', 'XS'), milestoneId: 'm', status: 'doing' }], [], '2026-10-21')).toBe(0);
-    expect(milestoneReward({ id: 'm' }, [], [], '2026-10-21')).toBe(0);
+  it('pays 50 without needing a linked task', () => {
+    expect(milestoneReward([], '2026-10-21')).toBe(50);
   });
   it('only 5 milestones pay per week', () => {
     const at = new Date('2026-10-20T12:00:00').toISOString();
     const ledger = Array.from({ length: 5 }, (_, i) => milestoneEntry(`m${i}`, at, { id: `m${i}`, title: 'x' }, 50));
-    const done = [{ ...task('2026-10-20', 'XS'), milestoneId: 'm' }];
-    expect(milestoneReward({ id: 'm' }, done, ledger, '2026-10-21')).toBe(0);
-    expect(milestoneReward({ id: 'm' }, done, ledger, '2026-10-26')).toBe(50);
+    expect(milestoneReward(ledger, '2026-10-21')).toBe(0);
+    expect(milestoneReward(ledger, '2026-10-26')).toBe(50);
   });
 });
 

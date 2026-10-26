@@ -479,7 +479,7 @@ export const useStore = create<Store>((set, get) => {
       commit((d) => ({ ...d, milestones: d.milestones.map((x) => (x.id === id ? { ...x, done, completedAt: done ? nowIso() : null } : x)) }));
       pulse('bookshelf', done);
       if (!done) return;
-      const amount = milestoneReward(m, get().data.tasks, get().data.ledger, todayStr());
+      const amount = milestoneReward(get().data.ledger, todayStr());
       toast(earn(milestoneEntry(uid(), nowIso(), m, amount)) ? `Milestone reached: ${m.title} · +${formatBerries(amount)}` : `Milestone reached: ${m.title}`);
     },
     deleteMilestone(id) {

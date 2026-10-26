@@ -251,7 +251,7 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
           <input type="date" className="input w-36" aria-label="Milestone due date" value={msDue} onChange={(e) => setMsDue(e.target.value)} />
           <button className="btn" disabled={!ms.trim()}>Add</button>
         </form>
-        <RewardLine>A milestone with a finished linked task earns {formatBerries(MILESTONE_REWARD)}</RewardLine>
+        <RewardLine>Reaching a milestone earns {formatBerries(MILESTONE_REWARD)}</RewardLine>
       </Section>
 
       <Section title="Linked tasks">
