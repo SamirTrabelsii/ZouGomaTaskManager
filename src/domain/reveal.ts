@@ -28,6 +28,12 @@ export function holoPattern(c: Pick<Card, 'rarity' | 'variant'>): HoloPattern {
   return tier === 'secret' ? 'gold' : tier === 'super' || tier === 'rare' ? 'soft' : 'none';
 }
 
+/** A pull worth remembering (and flying to the box's showcase): Super Rare and up, leaders aside. */
+export const isBigPull = (c: Pick<Card, 'rarity' | 'variant'>) => {
+  const t = revealTier(c);
+  return t === 'secret' || t === 'chase' || c.rarity === 'SR';
+};
+
 /**
  * The suspense before a card turns over, and how long the turn takes, in ms. Commons flip at once; a chase card dims
  * the room and shakes first, then turns slowly.

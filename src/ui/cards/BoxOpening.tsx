@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useStore } from '../../state/store';
 import { cardSet, type Card } from '../../domain/cards';
 import { profileFor } from '../../domain/odds';
-import { revealTier } from '../../domain/reveal';
+import { isBigPull, revealTier } from '../../domain/reveal';
 import { bestInPack, PRICES } from '../../domain/shop';
 import { CardThumb } from './CardArt';
 import { BoosterArt } from './Shop';
@@ -28,8 +28,6 @@ export function BoxOpening() {
 /** Cards still flying to the showcase when the summary takes over (or the box closes). */
 const clearGhosts = () => document.querySelectorAll('body > .tcg-shelf-card').forEach((g) => g.remove());
 
-/** A card worth sending to the showcase during the montage: SR and up, leaders aside. */
-const isBigPull = (c: Card) => { const t = revealTier(c); return t === 'secret' || t === 'chase' || c.rarity === 'SR'; };
 
 function Box({ boxId, setId, hidden }: { boxId: string; setId: string; hidden: boolean }) {
   const st = useStore.getState();

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   balance, bountyEntry, chestCoins, currentWeek, posterBounty, economyStart, goalReward, lifetimeEarned, milestoneReward, pendingBounties,
-  habitsKept, milestoneEntry, projectEntry, projectReward, streakMultiplier, weekBounty, welcomeEntry, WELCOME_GIFT,
+  earningsByWeek, earningTotals, habitsKept, milestoneEntry, projectEntry, projectReward, streakMultiplier, weekBounty, welcomeEntry, WELCOME_GIFT,
 } from './economy';
 import { emptyData, normalize } from '../data/storage';
 import type { AppData, LedgerEntry, Task, TaskSize } from './types';
@@ -225,5 +225,27 @@ describe('in the room', () => {
     const spent: LedgerEntry = { id: 's', key: 'buy:1', kind: 'purchase', amount: -3000, label: 'x', at: '' };
     const bounty: LedgerEntry = { id: 'b', key: 'week:x', kind: 'weekly', amount: 12_000, label: 'x', at: '' };
     expect(posterBounty([opened(), bounty, spent])).toBe('12,450');
+  });
+});
+
+describe('earnings by source', () => {
+  const at = (day: string) => new Date(`${day}T12:00:00`).toISOString();
+  const entries: LedgerEntry[] = [
+    { ...welcomeEntry('w', at('2026-10-05')) },
+    bountyEntry('b1', at('2026-10-12'), weekBounty('2026-10-05', 40, 0, 2)), // 400 for points + 50 for habits
+    projectEntry('p1', at('2026-10-14'), { id: 'p', title: 'P' }, { points: 4, amount: 200 }),
+    { id: 's', key: 'sell:1', kind: 'sale', amount: 30, at: at('2026-10-15'), label: 'Sold' },
+    { id: 'c', key: 'set:OP-01', kind: 'collection', amount: 1000, at: at('2026-10-20'), label: 'Set complete' },
+    { id: 'x', key: 'buy:1', kind: 'purchase', amount: -150, at: at('2026-10-20'), label: 'Pack' },
+  ];
+  it('splits each week bounty into points and habits, and leaves out the gift, sales and spending', () => {
+    const weeks = earningsByWeek(entries, '2026-10-21', 3);
+    expect(weeks.map((w) => w.start)).toEqual(['2026-10-05', '2026-10-12', '2026-10-19']);
+    expect(weeks[1].by).toEqual({ weekly: 400, habits: 50, projects: 200, goals: 0, sets: 0 });
+    expect(weeks[2]).toMatchObject({ total: 1000, by: { sets: 1000 } });
+    expect(weeks[0].total).toBe(0);
+  });
+  it('totals every source, with sales on the side', () => {
+    expect(earningTotals(entries)).toEqual({ by: { weekly: 400, habits: 50, projects: 200, goals: 0, sets: 1000 }, total: 1650, sales: 30 });
   });
 });
