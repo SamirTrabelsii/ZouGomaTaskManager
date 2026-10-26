@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { binderCards, chaseCards, sellBreakdown, collectionStats, duplicates, openSealed, openSealedMany, purchase, sealedBySet, PACK_PRICE, BOX_PRICE, sellCards, sellValue, setProgress } from './shop';
+import { bestInPack, binderCards, chaseCards, sealedGroups, sellBreakdown, collectionStats, duplicates, openSealed, openSealedMany, purchase, sealedBySet, PACK_PRICE, BOX_PRICE, sellCards, sellValue, setProgress } from './shop';
 import { balance, welcomeEntry } from './economy';
 import { cardById, cardSet } from './cards';
 import { openPack, seededRng } from './odds';
@@ -105,6 +105,36 @@ describe('opening several packs at once', () => {
   it('groups sealed packs by set', () => {
     const d = box();
     expect(sealedBySet(d)).toEqual([{ setId: 'OP-01', ids: d.cards.sealed.map((p) => p.id) }]);
+  });
+});
+
+describe('boxes', () => {
+  const buy = (d: AppData, product: string) => {
+    const r = purchase(d, product, '', newId, seededRng(11));
+    if (!r.ok) throw new Error(r.error);
+    return r.data;
+  };
+  it('every pack of a box shares its box id; a single pack has none', () => {
+    const d = buy(buy(withBerries(3300), 'OP-01:box'), 'OP-01:pack');
+    const boxIds = new Set(d.cards.sealed.slice(0, 24).map((p) => p.boxId));
+    expect(boxIds.size).toBe(1);
+    expect([...boxIds][0]).toEqual(expect.any(String));
+    expect(d.cards.sealed[24].boxId).toBeUndefined();
+  });
+  it('groups a box apart from loose packs of the same set', () => {
+    const d = buy(buy(withBerries(6300), 'OP-01:box'), 'OP-01:pack');
+    const groups = sealedGroups(buy(d, 'OP-01:box'));
+    expect(groups.map((g) => [g.boxId ? 'box' : 'packs', g.ids.length])).toEqual([['box', 24], ['packs', 1], ['box', 24]]);
+  });
+  it('knows each pack\u2019s best card before it is opened', () => {
+    const d = buy(withBerries(150), 'OP-01:pack');
+    expect(bestInPack(d.cards.sealed[0])?.id).toBe(d.cards.sealed[0].cards[11]);
+  });
+  it('saved box ids survive a reload; bad ones are dropped', () => {
+    const d = buy(withBerries(3000), 'OP-01:box');
+    const back = normalize(JSON.parse(JSON.stringify({ ...d, cards: { ...d.cards, sealed: [...d.cards.sealed, { ...d.cards.sealed[0], id: 'x', boxId: 7 }] } })));
+    expect(back.cards.sealed[0].boxId).toBe(d.cards.sealed[0].boxId);
+    expect(back.cards.sealed.at(-1)!.boxId).toBeUndefined();
   });
 });
 

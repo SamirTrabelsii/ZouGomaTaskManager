@@ -51,6 +51,8 @@ interface UIState {
   binderSetId: string | null;
   /** The pack being revealed in the opening overlay. Its cards are already in the collection. */
   packReveal: OpenedPack | null;
+  /** The box open on screen (its packs are picked from it), or null. */
+  boxReveal: { boxId: string; setId: string } | null;
   toasts: Toast[];
   pulse: Partial<Record<SceneObjectId, { key: number; celebrate: boolean }>>;
   cameraResetKey: number;
@@ -148,6 +150,9 @@ interface Actions {
   /** Opens several sealed packs at once, straight to one summary. */
   openSealedPacks(packIds: string[]): void;
   closeReveal(): void;
+  /** Shows a box bought whole: lift the lid, pick its packs one by one, or rip them all at once. */
+  openBox(boxId: string): void;
+  closeBox(): void;
   /** Sells duplicate copies for Berries; the last copy of a card is never sold. Returns false (with a toast) if refused. */
   sellDuplicates(sales: { id: string; count: number }[]): boolean;
   // prefs & data safety
@@ -250,6 +255,7 @@ export const useStore = create<Store>((set, get) => {
     shopSetId: null,
     binderSetId: null,
     packReveal: null,
+    boxReveal: null,
     toasts: [],
     pulse: {},
     cameraResetKey: 0,
@@ -312,7 +318,7 @@ export const useStore = create<Store>((set, get) => {
     dismissRecoveryCode() { set({ recoveryCode: null }); },
     async signOut() {
       await syncer.signOut();
-      set({ status: 'signin', data: emptyData(), selected: null, settingsOpen: false, inboxOpen: false, treasuryOpen: false, packReveal: null, recoveryCode: null });
+      set({ status: 'signin', data: emptyData(), selected: null, settingsOpen: false, inboxOpen: false, treasuryOpen: false, packReveal: null, boxReveal: null, recoveryCode: null });
     },
     async resolveConflict(keep) {
       const data = await syncer.resolveConflict(keep);
@@ -700,7 +706,9 @@ export const useStore = create<Store>((set, get) => {
       const ids = r.packs.map((p) => p.id);
       // the action opens exactly what was bought, if it is still sealed by then
       const still = () => ids.filter((id) => get().data.cards.sealed.some((p) => p.id === id));
-      toast(ids.length === 1 ? 'Pack bought!' : `${ids.length} packs bought!`, 'ok', {
+      const boxId = r.packs[0]?.boxId;
+      if (boxId) toast('Box bought!', 'ok', { label: 'Open the box', run: () => get().openBox(boxId) });
+      else toast(ids.length === 1 ? 'Pack bought!' : `${ids.length} packs bought!`, 'ok', {
         label: ids.length === 1 ? 'Open now' : 'Open all',
         run: () => { const left = still(); if (left.length === 1) get().openSealedPack(left[0]); else if (left.length) get().openSealedPacks(left); },
       });
@@ -719,6 +727,11 @@ export const useStore = create<Store>((set, get) => {
       set({ data: r.data, packReveal: r.opened });
     },
     closeReveal() { set({ packReveal: null }); },
+    openBox(boxId) {
+      const pack = get().data.cards.sealed.find((p) => p.boxId === boxId);
+      if (pack) set({ boxReveal: { boxId, setId: pack.setId } });
+    },
+    closeBox() { set({ boxReveal: null }); },
     sellDuplicates(sales) {
       const r = sellCards(get().data, sales, nowIso(), uid);
       if (!r.ok) { toast(r.error, 'error'); return false; }

@@ -76,7 +76,8 @@ function normalizeLedger(entries: any[]): any[] {
 
 function normalizeCards(raw: any): AppData['cards'] {
   const sealed = arr(raw?.sealed).filter((p) =>
-    typeof p.setId === 'string' && Array.isArray(p.cards) && p.cards.length > 0 && p.cards.every((c: unknown) => typeof c === 'string'));
+    typeof p.setId === 'string' && Array.isArray(p.cards) && p.cards.length > 0 && p.cards.every((c: unknown) => typeof c === 'string'))
+    .map(({ boxId, ...p }) => (typeof boxId === 'string' ? { ...p, boxId } : p));
   const owned: Record<string, number> = {};
   if (raw?.owned && typeof raw.owned === 'object' && !Array.isArray(raw.owned)) {
     for (const [id, n] of Object.entries(raw.owned)) if (Number.isInteger(n) && (n as number) > 0) owned[id] = n as number;

@@ -53,8 +53,9 @@ export function purchase(d: AppData, productId: string, at: string, newId: () =>
   if (!product || !set) return { ok: false, error: 'That product is not in the shop.' };
   const short = product.price - balance(d.ledger);
   if (short > 0) return { ok: false, error: `You need ${formatBerries(short)} more.` };
+  const boxId = product.kind === 'box' ? newId() : null;
   const packs: SealedPack[] = Array.from({ length: product.packs }, () => ({
-    id: newId(), setId: set.id, boughtAt: at, cards: openPack(set, rng).map((c) => c.id),
+    id: newId(), setId: set.id, boughtAt: at, cards: openPack(set, rng).map((c) => c.id), ...(boxId ? { boxId } : {}),
   }));
   const id = newId();
   const entry: LedgerEntry = { id, key: `buy:${id}`, kind: 'purchase', amount: -product.price, at, label: `${product.label} · ${set.id} ${set.name}` };
@@ -120,6 +121,24 @@ export function sealedBySet(d: AppData): { setId: string; ids: string[] }[] {
   for (const p of d.cards.sealed) groups.set(p.setId, [...(groups.get(p.setId) ?? []), p.id]);
   return [...groups].map(([setId, ids]) => ({ setId, ids }));
 }
+
+/**
+ * Sealed packs as the shop shows them: each box bought whole as its own group, then the loose packs of each set, in
+ * the order they were bought.
+ */
+export function sealedGroups(d: AppData): { setId: string; boxId: string | null; ids: string[] }[] {
+  const groups = new Map<string, { setId: string; boxId: string | null; ids: string[] }>();
+  for (const p of d.cards.sealed) {
+    const key = p.boxId ? `box:${p.boxId}` : `set:${p.setId}`;
+    const g = groups.get(key) ?? { setId: p.setId, boxId: p.boxId ?? null, ids: [] };
+    g.ids.push(p.id);
+    groups.set(key, g);
+  }
+  return [...groups.values()];
+}
+
+/** A sealed pack's best card (packs are rolled at purchase, best last), for the box's fast "open all". */
+export const bestInPack = (p: SealedPack): Card | null => cardById(p.cards[p.cards.length - 1]);
 
 /** The prints worth chasing in a set: the priciest on the market, then the rarest. */
 export function chaseCards(set: CardSet, n = 6): Card[] {
