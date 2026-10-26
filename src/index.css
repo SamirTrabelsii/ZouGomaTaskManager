@@ -230,3 +230,17 @@ h1, h2 { text-shadow: 0 0 24px rgba(255,170,80,.12); }
 [data-reduce-motion="true"] .tcg-charge, [data-reduce-motion="true"] .tcg-shake, [data-reduce-motion="true"] .tcg-banner,
 [data-reduce-motion="true"] .tcg-new, [data-reduce-motion="true"] .tcg-rays { animation: none; }
 [data-reduce-motion="true"] .tcg-spotlight { transition: none; }
+
+/* pack summary: cards fly in from a pile, fan out, then settle into the grid */
+.tcg-deal { --cx: 0px; --cy: 0px; --fx: 0px; --fy: 0px; --fr: 0deg;
+  animation: deal 1.25s cubic-bezier(.3,.8,.3,1) both; animation-delay: calc(var(--i, 0) * 45ms); }
+@keyframes deal {
+  0% { opacity: 0; transform: translate(var(--cx), var(--cy)) scale(.85); }
+  12% { opacity: 1; transform: translate(var(--cx), var(--cy)) scale(.9); }
+  45%, 58% { transform: translate(calc(var(--cx) + var(--fx)), calc(var(--cy) + var(--fy))) rotate(var(--fr)) scale(.95); }
+  100% { opacity: 1; transform: none; } }
+.tcg-rise { animation: rise .6s cubic-bezier(.2,1.2,.4,1) both; }
+@keyframes rise { from { opacity: 0; transform: translateY(24px) scale(.96); } }
+.tcg-bump { animation: bump .5s cubic-bezier(.3,1.8,.5,1); }
+@keyframes bump { 40% { transform: scale(1.06); box-shadow: 0 0 28px rgba(255,190,90,.5); } }
+[data-reduce-motion="true"] .tcg-deal, [data-reduce-motion="true"] .tcg-rise, [data-reduce-motion="true"] .tcg-bump { animation: none; }

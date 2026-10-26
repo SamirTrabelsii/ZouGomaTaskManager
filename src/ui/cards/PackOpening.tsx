@@ -1,11 +1,15 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { RARITY_LABEL, type Rarity } from '../../domain/cards';
 import { useStore } from '../../state/store';
 import { cardSet, type Card } from '../../domain/cards';
 import { holoPattern, REVEAL_TIMING, revealTier, type RevealTier } from '../../domain/reveal';
+import { formatBerries } from '../../domain/economy';
+import { sellValue, setProgress } from '../../domain/shop';
+import { ProgressBar } from '../common/ui';
 import { CardBack, CardFace, CardThumb, preloadCards, rarityText, toneOf } from './CardArt';
 import { BoosterArt } from './Shop';
 import { Burst, useTilt } from './fx';
+import { useSfx, type Sfx } from './sfx';
 
 type Phase = 'sealed' | 'tearing' | 'reveal' | 'summary';
 
@@ -49,6 +53,8 @@ function Opening() {
   const timing = reduce ? { charge: 0, flip: 0 } : REVEAL_TIMING[tier];
   const isNew = (c: Card, i: number) => reveal.fresh.includes(c.id) && cards.findIndex((x) => x.id === c.id) === i;
   const box = useRef<HTMLDivElement>(null);
+  const sfx = useSfx();
+  const soundOn = useStore((s) => s.data.prefs.scene.sound);
   const timers = useRef<number[]>([]);
   const later = (ms: number, fn: () => void) => { timers.current.push(window.setTimeout(fn, ms)); };
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
@@ -58,6 +64,7 @@ function Opening() {
 
   const tear = useCallback(() => {
     if (phase !== 'sealed') return;
+    sfx('tear');
     if (reduce) return setPhase('reveal');
     setPhase('tearing');
     later(1000, () => setPhase('reveal'));
@@ -69,11 +76,16 @@ function Opening() {
     if (!card || busy.current) return;
     busy.current = true;
     if (timing.charge) setCharging(true);
+    if (tier === 'secret' || tier === 'chase') sfx('charge');
     later(timing.charge, () => {
       setCharging(false);
       setFlipped(true);
+      sfx('flip');
       later(timing.flip, () => {
         busy.current = false;
+        const sting: Partial<Record<RevealTier, Sfx>> = { super: 'super', secret: 'secret', chase: 'chase' };
+        if (sting[tier]) sfx(sting[tier]!);
+        if (isNew(card, index)) later(sting[tier] ? 450 : 0, () => sfx('new'));
         if (tier === 'secret' || tier === 'chase') {
           setFx({ key: Date.now(), tier });
           if (!reduce) setShake((n) => n + 1);
@@ -81,12 +93,13 @@ function Opening() {
       });
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [card, tier, timing.charge, timing.flip, reduce]);
+  }, [card, tier, timing.charge, timing.flip, reduce, sfx, index]);
 
   /** Throws the turned card off the pile (left or right) and brings up the next one. */
   const toss = useCallback((dir: 1 | -1) => {
     if (busy.current) return;
     busy.current = true;
+    sfx('slide');
     setThrown(dir);
     setFx(null);
     later(reduce ? 0 : 300, () => {
@@ -97,7 +110,7 @@ function Opening() {
       setIndex(index + 1);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [index, cards.length, reduce]);
+  }, [index, cards.length, reduce, sfx]);
 
   /** One step, for a tap or Space: tear, flip, or throw the card to the right. */
   const advance = useCallback(() => {
@@ -128,7 +141,6 @@ function Opening() {
     return () => document.removeEventListener('keydown', onKey, true);
   });
 
-  const hits = cards.filter((c) => toneOf(c) === 'legend' || toneOf(c) === 'glow');
   const spotlight = phase === 'reveal' && tier === 'chase' && (charging || (flipped && !!fx));
 
   return (
@@ -138,6 +150,8 @@ function Opening() {
       {fx && <div key={fx.key} className="tcg-flash" aria-hidden />}
       <div className="absolute right-3 top-3 z-20 flex gap-2">
         {phase === 'reveal' && <button className="btn" onClick={() => setPhase('summary')}>Skip to all cards</button>}
+        <button className="btn btn-ghost px-2" aria-pressed={!soundOn} aria-label={soundOn ? 'Mute sounds' : 'Turn sounds on'} title={soundOn ? 'Mute sounds' : 'Turn sounds on'}
+          onClick={() => st.updatePrefs((p) => ({ ...p, scene: { ...p.scene, sound: !p.scene.sound } }))}>{soundOn ? '🔊' : '🔇'}</button>
         <button className="btn btn-ghost px-2" onClick={close} aria-label="Close pack opening">✕</button>
       </div>
 
@@ -170,21 +184,11 @@ function Opening() {
       )}
 
       {phase === 'summary' && !quick && (
-        <div className="scroll-thin relative z-10 flex max-h-full w-full max-w-3xl flex-col items-center gap-4 overflow-y-auto overflow-x-hidden px-2 py-10">
-          <h2 className="font-serif text-2xl font-semibold">{set?.name ?? 'Your pack'}</h2>
-          <p className="text-sm text-ink-500">
-            {reveal.fresh.length} new card{reveal.fresh.length === 1 ? '' : 's'}
-            {hits.length > 0 && ` · best pull: ${cards[cards.length - 1].name} (${rarityText(cards[cards.length - 1])})`}
-          </p>
-          <ul className="grid w-full grid-cols-4 gap-2 sm:grid-cols-6 sm:gap-3">
-            {cards.map((c, i) => <li key={`${c.id}-${i}`}><CardThumb id={c.id} isNew={isNew(c, i)} /></li>)}
-          </ul>
-          <div className="flex gap-2">
-            {sealedLeft > 0 && <button className="btn btn-primary" onClick={openNext} autoFocus>Open next pack ({queue.length} left)</button>}
-            {queue.length > 1 && <button className="btn" onClick={openRest}>⚡ Open all {queue.length}</button>}
-            <button className="btn" onClick={close} autoFocus={sealedLeft === 0}>Done</button>
-          </div>
-        </div>
+        <PackSummary cards={cards} setId={reveal.setId} fresh={reveal.fresh} isNew={isNew} reduce={reduce} sfx={sfx}>
+          {sealedLeft > 0 && <button className="btn btn-primary" onClick={openNext} autoFocus>Open next pack ({queue.length} left)</button>}
+          {queue.length > 1 && <button className="btn" onClick={openRest}>⚡ Open all {queue.length}</button>}
+          <button className="btn" onClick={close} autoFocus={sealedLeft === 0}>Done</button>
+        </PackSummary>
       )}
     </div>
   );
@@ -308,6 +312,154 @@ function Pile({ card, tier, left, flipped, charging, thrown, flipMs, isNew, fx, 
       )}
     </div>
   );
+}
+
+/** A card shown big with its holographic sheen, tilting toward the pointer. */
+function ShowcaseCard({ card, reduce }: { card: Card; reduce: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useTilt(ref, !reduce);
+  const tier = revealTier(card);
+  const pattern = holoPattern(card);
+  return (
+    <div ref={ref} className="tcg-tilt relative">
+      <CardFace card={card} foil={false} className={tier === 'chase' || tier === 'secret' ? 'tcg-hit-legend' : tier === 'super' ? 'tcg-hit-glow' : ''} />
+      {pattern !== 'none' && <div aria-hidden className={`tcg-holo tcg-holo-${pattern}`} />}
+    </div>
+  );
+}
+
+/** When the deal lands, then when the new cards reach the binder, in ms. */
+const DEAL_MS = 1250;
+const DEAL_STEP = 45;
+const FLY_MS = 700;
+const FLY_STEP = 90;
+
+/**
+ * One pack's summary: the cards fly in from a pile, fan out and settle into a grid; the best pull is shown big with
+ * the pack's resale value; then each new card flies into the binder and the set's progress bar fills up.
+ */
+function PackSummary({ cards, setId, fresh, isNew, reduce, sfx, children }: {
+  cards: Card[]; setId: string; fresh: string[]; isNew: (c: Card, i: number) => boolean; reduce: boolean;
+  sfx: (s: Sfx) => void; children: ReactNode;
+}) {
+  const data = useStore((s) => s.data);
+  const set = cardSet(setId);
+  const grid = useRef<HTMLUListElement>(null);
+  const binder = useRef<HTMLDivElement>(null);
+  const best = cards[cards.length - 1];
+  const value = cards.reduce((n, c) => n + sellValue(c), 0);
+  const after = setProgress(data, setId);
+  // the cards are already in the collection: the bar starts where it was before this pack
+  const freshHere = fresh.filter((id) => set?.cards.some((c) => c.id === id && c.variant !== 'promo')).length;
+  const [owned, setOwned] = useState(reduce ? after.owned : Math.max(0, after.owned - freshHere));
+  const [bump, setBump] = useState(false);
+  const target = useRef(after.owned);
+  target.current = after.owned;
+
+  // where each card starts (the middle of the grid) and where it pauses in the fan
+  useLayoutEffect(() => {
+    const ul = grid.current;
+    if (!ul || reduce) return;
+    const box = ul.getBoundingClientRect();
+    const items = [...ul.children] as HTMLElement[];
+    const mid = (items.length - 1) / 2;
+    items.forEach((li, i) => {
+      const r = li.getBoundingClientRect();
+      const k = i - mid;
+      li.style.setProperty('--cx', `${box.left + box.width / 2 - (r.left + r.width / 2)}px`);
+      li.style.setProperty('--cy', `${box.top + box.height / 2 - (r.top + r.height / 2)}px`);
+      li.style.setProperty('--fx', `${k * 26}px`);
+      li.style.setProperty('--fy', `${k * k * 1.6}px`);
+      li.style.setProperty('--fr', `${k * 5}deg`);
+    });
+  }, [reduce]);
+
+  useEffect(() => {
+    if (reduce) return;
+    const timers: number[] = [];
+    const at = (ms: number, fn: () => void) => timers.push(window.setTimeout(fn, ms));
+    cards.forEach((_, i) => at(DEAL_MS * 0.55 + i * DEAL_STEP, () => sfx('deal')));
+    const landed = DEAL_MS + cards.length * DEAL_STEP + 150;
+    const flying = [...(grid.current?.children ?? [])].filter((_, i) => isNew(cards[i], i)) as HTMLElement[];
+    if (!flying.length) return () => timers.forEach(clearTimeout);
+    at(landed, () => {
+      sfx('fly');
+      const to = binder.current?.getBoundingClientRect();
+      if (!to) return;
+      flying.forEach((li, k) => {
+        const from = li.getBoundingClientRect();
+        const ghost = li.cloneNode(true) as HTMLElement;
+        Object.assign(ghost.style, { position: 'fixed', left: `${from.left}px`, top: `${from.top}px`, width: `${from.width}px`, margin: '0', zIndex: '70', pointerEvents: 'none', animation: 'none' });
+        document.body.appendChild(ghost);
+        const dx = to.left + to.width * 0.12 - (from.left + from.width / 2);
+        const dy = to.top + to.height / 2 - (from.top + from.height / 2);
+        ghost.animate(
+          [{ transform: 'translate(0,0) scale(1)', opacity: 1 }, { transform: `translate(${dx * 0.5}px, ${dy * 0.5 - 60}px) scale(.6) rotate(-8deg)`, opacity: 1, offset: 0.5 },
+            { transform: `translate(${dx}px, ${dy}px) scale(.12) rotate(-14deg)`, opacity: 0.2 }],
+          { duration: FLY_MS, delay: k * FLY_STEP, easing: 'cubic-bezier(.5,0,.7,1)', fill: 'forwards' },
+        ).onfinish = () => ghost.remove();
+      });
+    });
+    at(landed + FLY_MS + (flying.length - 1) * FLY_STEP, () => { setOwned(target.current); setBump(true); sfx('fill'); });
+    return () => { timers.forEach(clearTimeout); document.querySelectorAll('body > li').forEach((g) => g.remove()); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div className="scroll-thin relative z-10 flex max-h-full w-full max-w-3xl flex-col items-center gap-5 overflow-y-auto overflow-x-hidden px-2 py-8">
+      <div className={`flex flex-col items-center gap-4 sm:flex-row sm:items-end ${reduce ? '' : 'tcg-rise'}`}>
+        <div className="w-36 sm:w-44"><ShowcaseCard card={best} reduce={reduce} /></div>
+        <div className="space-y-1 text-center sm:text-left">
+          <div className="label mb-0">Best pull</div>
+          <div className="font-serif text-2xl font-semibold leading-tight">{best.name}</div>
+          <div className="text-sm text-moss-400">{rarityText(best)}</div>
+          <div className="pt-2 text-sm text-ink-500">{set?.name ?? setId} · {cards.length} cards</div>
+          <div className="text-sm">Pack worth <b className="tabular-nums text-moss-400">{formatBerries(value)}</b> <span className="text-ink-500">if sold</span></div>
+        </div>
+      </div>
+
+      <ul ref={grid} className="grid w-full grid-cols-4 gap-2 sm:grid-cols-6 sm:gap-3">
+        {cards.map((c, i) => (
+          <li key={`${c.id}-${i}`} className={reduce ? '' : 'tcg-deal'} style={{ ['--i' as string]: i } as CSSProperties}>
+            <CardThumb id={c.id} isNew={isNew(c, i)} />
+          </li>
+        ))}
+      </ul>
+
+      <div ref={binder} className={`flex w-full max-w-sm items-center gap-3 rounded-xl border border-cream-300 bg-cream-50/70 px-3 py-2 ${bump ? 'tcg-bump' : ''}`}
+        onAnimationEnd={() => setBump(false)}>
+        <span aria-hidden className="text-2xl">📒</span>
+        <div className="min-w-0 flex-1">
+          <div className="flex justify-between text-xs">
+            <span>Binder · {setId}</span>
+            <span className="tabular-nums"><CountUp value={owned} /> / {after.total}{freshHere > 0 && <b className="ml-1 text-moss-400">+{freshHere} new</b>}</span>
+          </div>
+          <ProgressBar value={after.total ? owned / after.total : 0} label={`${setId} collection`} className="mt-1" />
+        </div>
+      </div>
+
+      <div className="flex flex-wrap justify-center gap-2">{children}</div>
+    </div>
+  );
+}
+
+/** A number that counts up to its new value. */
+function CountUp({ value }: { value: number }) {
+  const [shown, setShown] = useState(value);
+  const from = useRef(value);
+  useEffect(() => {
+    const start = performance.now();
+    const a = from.current;
+    let raf = 0;
+    const step = (now: number) => {
+      const t = Math.min(1, (now - start) / 600);
+      setShown(Math.round(a + (value - a) * (1 - (1 - t) ** 3)));
+      if (t < 1) raf = requestAnimationFrame(step); else from.current = value;
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [value]);
+  return <>{shown}</>;
 }
 
 const RARITY_ORDER: Rarity[] = ['TR', 'SEC', 'SR', 'L', 'R', 'UC', 'C', 'PR'];
