@@ -8,6 +8,7 @@ import { feedRouter } from './feeds';
 import { safeFetchText, type FeedFetcher } from './feedFetch';
 import { cardImageRouter, fetchImage, type ImageFetcher } from './cardImages';
 import { catalogRouter } from './catalog';
+import { agentRouter } from './agent';
 
 const COOKIE = 'lifeos_session';
 const SESSION_DAYS = 30;
@@ -443,6 +444,10 @@ export function createApp(opts: AppOptions) {
   app.use('/api/feeds', feedRouter(pool, requireAuth, (req) => (req as Authed).userId, opts.fetchFeed ?? safeFetchText));
   app.use('/api/cards', cardImageRouter(requireAuth, opts.fetchCardImage ?? fetchImage));
   app.use('/api/cards', catalogRouter(pool, requireAuth));
+
+  /* ── local AI agent (bearer token; the owner manages tokens with the normal session) ── */
+  app.use('/api/agent', agentRouter(pool, requireAuth, (req) => (req as Authed).userId,
+    { perToken: makeLimiter(120, 60_000), failures: makeLimiter(30, 10 * 60_000) }));
 
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));
 
