@@ -3,6 +3,7 @@ import { nextFeedReminderAt, nextFeedSyncAt, runDueFeedReminders, runDueFeeds } 
 import type { FeedFetcher } from './feedFetch';
 import { nextReminderAt, runDueReminders, type Sender } from './push';
 import { nextCatalogSyncAt, runDueCatalogSync, type JsonFetcher } from './catalog';
+import { purgeAgentData } from './agent';
 
 export interface SchedulerOptions {
   /** Longest nap between database visits (a safety net if a change notification is missed). */
@@ -40,6 +41,7 @@ export function startScheduler(pool: pg.Pool, send: Sender, fetchText: FeedFetch
         await runDueFeedReminders(pool, send).catch(log('feed reminders'));
         await runDueFeeds(pool, fetchText).catch(log('feed scheduler'));
         if (opts.fetchCatalog) await runDueCatalogSync(pool, opts.fetchCatalog).catch(log('catalog sync'));
+        await purgeAgentData(pool).catch(log('agent purge'));
         const now = Date.now();
         const due = await Promise.all([
           nextReminderAt(pool, now), nextFeedReminderAt(pool, now, maxSleep), nextFeedSyncAt(pool),
