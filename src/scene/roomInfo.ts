@@ -6,9 +6,11 @@ import { useExternalItems } from '../state/feeds';
 import { relativeDay } from '../domain/dates';
 import type { SceneObjectId } from '../domain/types';
 import { balance, economyStart, formatBerries, pendingBounties } from '../domain/economy';
+import { agentSummary } from '../domain/agent';
+import { useAgent } from '../state/agent';
 
 export const PIN_ICON: Record<SceneObjectId, string> = {
-  desk: '✓', bookshelf: '📖', plants: '🌿', calendar: '📅', notebook: '✎', chest: '฿',
+  desk: '✓', bookshelf: '📖', plants: '🌿', calendar: '📅', notebook: '✎', chest: '฿', agent: '⚡',
 };
 
 /** True when the user has no data at all — the room then guides them with prompts. */
@@ -24,6 +26,8 @@ export function useRoomInfo(id: SceneObjectId): { summary: string; prompt: strin
   const data = useStore((s) => s.data);
   const today = useToday();
   const imported = useExternalItems();
+  const agent = useAgent((s) => s.overview);
+  const alerts = useAgent((s) => s.alerts);
   return useMemo(() => {
     switch (id) {
       case 'desk': {
@@ -54,6 +58,7 @@ export function useRoomInfo(id: SceneObjectId): { summary: string; prompt: strin
       }
       case 'notebook':
         return { summary: `${data.notes.length} note${data.notes.length === 1 ? '' : 's'}`, prompt: data.notes.length ? null : 'Write your first note' };
+      case 'agent': return agentSummary(agent, alerts);
       case 'chest': {
         if (!economyStart(data.ledger)) return { summary: 'Earn Berries from your work', prompt: 'Open the treasure chest' };
         const ready = pendingBounties(data, today).length;
@@ -62,5 +67,5 @@ export function useRoomInfo(id: SceneObjectId): { summary: string; prompt: strin
         return { summary: `${formatBerries(balance(data.ledger))} · ${extra}`, prompt: null };
       }
     }
-  }, [id, data, today, imported]);
+  }, [id, data, today, imported, agent, alerts]);
 }

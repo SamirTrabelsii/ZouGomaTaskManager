@@ -33,13 +33,28 @@ export function useReminderEngine(enabled: boolean) {
 /** Keeps imported calendar feeds fresh while the app is open (the server itself re-reads each feed about every 15 minutes). */
 export function useFeedSync(enabled: boolean) {
   useEffect(() => {
-    if (!enabled) { useFeeds.getState().reset(); useAgent.getState().reset(); return; }
+    if (!enabled) { useFeeds.getState().reset(); return; }
     const tick = () => void useFeeds.getState().refresh();
     tick();
     const id = setInterval(tick, 5 * 60_000);
     const onVis = () => document.visibilityState === 'visible' && tick();
     document.addEventListener('visibilitychange', onVis);
     return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVis); };
+  }, [enabled]);
+}
+
+/**
+ * Keeps the agent console in the room current while the app is open and visible: every two minutes, so it costs
+ * the server one short query pair now and then instead of keeping it busy. Settings and the panel refresh faster while open.
+ */
+export function useAgentSync(enabled: boolean) {
+  useEffect(() => {
+    if (!enabled) { useAgent.getState().reset(); return; }
+    const tick = () => { if (document.visibilityState === 'visible') void useAgent.getState().sync(); };
+    tick();
+    const id = setInterval(tick, 2 * 60_000);
+    document.addEventListener('visibilitychange', tick);
+    return () => { clearInterval(id); document.removeEventListener('visibilitychange', tick); };
   }, [enabled]);
 }
 

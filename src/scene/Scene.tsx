@@ -13,6 +13,9 @@ import { Bookshelf, Desk, Notebook, Plants, WallCalendar } from './objects';
 import { Decor } from './decor';
 import { TreasureChestSpot } from './onepiece';
 import { CardShowcase, SHOWCASE_SPOT } from './showcase';
+import { AGENT_SPOT, AgentConsole } from './agentConsole';
+import { useAgent } from '../state/agent';
+import { agentConfigured } from '../domain/agent';
 
 const DEFAULT_POS: [number, number, number] = [11.8, 10.8, 11.9]; // isometric-style diagonal view
 const DEFAULT_TARGET: [number, number, number] = [0.2, 0.8, 0.3];
@@ -27,6 +30,7 @@ const FOCUS: Record<SceneObjectId, { target: [number, number, number]; dist: num
   notebook: { target: [0.55, 0.9, -1.8], dist: 8.5 },
   // never focused: the chest opens the Treasury dialog instead of a panel
   chest: { target: [0.95, 0.3, 2.35], dist: 8.5 },
+  agent: { target: AGENT_SPOT, dist: 8.5 },
 };
 
 /** Reading view for the wall poster: as close and as square-on as the orbit limits allow. */
@@ -170,6 +174,7 @@ export default function Scene({ onContextLost }: { onContextLost?: () => void })
   const lookAt = useStore((s) => s.lookAt);
   const q = resolveQuality(scene.quality);
   const evening = useNight();
+  const hasAgent = useAgent((s) => agentConfigured(s.overview));
 
   return (
     <Canvas
@@ -195,6 +200,7 @@ export default function Scene({ onContextLost }: { onContextLost?: () => void })
       <WallCalendar reduceMotion={scene.reduceMotion} />
       <TreasureChestSpot evening={evening} reduceMotion={scene.reduceMotion} />
       <CardShowcase reduceMotion={scene.reduceMotion} />
+      {hasAgent && <AgentConsole evening={evening} reduceMotion={scene.reduceMotion} />}
       {q !== 'low' && (
         <EffectComposer multisampling={0}>
           <Bloom intensity={evening ? 0.8 : 0.25} luminanceThreshold={0.92} luminanceSmoothing={0.25} mipmapBlur />

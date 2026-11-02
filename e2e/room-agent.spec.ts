@@ -1,0 +1,137 @@
+import bcrypt from 'bcryptjs';
+import pg from 'pg';
+import { expect, test, type Page } from '@playwright/test';
+import { assertTestDatabase, TEST_DATABASE_URL } from './testdb';
+
+// Owns its account (created straight in the test database). The tests below build on each other.
+// Named so it runs after app.spec.ts, whose first-run test needs a database with no user in it.
+test.describe.configure({ mode: 'serial' });
+
+const EMAIL = 'room-agent@example.com';
+const PASSWORD = 'room-agent-correct-horse-battery';
+
+test.beforeAll(async () => {
+  assertTestDatabase(TEST_DATABASE_URL);
+  const pool = new pg.Pool({ connectionString: TEST_DATABASE_URL, max: 1 });
+  try {
+    await pool.query('INSERT INTO users (email, password_hash) VALUES ($1,$2) ON CONFLICT (email) DO NOTHING', [EMAIL, await bcrypt.hash(PASSWORD, 4)]);
+  } finally { await pool.end(); }
+});
+
+const errors: string[] = [];
+test.beforeEach(({ page }) => { page.on('pageerror', (e) => errors.push(e.message)); });
+test.afterEach(() => { expect(errors, 'uncaught page errors').toEqual([]); });
+
+async function signIn(page: Page) {
+  await page.goto('/');
+  await page.getByLabel('Email').fill(EMAIL);
+  await page.getByLabel('Password').fill(PASSWORD);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible();
+}
+const dock = (page: Page) => page.getByRole('navigation', { name: 'Room objects' });
+const agentButton = (page: Page) => dock(page).getByRole('button', { name: /Agent/ });
+// the panel is named after what it shows: "AI agent" for the list, the alert's title for one alert
+const panel = (page: Page) => page.getByRole('complementary');
+
+// Windows turns line breaks into CRLF on the clipboard; what matters is that the text is the fix
+const clipboard = async (page: Page) => (await page.evaluate(() => navigator.clipboard.readText())).split('\r\n').join('\n');
+const FIX = "select o.id, o.customer_id\nfrom {{ ref('stg_orders') }} o\nleft join {{ ref('stg_customers') }} c on c.id = o.customer_id";
+let token = '';
+let criticalId = '';
+const asAgent = () => ({ authorization: `Bearer ${token}` });
+
+test('the console appears only once the agent is set up, and lists alerts worst first', async ({ page }) => {
+  await signIn(page);
+  await expect(dock(page).getByRole('button', { name: /Chest/ })).toBeVisible();
+  await expect(agentButton(page)).toHaveCount(0); // no token and no agent yet: no console in the room
+
+  token = (await (await page.request.post('/api/agent/tokens', { data: { name: 'room' } })).json()).token;
+  await page.request.post('/api/agent/heartbeat', { headers: asAgent(), data: { version: '0.1.0', state: 'idle' } });
+  await page.request.post('/api/agent/alerts', { headers: asAgent(), data: { externalId: 'rb-2', title: 'Slow model fct_sessions', category: 'performance', severity: 'medium', occurrences: 3 } });
+  const a = await (await page.request.post('/api/agent/alerts', {
+    headers: asAgent(),
+    data: { externalId: 'rb-1', title: 'NULL customer_id in orders', category: 'data_quality', severity: 'critical', occurrences: 40, summary: 'The join with customers drops rows without an address.' },
+  })).json();
+  criticalId = a.id;
+  await page.request.post(`/api/agent/alerts/${criticalId}/findings`, { headers: asAgent(), data: { kind: 'cause', text: 'LEFT JOIN on customers loses customers with no address.' } });
+  await page.request.post(`/api/agent/alerts/${criticalId}/patches`, {
+    headers: asAgent(), data: { title: 'Keep customers without an address', filePath: 'models/staging/stg_orders.sql', body: FIX, testCommand: 'dbt test -s stg_orders' },
+  });
+
+  await page.reload();
+  await expect(agentButton(page)).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Agent console: 2 open alerts · 1 critical/ })).toBeAttached();
+
+  await agentButton(page).click();
+  await expect(panel(page)).toContainText('Online');
+  const items = panel(page).getByRole('list', { name: 'Open alerts' }).getByRole('listitem');
+  await expect(items).toHaveCount(2);
+  await expect(items.nth(0)).toContainText('NULL customer_id in orders'); // the critical one first
+  await expect(items.nth(0)).toContainText('Critical');
+  await expect(items.nth(0)).toContainText('Data quality');
+  await expect(items.nth(1)).toContainText('Slow model fct_sessions');
+});
+
+test('read a diagnosis, copy the fix, and mark it applied: its text is wiped from the server', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await signIn(page);
+  await agentButton(page).click();
+  await panel(page).getByRole('button', { name: /NULL customer_id/ }).click();
+
+  await expect(panel(page)).toContainText('The join with customers drops rows without an address.');
+  await expect(panel(page)).toContainText('LEFT JOIN on customers loses customers with no address.');
+  await expect(panel(page)).toContainText('models/staging/stg_orders.sql');
+  await expect(panel(page).getByLabel('Fix for models/staging/stg_orders.sql')).toContainText("left join {{ ref('stg_customers') }}");
+
+  await panel(page).getByRole('button', { name: 'Copy fix' }).click();
+  await expect(page.getByText('Fix copied')).toBeVisible();
+  expect(await clipboard(page)).toBe(FIX);
+  await panel(page).getByRole('button', { name: 'Copy', exact: true }).click(); // the test command
+  expect(await clipboard(page)).toBe('dbt test -s stg_orders');
+
+  await panel(page).getByRole('button', { name: 'I applied it' }).click();
+  await expect(panel(page)).toContainText('The text of this fix was deleted from the server.');
+  await expect(panel(page).getByLabel('Fix for models/staging/stg_orders.sql')).toHaveCount(0);
+  const stored = await (await page.request.get(`/api/agent/alerts/${criticalId}`)).json();
+  expect(stored.patches[0]).toMatchObject({ status: 'applied', body: '' });
+});
+
+test('give the agent an order, follow it to its result, then ignore the alert', async ({ page }) => {
+  await signIn(page);
+  await agentButton(page).click();
+  await panel(page).getByRole('button', { name: /NULL customer_id/ }).click();
+
+  await panel(page).getByRole('button', { name: 'Investigate', exact: true }).click();
+  await expect(panel(page).getByRole('button', { name: /Investigate… \(waiting\)/ })).toBeDisabled();
+  const pending = await (await page.request.get('/api/agent/commands/pending', { headers: asAgent() })).json();
+  expect(pending.commands).toEqual([expect.objectContaining({ kind: 'investigate', externalId: 'rb-1' })]);
+  const orderId = pending.commands[0].id;
+  await page.request.post(`/api/agent/commands/${orderId}/ack`, { headers: asAgent(), data: {} });
+  await page.request.post(`/api/agent/commands/${orderId}/result`, { headers: asAgent(), data: { status: 'done', result: 'Cause found: left join drops rows' } });
+
+  // going back to the list refreshes the orders, so the result shows at once
+  await panel(page).getByRole('button', { name: '← All alerts' }).click();
+  await expect(panel(page)).toContainText('Cause found: left join drops rows');
+
+  await panel(page).getByRole('button', { name: /NULL customer_id/ }).click();
+  await panel(page).getByRole('button', { name: 'Ignore alert' }).click();
+  await panel(page).getByRole('button', { name: 'Ignore it?' }).click();
+  await expect(page.getByText('Alert ignored.')).toBeVisible();
+  await panel(page).getByRole('button', { name: '← All alerts' }).click();
+  await expect(panel(page).getByRole('list', { name: 'Open alerts' }).getByRole('listitem')).toHaveCount(1);
+  await expect(panel(page).getByRole('list', { name: 'Closed alerts' })).toContainText('NULL customer_id in orders');
+  // the agent is told to stop working on it
+  const stop = await (await page.request.get('/api/agent/commands/pending', { headers: asAgent() })).json();
+  expect(stop.commands).toEqual([expect.objectContaining({ kind: 'ignore', externalId: 'rb-1' })]);
+});
+
+test('signing out clears the agent from the room', async ({ page }) => {
+  await signIn(page);
+  await expect(agentButton(page)).toBeVisible();
+  await page.getByRole('button', { name: 'Settings' }).click();
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await page.getByRole('button', { name: 'Sign out of this device?' }).click();
+  await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible();
+  await expect(page.getByText('NULL customer_id')).toHaveCount(0);
+});
