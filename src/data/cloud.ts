@@ -29,7 +29,7 @@ async function api<T>(path: string, init: { method?: string; body?: unknown; tim
   return body as T;
 }
 
-import type { CalendarFeed, ExternalEvent } from '../domain/types';
+import type { AgentCommandKind, AgentOverview, CalendarFeed, ExternalEvent } from '../domain/types';
 
 export interface Health { ok: true; hasUser: boolean; registrationOpen: boolean }
 export interface CloudBackup { id: string; reason: string; revision: number; savedAt: string }
@@ -71,5 +71,10 @@ export const cloud = {
   updateFeed: (id: string, patch: { name?: string; color?: string; remindBefore?: number | null }) => api<{ feed: CalendarFeed }>(`/feeds/${encodeURIComponent(id)}`, { method: 'PATCH', body: patch }),
   removeFeed: (id: string) => api<{ ok: true }>(`/feeds/${encodeURIComponent(id)}`, { method: 'DELETE', body: {} }),
   refreshFeed: (id: string) => api<{ feed: CalendarFeed }>(`/feeds/${encodeURIComponent(id)}/refresh`, { method: 'POST', body: {}, timeoutMs: 40_000 }),
+  agent: () => api<AgentOverview>('/agent'),
+  /** The token comes back once, here, and is never readable again. */
+  createAgentToken: (name: string) => api<{ id: string; name: string; hint: string; createdAt: string; token: string }>('/agent/tokens', { method: 'POST', body: { name } }),
+  revokeAgentToken: (id: string) => api<{ ok: true }>(`/agent/tokens/${encodeURIComponent(id)}`, { method: 'DELETE', body: {} }),
+  sendAgentCommand: (kind: AgentCommandKind) => api<{ id: string; alreadyQueued?: boolean }>('/agent/commands', { method: 'POST', body: { kind } }),
   getBackup: (id: string) => api<{ data: unknown }>(`/data/backups/${encodeURIComponent(id)}`),
 };

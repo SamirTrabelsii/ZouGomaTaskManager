@@ -183,6 +183,25 @@ export interface CalendarFeed {
   remindBefore: number | null;
 }
 
+/** The local AI agent's access tokens and last known state. Lives on the server, never in {@link AppData}. */
+export interface AgentToken {
+  id: string;
+  name: string;
+  /** Last four characters, to tell tokens apart. The token itself is shown once, when created. */
+  hint: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+}
+export type AgentState = 'idle' | 'working' | 'paused';
+export interface AgentOverview {
+  online: boolean;
+  lastSeenAt: string | null;
+  version: string;
+  state: AgentState;
+  tokens: AgentToken[];
+}
+export type AgentCommandKind = 'investigate' | 'ignore' | 'reanalyze' | 'pause' | 'resume';
+
 /**
  * A meeting imported from a feed, as the server sends it. `start`/`end` are either a date ("2026-06-10", end exclusive),
  * an instant ("…Z", shown in this device's time zone), or a floating wall-clock time ("2026-06-10T09:30:00").
