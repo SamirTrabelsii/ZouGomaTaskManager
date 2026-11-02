@@ -66,7 +66,30 @@ CREATE TABLE IF NOT EXISTS agent_patches (
 );
 CREATE INDEX IF NOT EXISTS agent_patches_alert_idx ON agent_patches(alert_id);
 CREATE INDEX IF NOT EXISTS agent_patches_expiry_idx ON agent_patches(expires_at);
+-- orders from the owner to the agent, from a closed list. The agent polls for 'pending' ones, acknowledges, then reports a result
+CREATE TABLE IF NOT EXISTS agent_commands (
+  id          BIGSERIAL PRIMARY KEY,
+  user_id     BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind        TEXT NOT NULL,
+  alert_id    BIGINT REFERENCES agent_alerts(id) ON DELETE CASCADE,
+  status      TEXT NOT NULL DEFAULT 'pending',
+  result      TEXT NOT NULL DEFAULT '',
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  acked_at    TIMESTAMPTZ,
+  finished_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS agent_commands_user_idx ON agent_commands(user_id, status);
 `;
+
+/** What the owner can ask for. Never free text: the agent only ever acts on one of these. */
+export const COMMAND_KINDS = ['investigate', 'ignore', 'reanalyze', 'pause', 'resume'] as const;
+export type CommandKind = (typeof COMMAND_KINDS)[number];
+/** These target one alert; pause and resume apply to the agent as a whole. */
+const ALERT_COMMANDS: readonly CommandKind[] = ['investigate', 'ignore', 'reanalyze'];
+export const COMMAND_RESULTS = ['done', 'failed'] as const;
+/** An order nobody picked up within this long is stale (the agent was off), so it is dropped rather than run days later. */
+export const COMMAND_TTL_HOURS = 24;
+export const MAX_PENDING_COMMANDS = 20;
 
 export const TOKEN_PREFIX = 'lifeos_agent_';
 export const CATEGORIES = ['data_quality', 'pipeline_failure', 'performance', 'schema', 'other'] as const;
@@ -108,6 +131,10 @@ export function findSecret(text: string): string | null {
 export async function purgeAgentData(pool: pg.Pool): Promise<void> {
   await pool.query('DELETE FROM agent_patches WHERE expires_at < now()');
   await pool.query(`DELETE FROM agent_alerts WHERE last_seen_at < now() - interval '${ALERT_RETENTION_DAYS} days'`);
+  await pool.query(
+    `UPDATE agent_commands SET status='expired', finished_at=now()
+     WHERE status IN ('pending','acked') AND created_at < now() - interval '${COMMAND_TTL_HOURS} hours'`);
+  await pool.query("DELETE FROM agent_commands WHERE created_at < now() - interval '30 days'");
 }
 
 export const MAX_ACTIVE_TOKENS = 3;
@@ -211,11 +238,15 @@ export function agentRouter(
       const b = (req.body ?? {}) as { version?: unknown; state?: unknown };
       const version = typeof b.version === 'string' ? b.version.slice(0, 40) : '';
       const state: AgentState = AGENT_STATES.includes(b.state as AgentState) ? (b.state as AgentState) : 'idle';
+      const userId = (req as AgentReq).agentUserId;
       await pool.query(
         `INSERT INTO agent_status (user_id, last_seen_at, version, state) VALUES ($1, now(), $2, $3)
          ON CONFLICT (user_id) DO UPDATE SET last_seen_at=now(), version=$2, state=$3`,
-        [(req as AgentReq).agentUserId, version, state]);
-      res.json({ ok: true, serverTime: new Date().toISOString() });
+        [userId, version, state]);
+      // lets the agent fetch orders only when there are some, instead of polling for them on every beat
+      const { rows } = await pool.query(
+        `SELECT count(*)::int AS n FROM agent_commands WHERE user_id=$1 AND status='pending' AND created_at > now() - interval '${COMMAND_TTL_HOURS} hours'`, [userId]);
+      res.json({ ok: true, serverTime: new Date().toISOString(), pendingCommands: rows[0].n });
     } catch (e) { next(e); }
   });
 
@@ -377,6 +408,108 @@ export function agentRouter(
         `UPDATE agent_patches p SET status=$1, body='' FROM agent_alerts a
          WHERE p.id=$2 AND p.alert_id=a.id AND a.user_id=$3 AND p.status='proposed'`, [status, id, userIdOf(req)]) : null;
       if (!r?.rowCount) return res.status(404).json({ error: 'Fix not found, or already handled.' });
+      res.json({ ok: true });
+    } catch (e) { next(e); }
+  });
+
+  /* ── orders from the owner to the agent ── */
+
+  const commandJson = (r: Record<string, unknown>) => ({
+    id: String(r.id), kind: r.kind, alertId: r.alert_id == null ? null : String(r.alert_id), alertTitle: r.alert_title ?? null,
+    status: r.status, result: r.result, createdAt: r.created_at, finishedAt: r.finished_at,
+  });
+
+  /** Owner gives an order. Asking again for something already waiting returns the waiting one. */
+  router.post('/commands', requireAuth, async (req, res, next) => {
+    try {
+      const userId = userIdOf(req);
+      const b = (req.body ?? {}) as Record<string, unknown>;
+      const kind = oneOf(COMMAND_KINDS, b.kind);
+      if (!kind) return res.status(400).json({ error: `kind must be one of: ${COMMAND_KINDS.join(', ')}.` });
+      let alertId: string | null = null;
+      if (ALERT_COMMANDS.includes(kind)) {
+        alertId = idOf(b.alertId);
+        if (!alertId || !(await ownsAlert(alertId, userId))) return res.status(404).json({ error: 'Alert not found' });
+      } else if (b.alertId !== undefined) {
+        return res.status(400).json({ error: `${kind} applies to the whole agent, not to an alert.` });
+      }
+      await purgeAgentData(pool);
+      const dup = await pool.query(
+        "SELECT id FROM agent_commands WHERE user_id=$1 AND kind=$2 AND alert_id IS NOT DISTINCT FROM $3::bigint AND status IN ('pending','acked') LIMIT 1",
+        [userId, kind, alertId]);
+      if (dup.rows[0]) return res.json({ id: String(dup.rows[0].id), alreadyQueued: true });
+      const { rows: cnt } = await pool.query("SELECT count(*)::int AS n FROM agent_commands WHERE user_id=$1 AND status='pending'", [userId]);
+      if (cnt[0].n >= MAX_PENDING_COMMANDS) return res.status(409).json({ error: 'Too many orders are waiting for the agent.' });
+      const { rows } = await pool.query('INSERT INTO agent_commands (user_id, kind, alert_id) VALUES ($1,$2,$3) RETURNING id', [userId, kind, alertId]);
+      // ignoring is shown straight away; the order then tells the agent to stop working on it
+      if (kind === 'ignore') await pool.query("UPDATE agent_alerts SET status='ignored', updated_at=now() WHERE id=$1", [alertId]);
+      res.status(201).json({ id: String(rows[0].id) });
+    } catch (e) { next(e); }
+  });
+
+  router.get('/commands', requireAuth, async (req, res, next) => {
+    try {
+      await purgeAgentData(pool);
+      const { rows } = await pool.query(
+        `SELECT c.id, c.kind, c.alert_id, a.title AS alert_title, c.status, c.result, c.created_at, c.finished_at
+         FROM agent_commands c LEFT JOIN agent_alerts a ON a.id=c.alert_id
+         WHERE c.user_id=$1 ORDER BY c.id DESC LIMIT 50`, [userIdOf(req)]);
+      res.json({ commands: rows.map(commandJson) });
+    } catch (e) { next(e); }
+  });
+
+  /** Take back an order the agent has not picked up yet. */
+  router.post('/commands/:id/cancel', requireAuth, async (req, res, next) => {
+    try {
+      const id = idOf(req.params.id);
+      const r = id ? await pool.query(
+        "UPDATE agent_commands SET status='cancelled', finished_at=now() WHERE id=$1 AND user_id=$2 AND status='pending'", [id, userIdOf(req)]) : null;
+      if (!r?.rowCount) return res.status(404).json({ error: 'Order not found, or the agent already took it.' });
+      res.json({ ok: true });
+    } catch (e) { next(e); }
+  });
+
+  /** The agent's waiting orders, oldest first. Reading them changes nothing, so a failed poll can simply be repeated. */
+  router.get('/commands/pending', requireAgent, async (req, res, next) => {
+    try {
+      const { rows } = await pool.query(
+        `SELECT c.id, c.kind, c.alert_id, a.external_id, c.created_at
+         FROM agent_commands c LEFT JOIN agent_alerts a ON a.id=c.alert_id
+         WHERE c.user_id=$1 AND c.status='pending' AND c.created_at > now() - interval '${COMMAND_TTL_HOURS} hours'
+         ORDER BY c.id LIMIT 20`, [agentUser(req)]);
+      res.json({
+        commands: rows.map((r) => ({
+          id: String(r.id), kind: r.kind, alertId: r.alert_id == null ? null : String(r.alert_id), externalId: r.external_id ?? null, createdAt: r.created_at,
+        })),
+      });
+    } catch (e) { next(e); }
+  });
+
+  router.post('/commands/:id/ack', requireAgent, async (req, res, next) => {
+    try {
+      const id = idOf(req.params.id);
+      const cur = id ? await pool.query('SELECT status FROM agent_commands WHERE id=$1 AND user_id=$2', [id, agentUser(req)]) : null;
+      const status = cur?.rows[0]?.status as string | undefined;
+      if (!status) return res.status(404).json({ error: 'Order not found' });
+      if (status === 'acked') return res.json({ ok: true }); // acknowledging twice is harmless
+      if (status !== 'pending') return res.status(409).json({ error: `This order is ${status}.` });
+      await pool.query("UPDATE agent_commands SET status='acked', acked_at=now() WHERE id=$1 AND status='pending'", [id]);
+      res.json({ ok: true });
+    } catch (e) { next(e); }
+  });
+
+  router.post('/commands/:id/result', requireAgent, async (req, res, next) => {
+    try {
+      const id = idOf(req.params.id);
+      const b = (req.body ?? {}) as Record<string, unknown>;
+      const status = oneOf(COMMAND_RESULTS, b.status);
+      const result = b.result === undefined || b.result === '' ? '' : str(b.result, 500);
+      if (!status || result === null) return res.status(400).json({ error: 'status must be done or failed; result is up to 500 characters.' });
+      if (leaks(res, result)) return;
+      const r = id ? await pool.query(
+        "UPDATE agent_commands SET status=$3, result=$4, finished_at=now() WHERE id=$1 AND user_id=$2 AND status IN ('pending','acked')",
+        [id, agentUser(req), status, result]) : null;
+      if (!r?.rowCount) return res.status(409).json({ error: 'Order not found, or already finished.' });
       res.json({ ok: true });
     } catch (e) { next(e); }
   });
