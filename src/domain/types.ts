@@ -11,7 +11,7 @@ export type CertStatus = 'planned' | 'studying' | 'earned';
 /** How advanced a certification is; sets its Berries reward (see CERT_REWARD). */
 export type CertLevel = 'badge' | 'foundational' | 'associate' | 'professional' | 'expert';
 export type NoteKind = 'note' | 'idea' | 'journal' | 'reflection' | 'review' | 'lesson';
-export type SceneObjectId = 'desk' | 'bookshelf' | 'plants' | 'calendar' | 'notebook' | 'chest';
+export type SceneObjectId = 'desk' | 'bookshelf' | 'plants' | 'calendar' | 'notebook' | 'chest' | 'agent';
 export type ViewId = 'home' | 'tasks' | 'calendar' | 'insights';
 
 export interface Task {
@@ -201,6 +201,47 @@ export interface AgentOverview {
   tokens: AgentToken[];
 }
 export type AgentCommandKind = 'investigate' | 'ignore' | 'reanalyze' | 'pause' | 'resume';
+export type AlertCategory = 'data_quality' | 'pipeline_failure' | 'performance' | 'schema' | 'other';
+export type AlertSeverity = 'critical' | 'high' | 'medium' | 'low';
+export type AlertStatus = 'open' | 'investigating' | 'proposed' | 'resolved' | 'ignored';
+/** A monitored alert as the agent summarised it. Short text only, no logs or data. */
+export interface AgentAlert {
+  id: string;
+  externalId: string;
+  title: string;
+  category: AlertCategory;
+  severity: AlertSeverity;
+  status: AlertStatus;
+  occurrences: number;
+  summary: string;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  /** Fixes waiting for you (list view only). */
+  openPatches?: number;
+}
+export interface AgentFinding { id: string; kind: 'cause' | 'note'; text: string; createdAt: string }
+/** A proposed fix as text to copy. Its text is wiped from the server once applied or ignored, and after a week. */
+export interface AgentPatch {
+  id: string;
+  title: string;
+  filePath: string;
+  body: string;
+  testCommand: string;
+  status: 'proposed' | 'applied' | 'ignored';
+  createdAt: string;
+  expiresAt: string;
+}
+export interface AgentAlertDetail { alert: AgentAlert; findings: AgentFinding[]; patches: AgentPatch[] }
+export interface AgentCommand {
+  id: string;
+  kind: AgentCommandKind;
+  alertId: string | null;
+  alertTitle: string | null;
+  status: 'pending' | 'acked' | 'done' | 'failed' | 'expired' | 'cancelled';
+  result: string;
+  createdAt: string;
+  finishedAt: string | null;
+}
 
 /**
  * A meeting imported from a feed, as the server sends it. `start`/`end` are either a date ("2026-06-10", end exclusive),

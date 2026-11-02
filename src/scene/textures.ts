@@ -144,6 +144,28 @@ export function drawMonitorTexture(tex: THREE.CanvasTexture | null, done: number
   return finish(cv);
 }
 
+/** Face of the agent console: open alerts, how many are critical, and whether the agent is up. */
+export function drawAgentTexture(tex: THREE.CanvasTexture | null, open: number, critical: number, state: 'online' | 'paused' | 'offline'): THREE.CanvasTexture {
+  const W = 512, H = 320;
+  const cv = tex?.image as HTMLCanvasElement | undefined ?? canvas(W, H).c;
+  const g = cv.getContext('2d')!;
+  g.fillStyle = '#06140f'; g.fillRect(0, 0, W, H);
+  g.fillStyle = 'rgba(80,255,160,.05)';
+  for (let y = 0; y < H; y += 6) g.fillRect(0, y, W, 2); // scanlines
+  const live = state === 'online';
+  g.fillStyle = live ? '#58f2a0' : '#7a8a82'; g.font = '500 26px monospace'; g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+  g.fillText('AGENT', 32, 54);
+  g.beginPath(); g.arc(W - 48, 42, 11, 0, Math.PI * 2); g.fillStyle = live ? '#58f2a0' : '#56615b'; g.fill();
+  g.fillStyle = critical ? '#ff7a6b' : live ? '#d6ffe8' : '#9aa9a1'; g.font = '700 128px monospace';
+  g.fillText(String(Math.min(open, 99)), 32, 188);
+  g.fillStyle = live ? '#8df5bd' : '#8a9a92'; g.font = '26px monospace';
+  g.fillText(open === 1 ? 'open alert' : 'open alerts', 32, 232);
+  g.fillStyle = critical ? '#ff7a6b' : '#8df5bd';
+  g.fillText(critical ? `${critical} critical` : state === 'offline' ? 'offline' : state === 'paused' ? 'paused' : 'all quiet', 32, 282);
+  if (tex) { tex.needsUpdate = true; return tex; }
+  return finish(cv);
+}
+
 /** The framed picture above the desk: a little sheep on a hill (0.7 × 0.9 plane, so 560 × 720). */
 export function makeSheepArtTexture() {
   const W = 560, H = 720;

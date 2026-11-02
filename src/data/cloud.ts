@@ -29,7 +29,7 @@ async function api<T>(path: string, init: { method?: string; body?: unknown; tim
   return body as T;
 }
 
-import type { AgentCommandKind, AgentOverview, CalendarFeed, ExternalEvent } from '../domain/types';
+import type { AgentAlert, AgentAlertDetail, AgentCommand, AgentCommandKind, AgentOverview, CalendarFeed, ExternalEvent } from '../domain/types';
 
 export interface Health { ok: true; hasUser: boolean; registrationOpen: boolean }
 export interface CloudBackup { id: string; reason: string; revision: number; savedAt: string }
@@ -75,6 +75,14 @@ export const cloud = {
   /** The token comes back once, here, and is never readable again. */
   createAgentToken: (name: string) => api<{ id: string; name: string; hint: string; createdAt: string; token: string }>('/agent/tokens', { method: 'POST', body: { name } }),
   revokeAgentToken: (id: string) => api<{ ok: true }>(`/agent/tokens/${encodeURIComponent(id)}`, { method: 'DELETE', body: {} }),
-  sendAgentCommand: (kind: AgentCommandKind) => api<{ id: string; alreadyQueued?: boolean }>('/agent/commands', { method: 'POST', body: { kind } }),
+  sendAgentCommand: (kind: AgentCommandKind, alertId?: string) =>
+    api<{ id: string; alreadyQueued?: boolean }>('/agent/commands', { method: 'POST', body: alertId ? { kind, alertId } : { kind } }),
+  agentAlerts: () => api<{ alerts: AgentAlert[] }>('/agent/alerts'),
+  agentAlert: (id: string) => api<AgentAlertDetail>(`/agent/alerts/${encodeURIComponent(id)}`),
+  agentCommands: () => api<{ commands: AgentCommand[] }>('/agent/commands'),
+  cancelAgentCommand: (id: string) => api<{ ok: true }>(`/agent/commands/${encodeURIComponent(id)}/cancel`, { method: 'POST', body: {} }),
+  /** Marking a fix applied or ignored wipes its text from the server straight away. */
+  resolveAgentPatch: (id: string, status: 'applied' | 'ignored') =>
+    api<{ ok: true }>(`/agent/patches/${encodeURIComponent(id)}`, { method: 'PATCH', body: { status } }),
   getBackup: (id: string) => api<{ data: unknown }>(`/data/backups/${encodeURIComponent(id)}`),
 };
