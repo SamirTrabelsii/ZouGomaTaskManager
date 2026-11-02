@@ -32,7 +32,7 @@ const REMIND_OPTIONS: { value: string; label: string }[] = [
 ];
 const remindText = (m: number | null) => (m === null ? '' : m === 0 ? ' · 🔔 at the start' : m === 60 ? ' · 🔔 1 h before' : ` · 🔔 ${m} min before`);
 
-const ago = (iso: string | null) => {
+export const ago = (iso: string | null) => {
   if (!iso) return 'not yet';
   const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60_000));
   return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} d ago`;
