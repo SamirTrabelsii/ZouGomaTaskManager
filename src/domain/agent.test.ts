@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { agentConfigured, agentSummary, alertCounts, criticalIds, newlyCritical, relativeTime, seenFrom, unseenAlerts } from './agent';
+import { agentConfigured, agentSummary, alertCounts, analysisOf, criticalIds, newlyCritical, relativeTime, seenFrom, unseenAlerts } from './agent';
 import type { AgentOverview, AlertSeverity, AlertStatus } from './types';
 
 const overview = (o: Partial<AgentOverview> = {}): AgentOverview => ({ online: true, lastSeenAt: '2026-11-01T10:00:00Z', version: '1', state: 'idle', tokens: [], ...o });
@@ -53,6 +53,18 @@ describe('agent console', () => {
     expect(agentSummary(overview(), [alert('1')]).summary).toBe('1 open alert');
     expect(agentSummary(overview({ online: false }), [alert('1')]).summary).toBe('Agent offline · 1 open alert');
     expect(agentSummary(overview({ state: 'paused' }), []).summary).toBe('Agent paused · All quiet');
+  });
+
+  it('summarises what the agent found for each alert in the list', () => {
+    const base = { status: 'open' as AlertStatus, causes: 0, notes: 0, failedNotes: 0 };
+    expect(analysisOf(base)).toEqual({ label: 'Not analysed yet', tone: 'todo' });
+    expect(analysisOf({ ...base, status: 'investigating' }).tone).toBe('working');
+    expect(analysisOf({ ...base, causes: 1 })).toEqual({ label: 'Cause found', tone: 'found' });
+    expect(analysisOf({ ...base, causes: 2, notes: 1 }).label).toBe('2 causes found');
+    expect(analysisOf({ ...base, notes: 2 })).toEqual({ label: 'Analysed · no cause found', tone: 'none' });
+    expect(analysisOf({ ...base, failedNotes: 1 })).toEqual({ label: 'Analysis failed', tone: 'failed' });
+    expect(analysisOf({ ...base, failedNotes: 1, notes: 1 }).tone).toBe('none'); // a later real analysis wins over an old failure
+    expect(analysisOf({ status: 'open' }).tone).toBe('todo'); // an old server that does not send the counts
   });
 
   it('says how long ago in plain words', () => {

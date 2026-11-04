@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useStore } from '../../state/store';
 import { useAgent } from '../../state/agent';
-import { CATEGORY_LABEL, SEVERITY_LABEL, STATUS_LABEL, isOpen, relativeTime, unseenAlerts } from '../../domain/agent';
+import { CATEGORY_LABEL, SEVERITY_LABEL, STATUS_LABEL, analysisOf, isOpen, relativeTime, unseenAlerts, type Analysis } from '../../domain/agent';
 import type { AgentAlert, AgentAlertDetail, AgentCommand, AgentCommandKind, AgentPatch, AlertSeverity } from '../../domain/types';
 import { ConfirmButton, EmptyState } from '../common/ui';
 import { PanelShell, Section } from './PanelShell';
@@ -139,6 +139,14 @@ function AlertView({ id, onBack }: { id: string; onBack: () => void }) {
   );
 }
 
+const TAG_TONE: Record<Analysis['tone'], string> = {
+  found: 'bg-moss-600/15 text-moss-600', none: 'bg-ink-900/10 text-ink-700', failed: 'bg-clay-500/20 text-clay-600', working: 'bg-ink-900/10 text-ink-700', todo: 'bg-cream-200 text-ink-500',
+};
+function AnalysisTag({ a }: { a: AgentAlert }) {
+  const t = analysisOf(a);
+  return <div className="mt-1"><span className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${TAG_TONE[t.tone]}`}>{t.label}</span></div>;
+}
+
 export function AgentPanel() {
   const overview = useAgent((s) => s.overview);
   const alerts = useAgent((s) => s.alerts);
@@ -166,6 +174,11 @@ export function AgentPanel() {
 
   const open = alerts.filter(isOpen);
   const closed = alerts.filter((a) => !isOpen(a));
+  const simulated = alerts.filter((a) => a.externalId.startsWith('sim-')).length;
+  const removeSimulated = async () => {
+    const r = await useAgent.getState().deleteSimulated();
+    toast('error' in r ? r.error : `${r.deleted} simulated alert${r.deleted === 1 ? '' : 's'} deleted.`, 'error' in r ? 'error' : 'ok');
+  };
   const status = !overview ? 'Checking…' : overview.online ? (overview.state === 'paused' ? 'Online, paused' : overview.state === 'working' ? 'Online, working' : 'Online') : overview.lastSeenAt ? `Offline · seen ${relativeTime(overview.lastSeenAt)}` : 'Not connected yet';
 
   const row = (a: AgentAlert) => (
@@ -174,6 +187,7 @@ export function AgentPanel() {
         <div className="flex items-center gap-2"><Severity value={a.severity} />{fresh.has(a.id) && <span className="rounded bg-ink-900 px-1.5 py-0.5 text-[11px] font-semibold text-cream-50">New</span>}<span className="min-w-0 flex-1 truncate font-medium">{a.title}</span>
           {!!a.openPatches && <span className="shrink-0 text-xs" title="Fixes waiting for you">🩹 {a.openPatches}</span>}</div>
         <div className="mt-0.5 truncate text-xs text-ink-500">{meta(a)}</div>
+        {isOpen(a) && <AnalysisTag a={a} />}
       </button>
     </li>
   );
@@ -187,7 +201,16 @@ export function AgentPanel() {
       ) : (
         <Section title={`Open · ${open.length}`}><ul className="space-y-1.5" aria-label="Open alerts">{open.map(row)}</ul></Section>
       )}
-      {closed.length > 0 && <Section title={`Closed · ${closed.length}`}><ul className="space-y-1.5" aria-label="Closed alerts">{closed.slice(0, 20).map(row)}</ul></Section>}
+      {closed.length > 0 && (
+        <Section title={`Closed · ${closed.length}`}>
+          <ul className="space-y-1.5" aria-label="Closed alerts">{closed.slice(0, 20).map(row)}</ul>
+          {simulated > 0 && (
+            <ConfirmButton className="btn btn-ghost mt-2 text-xs text-clay-600" confirmLabel="Delete them for good?" onConfirm={() => void removeSimulated()}>
+              Delete the {simulated} simulated alert{simulated === 1 ? '' : 's'}
+            </ConfirmButton>
+          )}
+        </Section>
+      )}
       {commands.length > 0 && (
         <Section title="Recent orders"><ul className="space-y-1.5">{commands.slice(0, 5).map((c) => <OrderRow key={c.id} c={c} />)}</ul></Section>
       )}

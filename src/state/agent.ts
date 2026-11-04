@@ -35,6 +35,8 @@ interface AgentState {
   revokeToken(id: string): Promise<string | null>;
   /** Returns an error message, or null on success. */
   send(kind: AgentCommandKind, alertId?: string): Promise<string | null>;
+  /** Removes the demo alerts. Returns how many went, or an error message. */
+  deleteSimulated(): Promise<{ deleted: number } | { error: string }>;
   cancel(id: string): Promise<string | null>;
   resolvePatch(id: string, status: 'applied' | 'ignored'): Promise<string | null>;
   reset(): void;
@@ -97,6 +99,9 @@ export const useAgent = create<AgentState>((set, get) => {
     },
     async send(kind, alertId) {
       try { await cloud.sendAgentCommand(kind, alertId); await Promise.all([get().refreshCommands(), kind === 'ignore' ? get().sync() : null]); return null; } catch (e) { return messageOf(e); }
+    },
+    async deleteSimulated() {
+      try { const r = await cloud.deleteSimulatedAlerts(); await get().sync(); return r; } catch (e) { return { error: messageOf(e) }; }
     },
     async cancel(id) {
       try { await cloud.cancelAgentCommand(id); await get().refreshCommands(); return null; } catch (e) { return messageOf(e); }

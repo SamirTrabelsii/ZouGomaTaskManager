@@ -60,3 +60,13 @@ export const relativeTime = (iso: string | null, now = Date.now()) => {
   const m = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60_000));
   return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} d ago`;
 };
+
+/** The tag shown on each row of the alert list: has the agent looked at it, and did it find something? */
+export type Analysis = { label: string; tone: 'found' | 'none' | 'failed' | 'working' | 'todo' };
+export function analysisOf(a: Pick<AgentAlert, 'status' | 'causes' | 'notes' | 'failedNotes' | 'openPatches'>): Analysis {
+  if (a.status === 'investigating') return { label: 'Investigating…', tone: 'working' };
+  if (a.causes) return { label: a.causes === 1 ? 'Cause found' : `${a.causes} causes found`, tone: 'found' };
+  if (a.notes) return { label: 'Analysed · no cause found', tone: 'none' };
+  if (a.failedNotes) return { label: 'Analysis failed', tone: 'failed' };
+  return { label: 'Not analysed yet', tone: 'todo' };
+}

@@ -218,6 +218,10 @@ export interface AgentAlert {
   lastSeenAt: string;
   /** Fixes waiting for you (list view only). */
   openPatches?: number;
+  /** What the agent has written about it (list view only): causes found, other notes, and notes saying the analysis failed. */
+  causes?: number;
+  notes?: number;
+  failedNotes?: number;
 }
 export interface AgentFinding { id: string; kind: 'cause' | 'note'; text: string; createdAt: string }
 /** A proposed fix as text to copy. Its text is wiped from the server once applied or ignored, and after a week. */
