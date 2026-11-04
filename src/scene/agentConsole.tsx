@@ -14,6 +14,9 @@ const WOOD = '#a97b4f';
 
 const BEACON = { critical: '#ff4a3c', open: '#ffb347', quiet: '#6fd27a', idle: '#6b7570' } as const;
 
+/** How much bigger than its drawn size the beacon is built, so it can be seen from across the room. */
+const GYROPHARE_SCALE = 1.6;
+
 const FLASH = { critical: '#ff3b30', open: '#ffa11f' } as const;
 
 /**
@@ -36,7 +39,7 @@ function Gyrophare({ tone, reduceMotion }: { tone: 'critical' | 'open' | null; r
   });
   const color = tone ? FLASH[tone] : '#6a4b47';
   return (
-    <group position={[-0.03, 0.8, 0.02]}>
+    <group position={[-0.01, 0.8, 0.02]} scale={GYROPHARE_SCALE}>
       <mesh position={[0, 0.015, 0]} castShadow><cylinderGeometry args={[0.062, 0.07, 0.03, 16]} /><meshStandardMaterial color="#33302d" roughness={0.5} /></mesh>
       <group ref={blade} position={[0, 0.05, 0]} visible={false}>
         <mesh position={[0.026, 0, 0]}><boxGeometry args={[0.052, 0.034, 0.006]} /><meshBasicMaterial color="#fff3cf" toneMapped={false} /></mesh>
@@ -45,7 +48,7 @@ function Gyrophare({ tone, reduceMotion }: { tone: 'critical' | 'open' | null; r
         <sphereGeometry args={[0.056, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2]} />
         <meshStandardMaterial ref={glass} color={color} emissive={color} emissiveIntensity={0} transparent opacity={0.82} roughness={0.2} toneMapped={false} />
       </mesh>
-      <pointLight ref={light} color={color} intensity={0} distance={2.6} decay={2} position={[0, 0.09, 0]} />
+      <pointLight ref={light} color={color} intensity={0} distance={3.2} decay={2} position={[0, 0.09, 0]} />
     </group>
   );
 }
