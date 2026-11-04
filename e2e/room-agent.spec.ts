@@ -152,6 +152,31 @@ test('the room flags alerts you have not seen yet, until you open the agent pane
   await expect(page.getByRole('button', { name: /^Agent console: 2 open alerts · 1 new/ })).toBeAttached();
 });
 
+test('each open alert says whether the agent found something, and the demo alerts can be deleted', async ({ page }) => {
+  await signIn(page); // the list calls below need the session
+  const list = async () => (await (await page.request.get('/api/agent/alerts')).json()).alerts as { id: string; externalId: string }[];
+  const id = async (externalId: string) => (await list()).find((a) => a.externalId === externalId)!.id;
+  await page.request.post(`/api/agent/alerts/${await id('rb-2')}/findings`, { headers: asAgent(), data: { kind: 'note', text: 'Nothing conclusive in the logs.' } });
+  await page.request.post(`/api/agent/alerts/${await id('rb-3')}/findings`, { headers: asAgent(), data: { kind: 'cause', text: 'A duplicate key in the seed file.' } });
+  await page.request.post('/api/agent/alerts', { headers: asAgent(), data: { externalId: 'sim-1', title: '[simulated] Nightly pipeline failed', category: 'pipeline_failure', severity: 'critical', occurrences: 1, status: 'ignored' } });
+
+  await page.reload();
+  await agentButton(page).click();
+  const open = panel(page).getByRole('list', { name: 'Open alerts' }).getByRole('listitem');
+  await expect(open.filter({ hasText: 'Duplicate rows in dim_customers' })).toContainText('Cause found');
+  await expect(open.filter({ hasText: 'Slow model fct_sessions' })).toContainText('Analysed · no cause found');
+
+  const closed = panel(page).getByRole('list', { name: 'Closed alerts' });
+  await expect(closed).toContainText('[simulated] Nightly pipeline failed');
+  await panel(page).getByRole('button', { name: 'Delete the 1 simulated alert' }).click();
+  await expect(closed).toContainText('[simulated] Nightly pipeline failed'); // one click only asks
+  await panel(page).getByRole('button', { name: 'Delete them for good?' }).click();
+  await expect(page.getByText('1 simulated alert deleted.')).toBeVisible();
+  await expect(closed).not.toContainText('[simulated]');
+  await expect(panel(page).getByRole('button', { name: /Delete the \d+ simulated/ })).toHaveCount(0);
+  expect((await list()).some((a) => a.externalId === 'sim-1')).toBe(false);
+});
+
 test('signing out clears the agent from the room', async ({ page }) => {
   await signIn(page);
   await expect(agentButton(page)).toBeVisible();

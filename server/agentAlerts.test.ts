@@ -3,7 +3,7 @@ import type { Server } from 'node:http';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from './app';
 import { createPool, migrate } from './db';
-import { MAX_LIVE_PATCHES, MAX_PATCH_BYTES, TOKEN_PREFIX, findSecret, purgeAgentData } from './agent';
+import { FAILED_NOTE, MAX_LIVE_PATCHES, MAX_PATCH_BYTES, TOKEN_PREFIX, findSecret, purgeAgentData } from './agent';
 
 describe('secret scan', () => {
   it.each([
@@ -175,6 +175,40 @@ describe.skipIf(!reachable)('agent alerts API', () => {
     expect((await agent('POST', `/api/agent/alerts/${other.rows[0].id}/patches`, patch)).status).toBe(404);
     expect((await agent('POST', `/api/agent/alerts/${other.rows[0].id}/findings`, { text: 'hi' })).status).toBe(404);
     expect((await call('GET', '/api/agent/alerts')).body.alerts.some((a: { externalId: string }) => a.externalId === 'theirs')).toBe(false);
+  });
+
+  it('tells in the list what the agent found: causes, other notes, failed analyses, or nothing yet', async () => {
+    await pool.query('DELETE FROM agent_alerts');
+    const none = await newAlert({ externalId: 'n0' });
+    const cause = await newAlert({ externalId: 'n1' });
+    const note = await newAlert({ externalId: 'n2' });
+    const failed = await newAlert({ externalId: 'n3' });
+    await agent('POST', `/api/agent/alerts/${cause}/findings`, { kind: 'cause', text: 'a cause' });
+    await agent('POST', `/api/agent/alerts/${note}/findings`, { kind: 'note', text: 'nothing conclusive' });
+    await agent('POST', `/api/agent/alerts/${failed}/findings`, { kind: 'note', text: `${FAILED_NOTE} (timed out). Use Re-analyze to try again.` });
+    const by = Object.fromEntries((await call('GET', '/api/agent/alerts')).body.alerts.map((a: { externalId: string }) => [a.externalId, a]));
+    expect([by.n0, by.n1, by.n2, by.n3].map((a) => [a.causes, a.notes, a.failedNotes])).toEqual([[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]]);
+    expect(none).toBeTruthy();
+  });
+
+  it('deletes the simulated alerts with what hangs on them, and nobody else\'s', async () => {
+    await pool.query('DELETE FROM agent_alerts');
+    const sim = await newAlert({ externalId: 'sim-1', title: '[simulated] x' });
+    await agent('POST', `/api/agent/alerts/${sim}/findings`, { kind: 'cause', text: 'demo' });
+    await agent('POST', `/api/agent/alerts/${sim}/patches`, patch);
+    await newAlert({ externalId: 'sim-2', title: '[simulated] y' });
+    await newAlert({ externalId: 'rollbar-5', title: 'A real one' });
+    const u = await pool.query("INSERT INTO users (email, password_hash) VALUES ('sim-owner@x.co','x') RETURNING id");
+    await pool.query("INSERT INTO agent_alerts (user_id, external_id, title, category, severity) VALUES ($1,'sim-1','theirs','other','low')", [u.rows[0].id]);
+
+    expect((await call('DELETE', '/api/agent/alerts/simulated', { anon: true, body: {} })).status).toBe(401);
+    expect((await agent('DELETE', '/api/agent/alerts/simulated', {})).status).toBe(401); // the agent itself may not do this
+    expect((await call('DELETE', '/api/agent/alerts/simulated', { body: {} })).body).toEqual({ deleted: 2 });
+    expect((await call('GET', '/api/agent/alerts')).body.alerts.map((a: { externalId: string }) => a.externalId)).toEqual(['rollbar-5']);
+    expect((await pool.query('SELECT 1 FROM agent_findings WHERE alert_id=$1', [sim])).rowCount).toBe(0);
+    expect((await pool.query('SELECT 1 FROM agent_patches WHERE alert_id=$1', [sim])).rowCount).toBe(0);
+    expect((await pool.query("SELECT 1 FROM agent_alerts WHERE user_id=$1 AND external_id='sim-1'", [u.rows[0].id])).rowCount).toBe(1);
+    expect((await call('DELETE', '/api/agent/alerts/simulated', { body: {} })).body).toEqual({ deleted: 0 });
   });
 
   it('keeps fixes out of the account export', async () => {

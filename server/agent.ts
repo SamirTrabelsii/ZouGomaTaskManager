@@ -127,6 +127,9 @@ export function findSecret(text: string): string | null {
   return null;
 }
 
+/** How the agent starts the note it leaves when an automatic investigation could not finish (the list tells those apart from real findings). */
+export const FAILED_NOTE = 'The automatic investigation could not finish';
+
 /** Deletes expired fixes and alerts that have been quiet for a long time. Cheap, so it also runs whenever the owner looks. */
 export async function purgeAgentData(pool: pg.Pool): Promise<void> {
   await pool.query('DELETE FROM agent_patches WHERE expires_at < now()');
@@ -359,7 +362,10 @@ export function agentRouter(
       await purgeAgentData(pool);
       const { rows } = await pool.query(
         `SELECT a.id, a.external_id, a.title, a.category, a.severity, a.status, a.occurrences, a.summary, a.first_seen_at, a.last_seen_at,
-                (SELECT count(*)::int FROM agent_patches p WHERE p.alert_id=a.id AND p.status='proposed') AS open_patches
+                (SELECT count(*)::int FROM agent_patches p WHERE p.alert_id=a.id AND p.status='proposed') AS open_patches,
+                (SELECT count(*)::int FROM agent_findings f WHERE f.alert_id=a.id AND f.kind='cause') AS causes,
+                (SELECT count(*)::int FROM agent_findings f WHERE f.alert_id=a.id AND f.kind='note' AND f.text NOT LIKE '${FAILED_NOTE}%') AS notes,
+                (SELECT count(*)::int FROM agent_findings f WHERE f.alert_id=a.id AND f.kind='note' AND f.text LIKE '${FAILED_NOTE}%') AS failed_notes
          FROM agent_alerts a WHERE a.user_id=$1
          ORDER BY (a.status IN ('resolved','ignored')),
                   array_position(ARRAY['critical','high','medium','low'], a.severity), a.last_seen_at DESC
@@ -368,8 +374,17 @@ export function agentRouter(
         alerts: rows.map((r) => ({
           id: String(r.id), externalId: r.external_id, title: r.title, category: r.category, severity: r.severity, status: r.status,
           occurrences: r.occurrences, summary: r.summary, firstSeenAt: r.first_seen_at, lastSeenAt: r.last_seen_at, openPatches: r.open_patches,
+          causes: r.causes, notes: r.notes, failedNotes: r.failed_notes,
         })),
       });
+    } catch (e) { next(e); }
+  });
+
+  /** Removes the demo alerts the agent makes up before it is connected to Rollbar (external ids "sim-…"), with their findings, fixes and orders. */
+  router.delete('/alerts/simulated', requireAuth, async (req, res, next) => {
+    try {
+      const r = await pool.query("DELETE FROM agent_alerts WHERE user_id=$1 AND external_id LIKE 'sim-%'", [userIdOf(req)]);
+      res.json({ deleted: r.rowCount ?? 0 });
     } catch (e) { next(e); }
   });
 

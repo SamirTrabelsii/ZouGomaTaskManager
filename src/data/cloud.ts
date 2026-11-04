@@ -78,6 +78,7 @@ export const cloud = {
   sendAgentCommand: (kind: AgentCommandKind, alertId?: string) =>
     api<{ id: string; alreadyQueued?: boolean }>('/agent/commands', { method: 'POST', body: alertId ? { kind, alertId } : { kind } }),
   agentAlerts: () => api<{ alerts: AgentAlert[] }>('/agent/alerts'),
+  deleteSimulatedAlerts: () => api<{ deleted: number }>('/agent/alerts/simulated', { method: 'DELETE', body: {} }),
   agentAlert: (id: string) => api<AgentAlertDetail>(`/agent/alerts/${encodeURIComponent(id)}`),
   agentCommands: () => api<{ commands: AgentCommand[] }>('/agent/commands'),
   cancelAgentCommand: (id: string) => api<{ ok: true }>(`/agent/commands/${encodeURIComponent(id)}/cancel`, { method: 'POST', body: {} }),
