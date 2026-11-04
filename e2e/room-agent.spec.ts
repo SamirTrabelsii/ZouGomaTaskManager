@@ -126,6 +126,32 @@ test('give the agent an order, follow it to its result, then ignore the alert', 
   expect(stop.commands).toEqual([expect.objectContaining({ kind: 'ignore', externalId: 'rb-1' })]);
 });
 
+test('the room flags alerts you have not seen yet, until you open the agent panel', async ({ page }) => {
+  await signIn(page);
+  // the first look in a browser counts what is there as seen: nothing is new
+  await expect(page.getByRole('button', { name: /^Agent console: 1 open alert/ })).toBeAttached();
+  await expect(page.getByRole('button', { name: /new$/ })).toHaveCount(0);
+
+  await page.request.post('/api/agent/alerts', { headers: asAgent(), data: { externalId: 'rb-3', title: 'Duplicate rows in dim_customers', category: 'data_quality', severity: 'high', occurrences: 2 } });
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange'))); // the room checks again when the tab is shown
+  await expect(page.getByRole('button', { name: /^Agent console: 2 open alerts · 1 new/ })).toBeAttached();
+
+  await agentButton(page).click();
+  const fresh = panel(page).getByRole('list', { name: 'Open alerts' }).getByRole('listitem').filter({ hasText: 'Duplicate rows in dim_customers' });
+  await expect(fresh).toContainText('New');
+  await expect(panel(page).getByRole('list', { name: 'Open alerts' }).getByRole('listitem').filter({ hasText: 'Slow model' })).not.toContainText('New');
+  await expect(page.getByRole('button', { name: /new$/ })).toHaveCount(0); // looking at the list put the beacon out
+
+  await page.reload(); // and it stays out
+  await expect(page.getByRole('button', { name: /^Agent console: 2 open alerts/ })).toBeAttached();
+  await expect(page.getByRole('button', { name: /new$/ })).toHaveCount(0);
+
+  // an alert that happens again is new again
+  await page.request.post('/api/agent/alerts', { headers: asAgent(), data: { externalId: 'rb-3', title: 'Duplicate rows in dim_customers', category: 'data_quality', severity: 'high', occurrences: 7 } });
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  await expect(page.getByRole('button', { name: /^Agent console: 2 open alerts · 1 new/ })).toBeAttached();
+});
+
 test('signing out clears the agent from the room', async ({ page }) => {
   await signIn(page);
   await expect(agentButton(page)).toBeVisible();
