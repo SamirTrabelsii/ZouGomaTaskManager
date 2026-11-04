@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { agentConfigured, agentSummary, alertCounts, criticalIds, newlyCritical, relativeTime } from './agent';
+import { agentConfigured, agentSummary, alertCounts, criticalIds, newlyCritical, relativeTime, seenFrom, unseenAlerts } from './agent';
 import type { AgentOverview, AlertSeverity, AlertStatus } from './types';
 
 const overview = (o: Partial<AgentOverview> = {}): AgentOverview => ({ online: true, lastSeenAt: '2026-11-01T10:00:00Z', version: '1', state: 'idle', tokens: [], ...o });
@@ -26,6 +26,23 @@ describe('agent console', () => {
     expect(newlyCritical(new Set(['1']), [...list, alert('9', 'critical')])).toEqual(['9']);
     expect(newlyCritical(new Set(), [alert('5', 'critical', 'resolved')])).toEqual([]); // a closed alert is not news
     expect(newlyCritical(new Set(), [alert('6', 'high')])).toEqual([]); // only critical ones
+  });
+
+  it('knows which open alerts are new since the last look: new ones, and ones that happened again', () => {
+    const a = (id: string, occurrences: number, status: AlertStatus = 'open') => ({ id, status, occurrences });
+    const list = [a('1', 3), a('2', 5), a('3', 1)];
+    expect(unseenAlerts(null, list)).toEqual([]); // before the first look nothing is "new"
+    expect(unseenAlerts(seenFrom(list), list)).toEqual([]);
+    expect(unseenAlerts(seenFrom(list), [...list, a('4', 1)]).map((x) => x.id)).toEqual(['4']);
+    expect(unseenAlerts(seenFrom(list), [a('1', 4), a('2', 5), a('3', 1)]).map((x) => x.id)).toEqual(['1']); // happened again
+    expect(unseenAlerts({}, [a('9', 1, 'resolved'), a('8', 1, 'ignored')])).toEqual([]); // closed alerts never flash
+    expect(unseenAlerts({ '1': 9 }, [a('1', 3)])).toEqual([]); // fewer occurrences than before is not news
+  });
+
+  it('adds the number of new alerts to the hover card', () => {
+    expect(agentSummary(overview(), [alert('1', 'critical'), alert('2')], 2).summary).toBe('2 open alerts · 1 critical · 2 new');
+    expect(agentSummary(overview(), [alert('1')], 1).summary).toBe('1 open alert · 1 new');
+    expect(agentSummary(overview(), [], 0).summary).toBe('All quiet');
   });
 
   it('describes the console on its hover card', () => {

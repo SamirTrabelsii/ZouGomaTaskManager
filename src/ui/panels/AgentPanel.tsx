@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useStore } from '../../state/store';
 import { useAgent } from '../../state/agent';
-import { CATEGORY_LABEL, SEVERITY_LABEL, STATUS_LABEL, isOpen, relativeTime } from '../../domain/agent';
+import { CATEGORY_LABEL, SEVERITY_LABEL, STATUS_LABEL, isOpen, relativeTime, unseenAlerts } from '../../domain/agent';
 import type { AgentAlert, AgentAlertDetail, AgentCommand, AgentCommandKind, AgentPatch, AlertSeverity } from '../../domain/types';
 import { ConfirmButton, EmptyState } from '../common/ui';
 import { PanelShell, Section } from './PanelShell';
@@ -145,6 +145,14 @@ export function AgentPanel() {
   const commands = useAgent((s) => s.commands);
   const stale = useAgent((s) => s.stale);
   const [openId, setOpenId] = useState<string | null>(null);
+  // Looking at the list is what puts the beacon out. The alerts that were new stay tagged "New" while this panel is open.
+  const [fresh, setFresh] = useState<ReadonlySet<string>>(new Set());
+  useEffect(() => {
+    const s = useAgent.getState();
+    const ids = unseenAlerts(s.seen, s.alerts).map((a) => a.id);
+    if (ids.length) setFresh((prev) => new Set([...prev, ...ids]));
+    s.acknowledge();
+  }, [alerts]);
 
   // Faster than the room's own two-minute check while the panel is open
   useEffect(() => {
@@ -163,7 +171,7 @@ export function AgentPanel() {
   const row = (a: AgentAlert) => (
     <li key={a.id}>
       <button className="w-full rounded-lg bg-cream-100 p-2 text-left transition hover:bg-cream-200" onClick={() => setOpenId(a.id)}>
-        <div className="flex items-center gap-2"><Severity value={a.severity} /><span className="min-w-0 flex-1 truncate font-medium">{a.title}</span>
+        <div className="flex items-center gap-2"><Severity value={a.severity} />{fresh.has(a.id) && <span className="rounded bg-ink-900 px-1.5 py-0.5 text-[11px] font-semibold text-cream-50">New</span>}<span className="min-w-0 flex-1 truncate font-medium">{a.title}</span>
           {!!a.openPatches && <span className="shrink-0 text-xs" title="Fixes waiting for you">🩹 {a.openPatches}</span>}</div>
         <div className="mt-0.5 truncate text-xs text-ink-500">{meta(a)}</div>
       </button>

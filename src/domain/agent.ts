@@ -29,13 +29,29 @@ export function newlyCritical(previous: ReadonlySet<string> | null, alerts: Pick
 export const criticalIds = (alerts: Pick<AgentAlert, 'id' | 'status' | 'severity'>[]) =>
   new Set(alerts.filter((a) => isOpen(a) && a.severity === 'critical').map((a) => a.id));
 
+/**
+ * What the owner has already looked at: alert id → how many occurrences it had at the last look.
+ * Ids and counts only, so keeping it in the browser stores nothing from work.
+ */
+export type SeenMap = Record<string, number>;
+export const seenFrom = (alerts: Pick<AgentAlert, 'id' | 'occurrences'>[]): SeenMap => Object.fromEntries(alerts.map((a) => [a.id, a.occurrences]));
+
+/**
+ * Open alerts that are new since the last look: never seen, or that happened again. This is what makes the beacon flash.
+ * (Counting occurrences, not dates, so an alert the agent reports late is still new.) Before the first look there is nothing new.
+ */
+export function unseenAlerts<T extends Pick<AgentAlert, 'id' | 'status' | 'occurrences'>>(seen: SeenMap | null, alerts: T[]): T[] {
+  if (!seen) return [];
+  return alerts.filter((a) => isOpen(a) && !(a.id in seen && seen[a.id] >= a.occurrences));
+}
+
 /** The glanceable line on the console's hover card, from what the agent last reported. */
-export function agentSummary(overview: AgentOverview | null, alerts: Pick<AgentAlert, 'status' | 'severity'>[]): { summary: string; prompt: string | null } {
+export function agentSummary(overview: AgentOverview | null, alerts: Pick<AgentAlert, 'status' | 'severity'>[], fresh = 0): { summary: string; prompt: string | null } {
   if (!overview) return { summary: 'Checking the agent…', prompt: null };
   if (!overview.lastSeenAt) return { summary: 'Waiting for the agent to connect', prompt: 'Connect your agent in Settings' };
   const { open, critical } = alertCounts(alerts);
   const state = overview.online ? (overview.state === 'paused' ? 'paused' : null) : 'offline';
-  const work = open === 0 ? 'All quiet' : `${open} open alert${open === 1 ? '' : 's'}${critical ? ` · ${critical} critical` : ''}`;
+  const work = open === 0 ? 'All quiet' : `${open} open alert${open === 1 ? '' : 's'}${critical ? ` · ${critical} critical` : ''}${fresh ? ` · ${fresh} new` : ''}`;
   return { summary: state ? `Agent ${state} · ${work}` : work, prompt: null };
 }
 
