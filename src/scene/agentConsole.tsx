@@ -102,14 +102,9 @@ function Robot({ mode, tone, flash, open, critical, state, reduceMotion }: {
     invalidate();
   }, [open, critical, state, invalidate]);
 
-  // The scene is drawn on demand, so the robot asks for its own frames: about 30 a second while it is lively or the light flashes,
-  // 8 a second for the calm moods, and none at all with reduced motion.
-  const lively = mode === 'agitated' || mode === 'active' || flash !== null;
-  useEffect(() => {
-    if (reduceMotion) return;
-    const id = setInterval(invalidate, lively ? 33 : 125);
-    return () => clearInterval(id);
-  }, [reduceMotion, lively, invalidate]);
+  // The scene draws every frame unless reduced motion is on; then it only draws on demand. In that case the pose is set once
+  // (no wobble), and a frame is asked for whenever the mood changes.
+  useEffect(() => { invalidate(); }, [mode, flash, invalidate]);
 
   useFrame(({ clock }, dt) => {
     const t = clock.elapsedTime;
