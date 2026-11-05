@@ -70,3 +70,13 @@ export function analysisOf(a: Pick<AgentAlert, 'status' | 'causes' | 'notes' | '
   if (a.failedNotes) return { label: 'Analysis failed', tone: 'failed' };
   return { label: 'Not analysed yet', tone: 'todo' };
 }
+
+/** How the robot in the room behaves, from what the agent is doing and whether there are alerts you have not seen. */
+export type RobotMode = 'asleep' | 'resting' | 'agitated' | 'active' | 'calm';
+export function robotMode(overview: Pick<AgentOverview, 'online' | 'state'> | null, unseen: number): RobotMode {
+  if (!overview?.online) return 'asleep'; // offline (the night, a PC that is off): it sleeps
+  if (overview.state === 'paused') return 'resting';
+  if (unseen > 0) return 'agitated';
+  if (overview.state === 'working') return 'active';
+  return 'calm';
+}
