@@ -220,10 +220,14 @@ export interface AgentAlert {
   openPatches?: number;
   /** What the agent has written about it (list view only): causes found, other notes, and notes saying the analysis failed. */
   causes?: number;
+  noise?: number;
+  leads?: number;
   notes?: number;
   failedNotes?: number;
 }
-export interface AgentFinding { id: string; kind: 'cause' | 'note'; text: string; createdAt: string }
+/** cause: confirmed cause. noise: the headline that nothing is really wrong. lead: unconfirmed idea. note: evidence or context. todo: what you should do next. */
+export type FindingKind = 'cause' | 'noise' | 'lead' | 'note' | 'todo';
+export interface AgentFinding { id: string; kind: FindingKind; text: string; createdAt: string }
 /** A proposed fix as text to copy. Its text is wiped from the server once applied or ignored, and after a week. */
 export interface AgentPatch {
   id: string;

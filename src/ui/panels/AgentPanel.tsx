@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useStore } from '../../state/store';
 import { useAgent } from '../../state/agent';
-import { CATEGORY_LABEL, SEVERITY_LABEL, STATUS_LABEL, TICKET_SCOPE, analysisOf, findTicket, findTicketScope, ticketNotes, ticketTitle, isOpen, relativeTime, unseenAlerts, type Analysis } from '../../domain/agent';
+import { CATEGORY_LABEL, SEVERITY_LABEL, STATUS_LABEL, TICKET_SCOPE, VERDICT_LABEL, analysisOf, findTicket, findTicketScope, ticketNotes, ticketTitle, isOpen, readFindings, relativeTime, unseenAlerts, type Analysis } from '../../domain/agent';
 import type { AgentAlert, AgentAlertDetail, AgentCommand, AgentCommandKind, AgentPatch, AlertSeverity } from '../../domain/types';
 import { ConfirmButton, EmptyState } from '../common/ui';
 import { PanelShell, Section } from './PanelShell';
@@ -101,6 +101,7 @@ function AlertView({ id, onBack }: { id: string; onBack: () => void }) {
   if (detail === undefined) return <PanelShell title="Alert" icon="⚡" actions={back}><p className="text-sm text-ink-500">Loading…</p></PanelShell>;
   if (detail === null) return <PanelShell title="Alert" icon="⚡" actions={back}><EmptyState icon="🍃" title="This alert is gone" hint="It may have expired." /></PanelShell>;
   const { alert, findings, patches } = detail;
+  const { verdict, todo, more } = readFindings(findings);
   const existing = findTicket(tasks, alert.externalId, new Date());
   // One click makes the task that tracks this investigation: in progress, high priority, 1 story point, under the Run 'S&Y' scope.
   const createTicket = () => {
@@ -133,12 +134,25 @@ function AlertView({ id, onBack }: { id: string; onBack: () => void }) {
         </Section>
       )}
 
-      {findings.length > 0 && (
-        <Section title="What the agent found">
+      {verdict && (
+        <section aria-label="Verdict" className={`rounded-xl border p-3 ${verdict.kind === 'lead' ? 'border-ink-900/20 bg-cream-100' : 'border-moss-600/40 bg-moss-600/10'}`}>
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-500">{VERDICT_LABEL[verdict.kind]}</div>
+          <p className="mt-0.5 whitespace-pre-wrap text-sm font-medium">{verdict.text}</p>
+        </section>
+      )}
+
+      {todo.length > 0 && (
+        <Section title="To do by you">
+          <ul className="space-y-1.5">{todo.map((f) => <li key={f.id} className="flex gap-2 rounded-lg border border-clay-500/40 bg-clay-500/10 p-2 text-sm"><span aria-hidden>☐</span><span className="whitespace-pre-wrap">{f.text}</span></li>)}</ul>
+        </Section>
+      )}
+
+      {more.length > 0 && (
+        <Section title="Evidence and leads">
           <ul className="space-y-2">
-            {findings.map((f) => (
+            {more.map((f) => (
               <li key={f.id} className="rounded-lg bg-cream-100 p-2 text-sm">
-                <span className="mr-1 text-[11px] font-semibold uppercase tracking-wide text-ink-500">{f.kind === 'cause' ? 'Likely cause' : 'Note'}</span>
+                <span className="mr-1 text-[11px] font-semibold uppercase tracking-wide text-ink-500">{VERDICT_LABEL[f.kind]}</span>
                 <span className="whitespace-pre-wrap">{f.text}</span>
               </li>
             ))}
@@ -155,7 +169,7 @@ function AlertView({ id, onBack }: { id: string; onBack: () => void }) {
 }
 
 const TAG_TONE: Record<Analysis['tone'], string> = {
-  found: 'bg-moss-600/15 text-moss-600', none: 'bg-ink-900/10 text-ink-700', failed: 'bg-clay-500/20 text-clay-600', working: 'bg-ink-900/10 text-ink-700', todo: 'bg-cream-200 text-ink-500',
+  found: 'bg-moss-600/15 text-moss-600', ok: 'bg-moss-600/15 text-moss-600', lead: 'bg-clay-500/15 text-clay-600', none: 'bg-ink-900/10 text-ink-700', failed: 'bg-clay-500/20 text-clay-600', working: 'bg-ink-900/10 text-ink-700', todo: 'bg-cream-200 text-ink-500',
 };
 function AnalysisTag({ a }: { a: AgentAlert }) {
   const t = analysisOf(a);
