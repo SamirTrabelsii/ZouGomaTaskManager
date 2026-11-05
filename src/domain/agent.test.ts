@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { agentConfigured, agentSummary, alertCounts, analysisOf, criticalIds, newlyCritical, relativeTime, seenFrom, unseenAlerts } from './agent';
+import { agentConfigured, agentSummary, alertCounts, analysisOf, robotMode, criticalIds, newlyCritical, relativeTime, seenFrom, unseenAlerts } from './agent';
 import type { AgentOverview, AlertSeverity, AlertStatus } from './types';
 
 const overview = (o: Partial<AgentOverview> = {}): AgentOverview => ({ online: true, lastSeenAt: '2026-11-01T10:00:00Z', version: '1', state: 'idle', tokens: [], ...o });
@@ -65,6 +65,18 @@ describe('agent console', () => {
     expect(analysisOf({ ...base, failedNotes: 1 })).toEqual({ label: 'Analysis failed', tone: 'failed' });
     expect(analysisOf({ ...base, failedNotes: 1, notes: 1 }).tone).toBe('none'); // a later real analysis wins over an old failure
     expect(analysisOf({ status: 'open' }).tone).toBe('todo'); // an old server that does not send the counts
+  });
+
+  it('picks the robot mood: asleep offline, agitated for news, active when working, calm otherwise', () => {
+    const on = (state: AgentOverview['state']) => ({ online: true, state });
+    expect(robotMode(null, 0)).toBe('asleep');
+    expect(robotMode({ online: false, state: 'idle' }, 0)).toBe('asleep');
+    expect(robotMode({ online: false, state: 'working' }, 3)).toBe('asleep'); // sleeping wins: the beacon alone tells about the news
+    expect(robotMode(on('paused'), 2)).toBe('resting');
+    expect(robotMode(on('idle'), 1)).toBe('agitated');
+    expect(robotMode(on('working'), 1)).toBe('agitated'); // news first
+    expect(robotMode(on('working'), 0)).toBe('active');
+    expect(robotMode(on('idle'), 0)).toBe('calm');
   });
 
   it('says how long ago in plain words', () => {
