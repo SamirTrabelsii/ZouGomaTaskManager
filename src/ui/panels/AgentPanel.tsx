@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useStore } from '../../state/store';
 import { useAgent } from '../../state/agent';
-import { CATEGORY_LABEL, SEVERITY_LABEL, STATUS_LABEL, analysisOf, isOpen, relativeTime, unseenAlerts, type Analysis } from '../../domain/agent';
+import { CATEGORY_LABEL, SEVERITY_LABEL, STATUS_LABEL, TICKET_SCOPE, analysisOf, findTicket, findTicketScope, ticketNotes, ticketTitle, isOpen, relativeTime, unseenAlerts, type Analysis } from '../../domain/agent';
 import type { AgentAlert, AgentAlertDetail, AgentCommand, AgentCommandKind, AgentPatch, AlertSeverity } from '../../domain/types';
 import { ConfirmButton, EmptyState } from '../common/ui';
 import { PanelShell, Section } from './PanelShell';
@@ -95,16 +95,31 @@ function AlertView({ id, onBack }: { id: string; onBack: () => void }) {
     toast(e ?? (kind === 'ignore' ? 'Alert ignored.' : 'Order sent. The agent takes it on its next check-in.'), e ? 'error' : 'ok');
     void load();
   };
+  const tasks = useStore((s) => s.data.tasks);
   const back = <button className="btn btn-ghost text-xs" onClick={onBack}>← All alerts</button>;
 
   if (detail === undefined) return <PanelShell title="Alert" icon="⚡" actions={back}><p className="text-sm text-ink-500">Loading…</p></PanelShell>;
   if (detail === null) return <PanelShell title="Alert" icon="⚡" actions={back}><EmptyState icon="🍃" title="This alert is gone" hint="It may have expired." /></PanelShell>;
   const { alert, findings, patches } = detail;
+  const existing = findTicket(tasks, alert.externalId, new Date());
+  // One click makes the task that tracks this investigation: in progress, high priority, 1 story point, under the Run 'S&Y' scope.
+  const createTicket = () => {
+    const s = useStore.getState();
+    const scope = findTicketScope(s.data.scopes) ?? s.addScope({ title: TICKET_SCOPE });
+    const task = s.addTask({ title: ticketTitle(new Date()), status: 'doing', priority: 'high', size: 'XS', scopeId: scope.id, notes: ticketNotes(alert, findings) });
+    toast(`Task created: ${task.title}`);
+  };
 
   return (
     <PanelShell title={alert.title} icon="⚡" subtitle={meta(alert)} actions={back}>
       <div className="flex flex-wrap items-center gap-2"><Severity value={alert.severity} /><span className="text-xs text-ink-500">first seen {relativeTime(alert.firstSeenAt)}</span></div>
       {alert.summary && <p className="whitespace-pre-wrap text-sm">{alert.summary}</p>}
+
+      <Section title="Task">
+        {existing
+          ? <p className="text-sm text-ink-700">✓ Task created today: “{existing.title}”. Find it in Tasks.</p>
+          : <button className="btn text-xs" onClick={createTicket}>Create task</button>}
+      </Section>
 
       {isOpen(alert) && (
         <Section title="Ask the agent">

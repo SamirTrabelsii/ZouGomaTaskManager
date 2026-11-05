@@ -177,6 +177,33 @@ test('each open alert says whether the agent found something, and the demo alert
   expect((await list()).some((a) => a.externalId === 'sim-1')).toBe(false);
 });
 
+test('one click makes the task that tracks an investigation: in progress, high priority, 1 point, under Run S&Y', async ({ page }) => {
+  await signIn(page);
+  await agentButton(page).click();
+  await panel(page).getByRole('button', { name: /Duplicate rows in dim_customers/ }).click();
+  await panel(page).getByRole('button', { name: 'Create task' }).click();
+  await expect(page.getByText(/Task created: Investigation Alerte RollBar - \d{8}/)).toBeVisible();
+  await expect(panel(page).getByRole('button', { name: 'Create task' })).toHaveCount(0); // once a day per alert
+  await expect(panel(page)).toContainText('Task created today');
+
+  type Saved = { data: { tasks: { title: string; status: string; priority: string; size: string; scopeId: string; notes: string }[]; scopes: { id: string; title: string }[] } };
+  const saved = async () => ((await (await page.request.get('/api/data')).json()) as Saved).data;
+  await expect.poll(async () => (await saved()).tasks.length).toBe(1);
+  const { tasks, scopes } = await saved();
+  const now = new Date();
+  const ddmmyyyy = `${String(now.getDate()).padStart(2, '0')}${String(now.getMonth() + 1).padStart(2, '0')}${now.getFullYear()}`;
+  expect(tasks[0]).toMatchObject({ title: `Investigation Alerte RollBar - ${ddmmyyyy}`, status: 'doing', priority: 'high', size: 'XS' });
+  expect(scopes.find((s) => s.id === tasks[0].scopeId)?.title).toBe("Run 'S&Y'");
+  expect(tasks[0].notes).toContain('[rb-3]');
+  expect(tasks[0].notes).toContain('A duplicate key in the seed file.'); // what the agent found goes with it
+
+  // coming back later still knows the task exists
+  await page.reload();
+  await agentButton(page).click();
+  await panel(page).getByRole('button', { name: /Duplicate rows in dim_customers/ }).click();
+  await expect(panel(page)).toContainText('Task created today');
+});
+
 test('signing out clears the agent from the room', async ({ page }) => {
   await signIn(page);
   await expect(agentButton(page)).toBeVisible();
