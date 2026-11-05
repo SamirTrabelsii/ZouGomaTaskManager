@@ -1,4 +1,4 @@
-import type { AgentAlert, AgentOverview, AlertCategory, AlertSeverity, AlertStatus } from './types';
+import type { AgentAlert, AgentOverview, AlertCategory, AlertSeverity, AlertStatus, FindingKind } from './types';
 
 export const SEVERITY_LABEL: Record<AlertSeverity, string> = { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low' };
 export const CATEGORY_LABEL: Record<AlertCategory, string> = {
@@ -61,15 +61,32 @@ export const relativeTime = (iso: string | null, now = Date.now()) => {
   return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} d ago`;
 };
 
-/** The tag shown on each row of the alert list: has the agent looked at it, and did it find something? */
-export type Analysis = { label: string; tone: 'found' | 'none' | 'failed' | 'working' | 'todo' };
-export function analysisOf(a: Pick<AgentAlert, 'status' | 'causes' | 'notes' | 'failedNotes' | 'openPatches'>): Analysis {
+/** The tag shown on each row of the alert list: has the agent looked at it, and what did it conclude? */
+export type Analysis = { label: string; tone: 'found' | 'ok' | 'lead' | 'none' | 'failed' | 'working' | 'todo' };
+export function analysisOf(a: Pick<AgentAlert, 'status' | 'causes' | 'noise' | 'leads' | 'notes' | 'failedNotes' | 'openPatches'>): Analysis {
   if (a.status === 'investigating') return { label: 'Investigating…', tone: 'working' };
   if (a.causes) return { label: a.causes === 1 ? 'Cause found' : `${a.causes} causes found`, tone: 'found' };
+  if (a.noise) return { label: 'Not a real failure', tone: 'ok' };
+  if (a.leads) return { label: 'Lead · not confirmed', tone: 'lead' };
   if (a.notes) return { label: 'Analysed · no cause found', tone: 'none' };
   if (a.failedNotes) return { label: 'Analysis failed', tone: 'failed' };
   return { label: 'Not analysed yet', tone: 'todo' };
 }
+
+type FindingLike = { kind: FindingKind; text: string };
+/**
+ * What the agent found, sorted by what it is for: the verdict (a confirmed cause, else "not a real failure", else the first lead),
+ * what you should do next, and the rest (evidence and other leads).
+ */
+export function readFindings<F extends FindingLike>(findings: F[]) {
+  const verdict = findings.find((f) => f.kind === 'cause') ?? findings.find((f) => f.kind === 'noise') ?? findings.find((f) => f.kind === 'lead') ?? null;
+  return {
+    verdict,
+    todo: findings.filter((f) => f.kind === 'todo'),
+    more: findings.filter((f) => f !== verdict && f.kind !== 'todo'),
+  };
+}
+export const VERDICT_LABEL: Record<FindingKind, string> = { cause: 'Cause found', noise: 'Not a real failure', lead: 'Lead · not confirmed', note: 'Evidence', todo: 'To do' };
 
 /** How the robot in the room behaves, from what the agent is doing and whether there are alerts you have not seen. */
 export type RobotMode = 'asleep' | 'resting' | 'agitated' | 'active' | 'calm';
@@ -101,14 +118,17 @@ const NOTES_LIMIT = 4000;
 /** What goes in the task: the alert, and what the agent found. The first line is the key used to spot a task already made. */
 export function ticketNotes(
   alert: Pick<AgentAlert, 'externalId' | 'title' | 'severity' | 'occurrences' | 'lastSeenAt' | 'summary'>,
-  findings: { kind: 'cause' | 'note'; text: string }[],
+  findings: FindingLike[],
 ): string {
   const lines = [
     `Rollbar alert: ${alert.title} [${alert.externalId}]`,
     `${SEVERITY_LABEL[alert.severity]} · seen ${alert.occurrences} time${alert.occurrences === 1 ? '' : 's'} · last ${alert.lastSeenAt.slice(0, 16).replace('T', ' ')} UTC`,
   ];
   if (alert.summary) lines.push('', alert.summary);
-  if (findings.length) lines.push('', 'What the agent found:', ...findings.map((f) => `- ${f.kind === 'cause' ? 'Likely cause' : 'Note'}: ${f.text}`));
+  const { verdict, todo, more } = readFindings(findings);
+  if (verdict) lines.push('', `${VERDICT_LABEL[verdict.kind]}: ${verdict.text}`);
+  if (todo.length) lines.push('', 'To do:', ...todo.map((f) => `- ${f.text}`));
+  if (more.length) lines.push('', 'What the agent found:', ...more.map((f) => `- ${VERDICT_LABEL[f.kind]}: ${f.text}`));
   const text = lines.join('\n');
   return text.length <= NOTES_LIMIT ? text : `${text.slice(0, NOTES_LIMIT - 1).trimEnd()}…`;
 }

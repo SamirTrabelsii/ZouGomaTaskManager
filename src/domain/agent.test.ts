@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { agentConfigured, agentSummary, alertCounts, analysisOf, findTicket, findTicketScope, robotMode, ticketNotes, ticketTitle, criticalIds, newlyCritical, relativeTime, seenFrom, unseenAlerts } from './agent';
+import { agentConfigured, agentSummary, alertCounts, analysisOf, findTicket, readFindings, findTicketScope, robotMode, ticketNotes, ticketTitle, criticalIds, newlyCritical, relativeTime, seenFrom, unseenAlerts } from './agent';
 import type { AgentOverview, AlertSeverity, AlertStatus } from './types';
 
 const overview = (o: Partial<AgentOverview> = {}): AgentOverview => ({ online: true, lastSeenAt: '2026-11-01T10:00:00Z', version: '1', state: 'idle', tokens: [], ...o });
@@ -64,7 +64,21 @@ describe('agent console', () => {
     expect(analysisOf({ ...base, notes: 2 })).toEqual({ label: 'Analysed · no cause found', tone: 'none' });
     expect(analysisOf({ ...base, failedNotes: 1 })).toEqual({ label: 'Analysis failed', tone: 'failed' });
     expect(analysisOf({ ...base, failedNotes: 1, notes: 1 }).tone).toBe('none'); // a later real analysis wins over an old failure
+    expect(analysisOf({ ...base, noise: 1, notes: 3 })).toEqual({ label: 'Not a real failure', tone: 'ok' });
+    expect(analysisOf({ ...base, leads: 1, notes: 1 })).toEqual({ label: 'Lead · not confirmed', tone: 'lead' });
+    expect(analysisOf({ ...base, causes: 1, noise: 1 }).tone).toBe('found'); // a confirmed cause outranks the rest
     expect(analysisOf({ status: 'open' }).tone).toBe('todo'); // an old server that does not send the counts
+  });
+
+  it('sorts the findings: the verdict, what to do, and the rest', () => {
+    const f = (kind: 'cause' | 'noise' | 'lead' | 'note' | 'todo', text: string) => ({ kind, text });
+    const r = readFindings([f('note', 'e1'), f('lead', 'l1'), f('noise', 'n1'), f('todo', 't1'), f('lead', 'l2')]);
+    expect(r.verdict?.text).toBe('n1'); // no cause, so the noise verdict leads
+    expect(r.todo.map((x) => x.text)).toEqual(['t1']);
+    expect(r.more.map((x) => x.text)).toEqual(['e1', 'l1', 'l2']);
+    expect(readFindings([f('lead', 'l1'), f('cause', 'c1')]).verdict?.text).toBe('c1');
+    expect(readFindings([f('note', 'e1')]).verdict).toBeNull();
+    expect(readFindings([]).more).toEqual([]);
   });
 
   it('picks the robot mood: asleep offline, agitated for news, active when working, calm otherwise', () => {
@@ -89,11 +103,12 @@ describe('agent console', () => {
 
   it('puts the alert and what the agent found in the task, and spots a task already made today', () => {
     const alert = { externalId: 'rb-35', title: 'DBT run failed (#35)', severity: 'medium' as const, occurrences: 1334, lastSeenAt: '2026-11-05T07:21:40Z', summary: '' };
-    const notes = ticketNotes(alert, [{ kind: 'cause', text: 'No real failure.' }, { kind: 'note', text: 'Check the payload.' }]);
+    const notes = ticketNotes(alert, [{ kind: 'noise', text: 'No real failure.' }, { kind: 'note', text: 'Check the payload.' }, { kind: 'todo', text: 'Open item 35 in Rollbar.' }]);
     expect(notes.split('\n')[0]).toBe('Rollbar alert: DBT run failed (#35) [rb-35]');
     expect(notes).toContain('Medium · seen 1334 times · last 2026-11-05 07:21 UTC');
-    expect(notes).toContain('- Likely cause: No real failure.');
-    expect(notes).toContain('- Note: Check the payload.');
+    expect(notes).toContain('Not a real failure: No real failure.');
+    expect(notes).toContain('To do:\n- Open item 35 in Rollbar.');
+    expect(notes).toContain('- Evidence: Check the payload.');
     expect(ticketNotes(alert, []).includes('What the agent found')).toBe(false);
     expect(ticketNotes(alert, [{ kind: 'note', text: 'x'.repeat(9000) }]).length).toBeLessThanOrEqual(4000);
 

@@ -211,6 +211,24 @@ describe.skipIf(!reachable)('agent alerts API', () => {
     expect((await call('DELETE', '/api/agent/alerts/simulated', { body: {} })).body).toEqual({ deleted: 0 });
   });
 
+  it('knows the kinds of finding, refuses others, and a new analysis replaces the previous one', async () => {
+    await pool.query('DELETE FROM agent_alerts');
+    const id = await newAlert({ externalId: 'k1' });
+    const post = (body: object) => agent('POST', `/api/agent/alerts/${id}/findings`, body);
+    for (const kind of ['cause', 'noise', 'lead', 'note', 'todo']) expect((await post({ kind, text: `a ${kind}` })).status, kind).toBe(201);
+    expect((await post({ kind: 'verdict', text: 'x' })).status).toBe(400);
+
+    const row = async () => (await call('GET', '/api/agent/alerts')).body.alerts.find((a: { externalId: string }) => a.externalId === 'k1');
+    expect(await row()).toMatchObject({ causes: 1, noise: 1, leads: 1, notes: 2, failedNotes: 0 }); // the to-do counts with the notes
+
+    // the first finding of a new run asks for the old ones to go
+    expect((await post({ kind: 'noise', text: 'new headline', replace: true })).status).toBe(201);
+    expect((await post({ kind: 'note', text: 'new evidence' })).status).toBe(201);
+    const found = (await call('GET', `/api/agent/alerts/${id}`)).body.findings.map((f: { kind: string; text: string }) => `${f.kind}:${f.text}`);
+    expect(found).toEqual(['noise:new headline', 'note:new evidence']);
+    expect(await row()).toMatchObject({ causes: 0, noise: 1, leads: 0, notes: 1 });
+  });
+
   it('keeps fixes out of the account export', async () => {
     const id = await newAlert({ externalId: 'exp' });
     await agent('POST', `/api/agent/alerts/${id}/patches`, { ...patch, body: 'UNIQUE-PATCH-TEXT' });

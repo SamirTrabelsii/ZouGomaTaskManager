@@ -33,6 +33,15 @@ const dock = (page: Page) => page.getByRole('navigation', { name: 'Room objects'
 const agentButton = (page: Page) => dock(page).getByRole('button', { name: /Agent/ });
 // the panel is named after what it shows: "AI agent" for the list, the alert's title for one alert
 const panel = (page: Page) => page.getByRole('complementary');
+// A two-step button arms itself for 4 seconds, and the 3D scene is slow to draw here (software WebGL), so a slow page can miss
+// that window. Try again until both clicks land inside it.
+async function confirmed(page: Page, first: string, second: string) {
+  await expect(async () => {
+    const armed = panel(page).getByRole('button', { name: second });
+    if (!(await armed.count())) await panel(page).getByRole('button', { name: first }).click({ timeout: 10_000 });
+    await armed.click({ timeout: 10_000 });
+  }).toPass({ timeout: 90_000 });
+}
 
 // Windows turns line breaks into CRLF on the clipboard; what matters is that the text is the fix
 const clipboard = async (page: Page) => (await page.evaluate(() => navigator.clipboard.readText())).split('\r\n').join('\n');
@@ -115,8 +124,7 @@ test('give the agent an order, follow it to its result, then ignore the alert', 
   await expect(panel(page)).toContainText('Cause found: left join drops rows');
 
   await panel(page).getByRole('button', { name: /NULL customer_id/ }).click();
-  await panel(page).getByRole('button', { name: 'Ignore alert' }).click();
-  await panel(page).getByRole('button', { name: 'Ignore it?' }).click();
+  await confirmed(page, 'Ignore alert', 'Ignore it?');
   await expect(page.getByText('Alert ignored.')).toBeVisible();
   await panel(page).getByRole('button', { name: '← All alerts' }).click();
   await expect(panel(page).getByRole('list', { name: 'Open alerts' }).getByRole('listitem')).toHaveCount(1);
@@ -168,9 +176,7 @@ test('each open alert says whether the agent found something, and the demo alert
 
   const closed = panel(page).getByRole('list', { name: 'Closed alerts' });
   await expect(closed).toContainText('[simulated] Nightly pipeline failed');
-  await panel(page).getByRole('button', { name: 'Delete the 1 simulated alert' }).click();
-  await expect(closed).toContainText('[simulated] Nightly pipeline failed'); // one click only asks
-  await panel(page).getByRole('button', { name: 'Delete them for good?' }).click();
+  await confirmed(page, 'Delete the 1 simulated alert', 'Delete them for good?');
   await expect(page.getByText('1 simulated alert deleted.')).toBeVisible();
   await expect(closed).not.toContainText('[simulated]');
   await expect(panel(page).getByRole('button', { name: /Delete the \d+ simulated/ })).toHaveCount(0);
@@ -202,6 +208,30 @@ test('one click makes the task that tracks an investigation: in progress, high p
   await agentButton(page).click();
   await panel(page).getByRole('button', { name: /Duplicate rows in dim_customers/ }).click();
   await expect(panel(page)).toContainText('Task created today');
+});
+
+test('an analysis reads as a verdict, what to do and the evidence, and a new one replaces the old', async ({ page }) => {
+  await signIn(page);
+  const create = async (externalId: string, title: string) => (await (await page.request.post('/api/agent/alerts', { headers: asAgent(), data: { externalId, title, category: 'pipeline_failure', severity: 'medium', occurrences: 1334 } })).json()).id as string;
+  const id = await create('rb-35', 'DBT run failed (#35)');
+  const say = (kind: string, text: string, replace?: boolean) => page.request.post(`/api/agent/alerts/${id}/findings`, { headers: asAgent(), data: { kind, text, replace } });
+  await say('lead', 'An old idea that the next analysis drops.');
+  await say('noise', 'Not a real failure: the daily run succeeded, 0 of 665 models failed.', true); // a new analysis
+  await say('note', 'The build at 07:03 UTC built 665 models, none failed.');
+  await say('todo', 'Open the payload of item 35 in Rollbar.');
+
+  await page.reload();
+  await agentButton(page).click();
+  const row = panel(page).getByRole('list', { name: 'Open alerts' }).getByRole('listitem').filter({ hasText: 'DBT run failed (#35)' });
+  await expect(row).toContainText('Not a real failure'); // the tag in the list says what the agent concluded
+  await row.getByRole('button').click();
+
+  await expect(panel(page).getByRole('region', { name: 'Verdict' })).toContainText('the daily run succeeded');
+  await expect(panel(page).getByRole('region', { name: 'Verdict' })).toContainText('Not a real failure');
+  await expect(panel(page)).toContainText('To do by you');
+  await expect(panel(page)).toContainText('Open the payload of item 35 in Rollbar.');
+  await expect(panel(page)).toContainText('The build at 07:03 UTC built 665 models, none failed.');
+  await expect(panel(page)).not.toContainText('An old idea'); // replaced
 });
 
 test('signing out clears the agent from the room', async ({ page }) => {

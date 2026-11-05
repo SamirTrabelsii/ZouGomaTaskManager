@@ -95,7 +95,11 @@ export const TOKEN_PREFIX = 'lifeos_agent_';
 export const CATEGORIES = ['data_quality', 'pipeline_failure', 'performance', 'schema', 'other'] as const;
 export const SEVERITIES = ['critical', 'high', 'medium', 'low'] as const;
 export const ALERT_STATUSES = ['open', 'investigating', 'proposed', 'resolved', 'ignored'] as const;
-export const FINDING_KINDS = ['cause', 'note'] as const;
+/**
+ * What a finding is: a confirmed cause, the headline that nothing is really wrong (noise), an unconfirmed lead, a piece of
+ * evidence or context (note), or something for the owner to do next (todo).
+ */
+export const FINDING_KINDS = ['cause', 'noise', 'lead', 'note', 'todo'] as const;
 export const PATCH_RESOLUTIONS = ['applied', 'ignored'] as const;
 
 export const MAX_PATCH_BYTES = 20 * 1024;
@@ -319,9 +323,11 @@ export function agentRouter(
       const b = (req.body ?? {}) as Record<string, unknown>;
       const text = str(b.text, 2000);
       const kind = b.kind === undefined ? 'note' : oneOf(FINDING_KINDS, b.kind);
-      if (!text || !kind) return res.status(400).json({ error: 'text (up to 2000 characters) is required; kind is cause or note.' });
+      if (!text || !kind) return res.status(400).json({ error: 'text (up to 2000 characters) is required; kind is one of ' + FINDING_KINDS.join(', ') + '.' });
       if (leaks(res, text)) return;
       if (!alertId || !(await ownsAlert(alertId, userId))) return res.status(404).json({ error: 'Alert not found' });
+      // a new analysis replaces the previous one instead of piling up next to it: the agent asks for it on the first finding of a run
+      if (b.replace === true) await pool.query('DELETE FROM agent_findings WHERE alert_id=$1', [alertId]);
       const { rows: cnt } = await pool.query('SELECT count(*)::int AS n FROM agent_findings WHERE alert_id=$1', [alertId]);
       if (cnt[0].n >= MAX_FINDINGS_PER_ALERT) return res.status(409).json({ error: 'This alert already has the maximum number of findings.' });
       const { rows } = await pool.query('INSERT INTO agent_findings (alert_id, kind, text) VALUES ($1,$2,$3) RETURNING id', [alertId, kind, text]);
@@ -364,7 +370,9 @@ export function agentRouter(
         `SELECT a.id, a.external_id, a.title, a.category, a.severity, a.status, a.occurrences, a.summary, a.first_seen_at, a.last_seen_at,
                 (SELECT count(*)::int FROM agent_patches p WHERE p.alert_id=a.id AND p.status='proposed') AS open_patches,
                 (SELECT count(*)::int FROM agent_findings f WHERE f.alert_id=a.id AND f.kind='cause') AS causes,
-                (SELECT count(*)::int FROM agent_findings f WHERE f.alert_id=a.id AND f.kind='note' AND f.text NOT LIKE '${FAILED_NOTE}%') AS notes,
+                (SELECT count(*)::int FROM agent_findings f WHERE f.alert_id=a.id AND f.kind='noise') AS noise,
+                (SELECT count(*)::int FROM agent_findings f WHERE f.alert_id=a.id AND f.kind='lead') AS leads,
+                (SELECT count(*)::int FROM agent_findings f WHERE f.alert_id=a.id AND f.kind IN ('note','todo') AND f.text NOT LIKE '${FAILED_NOTE}%') AS notes,
                 (SELECT count(*)::int FROM agent_findings f WHERE f.alert_id=a.id AND f.kind='note' AND f.text LIKE '${FAILED_NOTE}%') AS failed_notes
          FROM agent_alerts a WHERE a.user_id=$1
          ORDER BY (a.status IN ('resolved','ignored')),
@@ -374,7 +382,7 @@ export function agentRouter(
         alerts: rows.map((r) => ({
           id: String(r.id), externalId: r.external_id, title: r.title, category: r.category, severity: r.severity, status: r.status,
           occurrences: r.occurrences, summary: r.summary, firstSeenAt: r.first_seen_at, lastSeenAt: r.last_seen_at, openPatches: r.open_patches,
-          causes: r.causes, notes: r.notes, failedNotes: r.failed_notes,
+          causes: r.causes, noise: r.noise, leads: r.leads, notes: r.notes, failedNotes: r.failed_notes,
         })),
       });
     } catch (e) { next(e); }
