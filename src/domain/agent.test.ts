@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { agentConfigured, agentSummary, alertCounts, analysisOf, robotMode, criticalIds, newlyCritical, relativeTime, seenFrom, unseenAlerts } from './agent';
+import { agentConfigured, agentSummary, alertCounts, analysisOf, findTicket, findTicketScope, robotMode, ticketNotes, ticketTitle, criticalIds, newlyCritical, relativeTime, seenFrom, unseenAlerts } from './agent';
 import type { AgentOverview, AlertSeverity, AlertStatus } from './types';
 
 const overview = (o: Partial<AgentOverview> = {}): AgentOverview => ({ online: true, lastSeenAt: '2026-11-01T10:00:00Z', version: '1', state: 'idle', tokens: [], ...o });
@@ -77,6 +77,31 @@ describe('agent console', () => {
     expect(robotMode(on('working'), 1)).toBe('agitated'); // news first
     expect(robotMode(on('working'), 0)).toBe('active');
     expect(robotMode(on('idle'), 0)).toBe('calm');
+  });
+
+  it('names the investigation task after the day, and finds the scope whatever the quotes', () => {
+    expect(ticketTitle(new Date(2026, 10, 5))).toBe('Investigation Alerte RollBar - 05112026');
+    expect(ticketTitle(new Date(2026, 0, 31))).toBe('Investigation Alerte RollBar - 31012026');
+    const scopes = [{ title: 'Home' }, { title: 'run ’S&Y’ ' }];
+    expect(findTicketScope(scopes)).toBe(scopes[1]);
+    expect(findTicketScope([{ title: 'Run S&Y' }])).toBeUndefined();
+  });
+
+  it('puts the alert and what the agent found in the task, and spots a task already made today', () => {
+    const alert = { externalId: 'rb-35', title: 'DBT run failed (#35)', severity: 'medium' as const, occurrences: 1334, lastSeenAt: '2026-11-05T07:21:40Z', summary: '' };
+    const notes = ticketNotes(alert, [{ kind: 'cause', text: 'No real failure.' }, { kind: 'note', text: 'Check the payload.' }]);
+    expect(notes.split('\n')[0]).toBe('Rollbar alert: DBT run failed (#35) [rb-35]');
+    expect(notes).toContain('Medium · seen 1334 times · last 2026-11-05 07:21 UTC');
+    expect(notes).toContain('- Likely cause: No real failure.');
+    expect(notes).toContain('- Note: Check the payload.');
+    expect(ticketNotes(alert, []).includes('What the agent found')).toBe(false);
+    expect(ticketNotes(alert, [{ kind: 'note', text: 'x'.repeat(9000) }]).length).toBeLessThanOrEqual(4000);
+
+    const today = new Date(2026, 10, 5);
+    const task = { title: ticketTitle(today), notes };
+    expect(findTicket([task], 'rb-35', today)).toBe(task);
+    expect(findTicket([task], 'rb-3', today)).toBeUndefined(); // another alert
+    expect(findTicket([task], 'rb-35', new Date(2026, 10, 6))).toBeUndefined(); // another day: a new task is fine
   });
 
   it('says how long ago in plain words', () => {

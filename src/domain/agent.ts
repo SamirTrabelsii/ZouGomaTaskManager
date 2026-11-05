@@ -80,3 +80,41 @@ export function robotMode(overview: Pick<AgentOverview, 'online' | 'state'> | nu
   if (overview.state === 'working') return 'active';
   return 'calm';
 }
+
+/* ── the task that tracks an investigation ── */
+
+/** The scope every investigation task goes under. */
+export const TICKET_SCOPE = "Run 'S&Y'";
+const TICKET_PREFIX = 'Investigation Alerte RollBar';
+const same = (s: string) => s.replace(/[‘’´`]/g, "'").replace(/\s+/g, ' ').trim().toLowerCase();
+
+/** "Investigation Alerte RollBar - 05112026": the day the task is made, as DDMMYYYY. */
+export function ticketTitle(now: Date): string {
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${TICKET_PREFIX} - ${p(now.getDate())}${p(now.getMonth() + 1)}${now.getFullYear()}`;
+}
+
+/** The scope called Run 'S&Y' (quotes and case do not matter), if the user already has it. */
+export const findTicketScope = <S extends { title: string }>(scopes: S[]): S | undefined => scopes.find((s) => same(s.title) === same(TICKET_SCOPE));
+
+const NOTES_LIMIT = 4000;
+/** What goes in the task: the alert, and what the agent found. The first line is the key used to spot a task already made. */
+export function ticketNotes(
+  alert: Pick<AgentAlert, 'externalId' | 'title' | 'severity' | 'occurrences' | 'lastSeenAt' | 'summary'>,
+  findings: { kind: 'cause' | 'note'; text: string }[],
+): string {
+  const lines = [
+    `Rollbar alert: ${alert.title} [${alert.externalId}]`,
+    `${SEVERITY_LABEL[alert.severity]} · seen ${alert.occurrences} time${alert.occurrences === 1 ? '' : 's'} · last ${alert.lastSeenAt.slice(0, 16).replace('T', ' ')} UTC`,
+  ];
+  if (alert.summary) lines.push('', alert.summary);
+  if (findings.length) lines.push('', 'What the agent found:', ...findings.map((f) => `- ${f.kind === 'cause' ? 'Likely cause' : 'Note'}: ${f.text}`));
+  const text = lines.join('\n');
+  return text.length <= NOTES_LIMIT ? text : `${text.slice(0, NOTES_LIMIT - 1).trimEnd()}…`;
+}
+
+/** The task already made today for this alert, if any (same title, and the alert's id on its first line). */
+export function findTicket<T extends { title: string; notes: string }>(tasks: T[], externalId: string, now: Date): T | undefined {
+  const title = ticketTitle(now);
+  return tasks.find((t) => t.title === title && t.notes.split('\n', 1)[0].includes(`[${externalId}]`));
+}
