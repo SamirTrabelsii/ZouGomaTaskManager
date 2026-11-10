@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { cloud, ApiError } from '../data/cloud';
-import type { AbsenceDay, AbsenceList, AbsenceSettings, AbsenceStep } from '../domain/absence';
+import type { AbsenceDay, AbsenceList, AbsenceSettings, AbsenceStep, AbsenceType } from '../domain/absence';
 
 /**
  * Absences as the app sees them: the booked ones with the state of each step, whether an executor (n8n) is listening,
@@ -14,7 +14,7 @@ interface AbsenceState {
   loadSettings(): Promise<void>;
   /** Each returns an error message, or null on success. */
   saveSettings(s: AbsenceSettings): Promise<string | null>;
-  book(days: AbsenceDay[], steps: AbsenceStep[]): Promise<string | null>;
+  book(days: AbsenceDay[], steps: AbsenceStep[], type: AbsenceType): Promise<string | null>;
   cancel(id: string): Promise<string | null>;
   remove(id: string): Promise<string | null>;
   retry(stepId: string): Promise<string | null>;
@@ -41,7 +41,7 @@ export const useAbsences = create<AbsenceState>((set, get) => {
     async saveSettings(s) {
       try { set({ settings: await cloud.saveAbsenceSettings(s) }); return null; } catch (e) { return messageOf(e); }
     },
-    book: (days, steps) => act(() => cloud.bookAbsence(days, steps)),
+    book: (days, steps, type) => act(() => cloud.bookAbsence(days, steps, type)),
     cancel: (id) => act(() => cloud.cancelAbsence(id)),
     remove: (id) => act(() => cloud.deleteAbsence(id)),
     retry: (stepId) => act(() => cloud.retryAbsenceStep(stepId)),

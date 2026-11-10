@@ -73,6 +73,7 @@ describe.skipIf(!reachable)('absences API', () => {
     expect((await book([])).status).toBe(400);
     expect((await book([{ date: '2026-11-13', part: 'full' }], ['send_everything'])).status).toBe(400);
     expect((await book([{ date: '2026-11-13', part: 'full' }], [])).status).toBe(400);
+    expect((await owner('POST', '/api/absences', { days: [{ date: '2026-11-13', part: 'full' }], steps: ['boond_absence'], type: 'Vacances' })).status).toBe(400);
     await owner('PUT', '/api/absences/settings', { ...SETTINGS, planningName: '' });
     expect((await book([{ date: '2026-11-13', part: 'full' }], ['planning'])).body.error).toMatch(/planning/);
   });
@@ -91,6 +92,7 @@ describe.skipIf(!reachable)('absences API', () => {
     expect(steps[2].mail).toBeUndefined();
     expect(steps[2].absence.planning).toEqual({ name: 'Samir', cells: [{ date: '2026-11-13', value: 'Absent' }] });
     expect(steps[0].absence.windows).toEqual([{ start: '2026-11-12T13:00', end: '2026-11-14T00:00' }]);
+    expect((steps[0].absence as unknown as { type: string }).type).toBe('CP'); // the default
 
     expect((await exec('POST', `/api/absences/steps/${steps[0].id}/start`, {})).status).toBe(200);
     expect((await exec('POST', `/api/absences/steps/${steps[0].id}/start`, {})).status).toBe(409); // never twice

@@ -3,8 +3,8 @@ import { PanelShell, Section, Tabs } from './PanelShell';
 import { useAbsences } from '../../state/absences';
 import { useToday } from '../../state/hooks';
 import {
-  ABSENCE_STEPS, STEP_LABELS, EMPTY_SETTINGS, absenceMails, addRange, cycleDay, dayCount, defaultSteps, describeDays, isWeekend, monthGrid,
-  type Absence, type AbsenceDay, type AbsenceSettings, type AbsenceStep, type AbsenceStepState,
+  ABSENCE_STEPS, ABSENCE_TYPES, STEP_LABELS, EMPTY_SETTINGS, absenceMails, addRange, cycleDay, dayCount, defaultSteps, describeDays, isWeekend, monthGrid,
+  type Absence, type AbsenceDay, type AbsenceSettings, type AbsenceStep, type AbsenceStepState, type AbsenceType,
 } from '../../domain/absence';
 
 type Tab = 'book' | 'history' | 'settings';
@@ -92,6 +92,7 @@ function BookTab({ onBooked }: { onBooked: () => void }) {
   const [cursor, setCursor] = useState(() => ({ y: Number(today.slice(0, 4)), m: Number(today.slice(5, 7)) - 1 }));
   const [days, setDays] = useState<AbsenceDay[]>([]);
   const [mode, setMode] = useState<'day' | 'range'>('day');
+  const [type, setType] = useState<AbsenceType>('CP');
   const [anchor, setAnchor] = useState<string | null>(null);
   const [steps, setSteps] = useState<AbsenceStep[] | null>(null);
   const [confirm, setConfirm] = useState(false);
@@ -117,7 +118,7 @@ function BookTab({ onBooked }: { onBooked: () => void }) {
   const submit = async () => {
     if (!confirm) { setConfirm(true); return; }
     setBusy(true);
-    const err = await book(days, chosen);
+    const err = await book(days, chosen, type);
     setBusy(false);
     if (err) { setError(err); setConfirm(false); return; }
     setDays([]); setConfirm(false); onBooked();
@@ -160,6 +161,12 @@ function BookTab({ onBooked }: { onBooked: () => void }) {
               <button type="button" className="btn btn-ghost shrink-0 text-xs" onClick={() => { setDays([]); setAnchor(null); setConfirm(false); }}>Clear</button>
             </div>
             <div className="mt-0.5 text-xs text-ink-500">{dayCount(days)} day{dayCount(days) === 1 ? '' : 's'}</div>
+            <label className="mt-2 flex items-center gap-2 text-xs">
+              <span className="text-ink-500">Type (Boond)</span>
+              <select className="input w-auto py-1 text-xs" value={type} onChange={(e) => { setType(e.target.value as AbsenceType); setConfirm(false); }}>
+                {ABSENCE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </label>
           </div>
 
           <Section title="What to do">

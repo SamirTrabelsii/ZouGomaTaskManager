@@ -30,7 +30,7 @@ async function api<T>(path: string, init: { method?: string; body?: unknown; tim
 }
 
 import type { AgentAlert, AgentAlertDetail, AgentCommand, AgentCommandKind, AgentOverview, CalendarFeed, ExternalEvent } from '../domain/types';
-import type { AbsenceDay, AbsenceList, AbsenceSettings, AbsenceStep } from '../domain/absence';
+import type { AbsenceDay, AbsenceList, AbsenceSettings, AbsenceStep, AbsenceType } from '../domain/absence';
 
 export interface Health { ok: true; hasUser: boolean; registrationOpen: boolean }
 export interface CloudBackup { id: string; reason: string; revision: number; savedAt: string }
@@ -82,7 +82,7 @@ export const cloud = {
   absences: () => api<AbsenceList>('/absences'),
   absenceSettings: () => api<AbsenceSettings>('/absences/settings'),
   saveAbsenceSettings: (s: AbsenceSettings) => api<AbsenceSettings>('/absences/settings', { method: 'PUT', body: s }),
-  bookAbsence: (days: AbsenceDay[], steps: AbsenceStep[]) => api<{ id: string; label: string }>('/absences', { method: 'POST', body: { days, steps } }),
+  bookAbsence: (days: AbsenceDay[], steps: AbsenceStep[], type: AbsenceType) => api<{ id: string; label: string }>('/absences', { method: 'POST', body: { days, steps, type } }),
   cancelAbsence: (id: string) => api<{ ok: true }>(`/absences/${encodeURIComponent(id)}/cancel`, { method: 'POST', body: {} }),
   deleteAbsence: (id: string) => api<{ ok: true }>(`/absences/${encodeURIComponent(id)}`, { method: 'DELETE', body: {} }),
   retryAbsenceStep: (id: string) => api<{ ok: true }>(`/absences/steps/${encodeURIComponent(id)}/retry`, { method: 'POST', body: {} }),

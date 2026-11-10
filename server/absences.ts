@@ -2,8 +2,8 @@ import { Router, type Request, type RequestHandler } from 'express';
 import type pg from 'pg';
 import { agentTokenOf, agentUserOf, findSecret } from './agent';
 import {
-  ABSENCE_STEPS, absenceMails, awayWindows, cleanDays, describeDays, EMPTY_SETTINGS, mailHtml, planningCells,
-  type AbsenceDay, type AbsenceSettings, type AbsenceStep, type Recipients,
+  ABSENCE_STEPS, ABSENCE_TYPES, absenceMails, awayWindows, cleanDays, describeDays, EMPTY_SETTINGS, mailHtml, planningCells,
+  type AbsenceDay, type AbsenceSettings, type AbsenceStep, type AbsenceType, type Recipients,
 } from './absenceText';
 
 /**
@@ -178,6 +178,8 @@ export function absenceRouter(pool: pg.Pool, requireAuth: RequestHandler, userId
         return res.status(400).json({ error: 'Pick at least one action from the list.' });
       }
       const steps = ABSENCE_STEPS.filter((k) => chosen.includes(k));
+      const type: AbsenceType = b.type === undefined ? 'CP' : (b.type as AbsenceType);
+      if (!ABSENCE_TYPES.includes(type)) return res.status(400).json({ error: `type is one of: ${ABSENCE_TYPES.join(', ')}.` });
       const settings = await loadSettings(pool, userId);
       const missing = missingSettings(steps, settings);
       if (missing) return res.status(400).json({ error: missing });
@@ -190,7 +192,7 @@ export function absenceRouter(pool: pg.Pool, requireAuth: RequestHandler, userId
       if (clash[0]) return res.status(409).json({ error: `One of these days is already booked (${clash[0].label}).` });
 
       const mails = absenceMails(days, settings).map((m) => ({ ...m, html: mailHtml(m), text: m.lines.join('\n') }));
-      const payload = { mails, windows: awayWindows(days), planning: { name: settings.planningName, cells: planningCells(days) } };
+      const payload = { type, mails, windows: awayWindows(days), planning: { name: settings.planningName, cells: planningCells(days) } };
       const label = describeDays(days);
       const client = await pool.connect();
       try {
@@ -265,11 +267,11 @@ export function absenceRouter(pool: pg.Pool, requireAuth: RequestHandler, userId
          ORDER BY a.first_day, s.id LIMIT 20`, [userId, kinds]);
       res.json({
         steps: rows.map((r) => {
-          const p = r.payload as { mails: { key: string }[]; windows: unknown; planning: unknown };
+          const p = r.payload as { type?: string; mails: { key: string }[]; windows: unknown; planning: unknown };
           const mailKey = r.kind === 'mail_employer' ? 'employer' : r.kind === 'mail_client' ? 'client' : null;
           return {
             id: String(r.id), kind: r.kind,
-            absence: { id: String(r.absence_id), days: r.days as AbsenceDay[], label: r.label, windows: p.windows, planning: p.planning },
+            absence: { id: String(r.absence_id), days: r.days as AbsenceDay[], label: r.label, type: p.type ?? 'CP', windows: p.windows, planning: p.planning },
             ...(mailKey ? { mail: p.mails.find((m) => m.key === mailKey) } : {}),
           };
         }),

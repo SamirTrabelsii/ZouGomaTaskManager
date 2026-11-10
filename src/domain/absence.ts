@@ -5,8 +5,8 @@
 import { dayValue, isWeekend, type AbsenceDay, type AbsenceStep, type DayPart, type StepStatus } from '../../server/absenceText';
 
 export {
-  ABSENCE_STEPS, STEP_LABELS, absenceMails, dayCount, describeDays, isWeekend, EMPTY_SETTINGS,
-  type AbsenceDay, type AbsenceSettings, type AbsenceStep, type DayPart, type Recipients, type StepStatus, type AbsenceMail,
+  ABSENCE_STEPS, ABSENCE_TYPES, STEP_LABELS, absenceMails, dayCount, describeDays, isWeekend, EMPTY_SETTINGS,
+  type AbsenceDay, type AbsenceSettings, type AbsenceType, type AbsenceStep, type DayPart, type Recipients, type StepStatus, type AbsenceMail,
 } from '../../server/absenceText';
 
 export interface AbsenceStepState { id: string; kind: AbsenceStep; status: StepStatus; detail: string; finishedAt: string | null }

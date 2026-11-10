@@ -31,6 +31,10 @@ export const STEP_LABELS: Record<AbsenceStep, string> = {
   boond_absence: 'Absence request in Boond',
   boond_cra: 'Timesheet (CRA) in Boond',
 };
+/** Absence types as Boond names them (the Boond step picks one; the mails do not mention it). */
+export const ABSENCE_TYPES = ['CP', 'Congés Sans Solde', 'Maladie', 'Exceptionnelle', 'Absence école'] as const;
+export type AbsenceType = (typeof ABSENCE_TYPES)[number];
+
 export const STEP_STATUSES = ['pending', 'running', 'done', 'failed', 'skipped'] as const;
 export type StepStatus = (typeof STEP_STATUSES)[number];
 export const MAX_ABSENCE_DAYS = 60;
