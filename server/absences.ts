@@ -1,6 +1,6 @@
 import { Router, type Request, type RequestHandler } from 'express';
 import type pg from 'pg';
-import { agentUserOf, findSecret } from './agent';
+import { agentTokenOf, agentUserOf, findSecret } from './agent';
 import {
   ABSENCE_STEPS, absenceMails, awayWindows, cleanDays, describeDays, EMPTY_SETTINGS, mailHtml, planningCells,
   type AbsenceDay, type AbsenceSettings, type AbsenceStep, type Recipients,
@@ -42,9 +42,10 @@ CREATE TABLE IF NOT EXISTS absence_steps (
   UNIQUE (absence_id, kind)
 );
 CREATE INDEX IF NOT EXISTS absence_steps_status_idx ON absence_steps(status);
--- when an executor last asked for work, so the room can say whether anyone is listening
-CREATE TABLE IF NOT EXISTS absence_executors (
-  user_id      BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+-- when each executor (one per agent token: n8n, the local agent…) last asked for work, and for which steps
+CREATE TABLE IF NOT EXISTS absence_pollers (
+  token_id     BIGINT PRIMARY KEY REFERENCES agent_tokens(id) ON DELETE CASCADE,
+  user_id      BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   kinds        TEXT NOT NULL DEFAULT ''
 );
@@ -54,6 +55,8 @@ CREATE TABLE IF NOT EXISTS absence_executors (
 export const STALE_STEP_MINUTES = 30;
 /** No poll for this long and the executor counts as offline. */
 export const EXECUTOR_ONLINE_MS = 5 * 60_000;
+/** An executor not seen for this long no longer counts for which steps are automated. */
+export const EXECUTOR_FORGET_MS = 14 * 86_400_000;
 export const ABSENCE_RETENTION_DAYS = 400;
 const MAX_RECIPIENTS = 10;
 const EMAIL = /^[^\s@<>(),;:"]+@[^\s@<>(),;:"]+\.[a-z]{2,}$/i;
@@ -134,20 +137,30 @@ export function absenceRouter(pool: pg.Pool, requireAuth: RequestHandler, userId
         pool.query(
           `SELECT s.id, s.absence_id, s.kind, s.status, s.detail, s.finished_at FROM absence_steps s
            JOIN absences a ON a.id=s.absence_id WHERE a.user_id=$1`, [userId]),
-        pool.query('SELECT last_seen_at, kinds FROM absence_executors WHERE user_id=$1', [userId]),
+        pool.query(
+          `SELECT t.name, p.last_seen_at, p.kinds FROM absence_pollers p JOIN agent_tokens t ON t.id=p.token_id
+           WHERE p.user_id=$1 AND t.revoked_at IS NULL ORDER BY p.last_seen_at DESC`, [userId]),
       ]);
       const order = (k: string) => ABSENCE_STEPS.indexOf(k as AbsenceStep);
-      const e = exec.rows[0];
+      const executors = exec.rows
+        .filter((r) => Date.now() - new Date(r.last_seen_at).getTime() < EXECUTOR_FORGET_MS)
+        .map((r) => ({
+          name: String(r.name), lastSeenAt: r.last_seen_at,
+          online: Date.now() - new Date(r.last_seen_at).getTime() < EXECUTOR_ONLINE_MS,
+          kinds: r.kinds ? String(r.kinds).split(',') : [],
+        }));
       res.json({
         absences: abs.rows.map((a) => ({
           id: String(a.id), days: a.days, label: a.label, cancelled: !!a.cancelled_at, createdAt: a.created_at,
           steps: steps.rows.filter((s) => String(s.absence_id) === String(a.id)).sort((x, y) => order(x.kind) - order(y.kind))
             .map((s) => ({ id: String(s.id), kind: s.kind, status: s.status, detail: s.detail, finishedAt: s.finished_at })),
         })),
+        executors,
+        // all of them together: someone is listening, the last time anyone asked, and every step some executor knows
         executor: {
-          lastSeenAt: e ? e.last_seen_at : null,
-          online: !!e && Date.now() - new Date(e.last_seen_at).getTime() < EXECUTOR_ONLINE_MS,
-          kinds: e && e.kinds ? String(e.kinds).split(',') : [],
+          lastSeenAt: executors[0]?.lastSeenAt ?? null,
+          online: executors.some((x) => x.online),
+          kinds: ABSENCE_STEPS.filter((k) => executors.some((x) => x.kinds.includes(k))),
         },
       });
     } catch (e) { next(e); }
@@ -242,10 +255,10 @@ export function absenceRouter(pool: pg.Pool, requireAuth: RequestHandler, userId
       if (!kinds.length) return res.status(400).json({ error: `kinds is a comma-separated list among: ${ABSENCE_STEPS.join(', ')}.` });
       await tidyAbsences(pool);
       await pool.query(
-        `INSERT INTO absence_executors (user_id, kinds) VALUES ($1,$2)
-         ON CONFLICT (user_id) DO UPDATE SET last_seen_at=now(), kinds=EXCLUDED.kinds
-         WHERE absence_executors.last_seen_at < now() - interval '1 minute' OR absence_executors.kinds <> EXCLUDED.kinds`,
-        [userId, kinds.join(',')]);
+        `INSERT INTO absence_pollers (token_id, user_id, kinds) VALUES ($1,$2,$3)
+         ON CONFLICT (token_id) DO UPDATE SET last_seen_at=now(), kinds=EXCLUDED.kinds
+         WHERE absence_pollers.last_seen_at < now() - interval '1 minute' OR absence_pollers.kinds <> EXCLUDED.kinds`,
+        [agentTokenOf(req), userId, kinds.join(',')]);
       const { rows } = await pool.query(
         `SELECT s.id, s.kind, a.id AS absence_id, a.days, a.label, a.payload FROM absence_steps s JOIN absences a ON a.id=s.absence_id
          WHERE a.user_id=$1 AND a.cancelled_at IS NULL AND s.status='pending' AND s.kind = ANY($2::text[])

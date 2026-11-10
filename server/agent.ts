@@ -160,9 +160,11 @@ export function newAgentToken(): string {
   return TOKEN_PREFIX + crypto.randomBytes(32).toString('base64url');
 }
 
-type AgentReq = Request & { agentUserId: number };
+type AgentReq = Request & { agentUserId: number; agentTokenId: string };
 /** The account an agent token belongs to (only after `makeRequireAgent` let the request through). */
 export const agentUserOf = (req: Request) => (req as AgentReq).agentUserId;
+/** Which token made the request, to tell two executors of one account apart. */
+export const agentTokenOf = (req: Request) => (req as AgentReq).agentTokenId;
 
 /**
  * Bearer-token auth for the agent and the other local executors (n8n). Ignores cookies on purpose, so a browser session can
@@ -185,6 +187,7 @@ export function makeRequireAgent(pool: pg.Pool, limits: { perToken: Limiter; fai
       await pool.query(
         "UPDATE agent_tokens SET last_used_at=now() WHERE id=$1 AND (last_used_at IS NULL OR last_used_at < now() - interval '1 minute')", [rows[0].id]);
       (req as AgentReq).agentUserId = Number(rows[0].user_id);
+      (req as AgentReq).agentTokenId = String(rows[0].id);
       next();
     } catch (e) { next(e); }
   };

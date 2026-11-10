@@ -32,10 +32,11 @@ export function AbsencePanel() {
   }, []);
   const failed = list?.absences.flatMap((a) => a.steps).filter((s) => s.status === 'failed').length ?? 0;
   const exec = list?.executor;
+  const listening = list?.executors.filter((e) => e.online).map((e) => e.name) ?? [];
   return (
     <PanelShell
       title="Absences" icon="🌴"
-      subtitle={!exec ? 'Loading…' : exec.online ? `n8n is listening · seen ${ago(exec.lastSeenAt)}` : `n8n not connected · last seen ${ago(exec.lastSeenAt)}`}
+      subtitle={!exec ? 'Loading…' : exec.online ? `${listening.join(' and ')} listening` : `No executor connected · last seen ${ago(exec.lastSeenAt)}`}
     >
       <Tabs<Tab> value={tab} onChange={setTab} tabs={[
         { id: 'book', label: 'Book' },
@@ -185,7 +186,7 @@ function BookTab({ onBooked }: { onBooked: () => void }) {
           )}
 
           {error && <p role="alert" className="text-sm text-clay-600">{error}</p>}
-          {!list?.executor.online && <p className="text-xs text-ink-500">n8n is not connected right now: the actions will wait and run as soon as it polls.</p>}
+          {!list?.executor.online && <p className="text-xs text-ink-500">No executor is connected right now (is the PC on?): the actions will wait and run as soon as one polls.</p>}
           <button type="button" className={`btn w-full ${confirm ? 'btn-danger' : 'btn-primary'}`} disabled={busy || chosen.length === 0} onClick={submit}>
             {busy ? 'Booking…' : confirm ? `Confirm: ${chosen.length} action${chosen.length === 1 ? '' : 's'}, mails go out` : 'Book this absence'}
           </button>
@@ -282,10 +283,23 @@ function SettingsTab() {
       {msg && <p role={msg.ok ? 'status' : 'alert'} className={`text-sm ${msg.ok ? 'text-moss-600' : 'text-clay-600'}`}>{msg.text}</p>}
       <button type="button" className="btn btn-primary w-full" onClick={submit}>Save settings</button>
       <Section title="Executor">
-        <p className="text-xs text-ink-500">
-          The actions run on your PC through n8n, which asks LifeOS for work about every minute with an agent token
-          (Settings → Agent → new token). {list?.executor.kinds.length ? `It currently handles: ${list.executor.kinds.map((k) => STEP_LABELS[k]).join(', ')}.` : 'No executor has connected yet.'}
+        <p className="mb-2 text-xs text-ink-500">
+          The actions run on your PC: n8n and the local agent each ask LifeOS for the steps they know, about every minute,
+          with their own agent token (Settings → Agent → new token).
         </p>
+        {list?.executors.length ? (
+          <ul className="space-y-1.5">
+            {list.executors.map((e) => (
+              <li key={e.name} className="rounded-lg bg-cream-100 p-2 text-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <b>{e.name}</b>
+                  <span className={`text-xs ${e.online ? 'text-moss-600' : 'text-ink-500'}`}>{e.online ? 'listening' : `seen ${ago(e.lastSeenAt)}`}</span>
+                </div>
+                <div className="text-xs text-ink-500">{e.kinds.map((k) => STEP_LABELS[k] ?? k).join(' · ')}</div>
+              </li>
+            ))}
+          </ul>
+        ) : <p className="text-xs text-ink-500">No executor has connected yet.</p>}
       </Section>
     </div>
   );

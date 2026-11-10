@@ -101,7 +101,7 @@ describe.skipIf(!reachable)('absences API', () => {
 
     const list = (await owner('GET', '/api/absences')).body;
     expect(list.executor.online).toBe(true);
-    expect(list.executor.kinds).toEqual(['mail_employer', 'mail_client', 'planning']);
+    expect(list.executors.find((e: { name: string }) => e.name === 'n8n').kinds).toEqual(['mail_employer', 'mail_client', 'planning']);
     expect(list.absences[0].steps.map((s: { status: string }) => s.status)).toEqual(['done', 'failed', 'pending']);
 
     // a failed step can be run again; a done one cannot
@@ -110,6 +110,19 @@ describe.skipIf(!reachable)('absences API', () => {
     expect((await work()).map((s) => s.kind)).toEqual(['mail_client', 'planning']);
     // and an absence with work done cannot be cancelled
     expect((await owner('POST', `/api/absences/${created.body.id}/cancel`, {})).status).toBe(409);
+  });
+
+  it('tracks each executor apart, by its token', async () => {
+    const second = (await owner('POST', '/api/agent/tokens', { name: 'agent' })).body.token;
+    const mine = token;
+    await exec('GET', '/api/absences/work?kinds=mail_client'); // "n8n"
+    token = second;
+    await exec('GET', '/api/absences/work?kinds=mail_employer,outlook_status'); // the local agent
+    token = mine;
+    const list = (await owner('GET', '/api/absences')).body;
+    expect(list.executors.map((e: { name: string; kinds: string[] }) => `${e.name}:${e.kinds.join('+')}`).sort())
+      .toEqual(['agent:mail_employer+outlook_status', 'n8n:mail_client']);
+    expect(list.executor).toMatchObject({ online: true, kinds: ['mail_employer', 'mail_client', 'outlook_status'] });
   });
 
   it('only hands out the kinds an executor asks for', async () => {

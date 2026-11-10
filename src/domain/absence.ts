@@ -12,7 +12,9 @@ export {
 export interface AbsenceStepState { id: string; kind: AbsenceStep; status: StepStatus; detail: string; finishedAt: string | null }
 export interface Absence { id: string; days: AbsenceDay[]; label: string; cancelled: boolean; createdAt: string; steps: AbsenceStepState[] }
 export interface AbsenceExecutor { lastSeenAt: string | null; online: boolean; kinds: AbsenceStep[] }
-export interface AbsenceList { absences: Absence[]; executor: AbsenceExecutor }
+/** One executor (one agent token: n8n, the local agent…). */
+export interface AbsencePoller extends AbsenceExecutor { name: string }
+export interface AbsenceList { absences: Absence[]; executor: AbsenceExecutor; executors: AbsencePoller[] }
 
 /** The steps ticked by default: the ones an executor already runs, else everything but Boond (not automated yet). */
 export function defaultSteps(executor: AbsenceExecutor | null): AbsenceStep[] {

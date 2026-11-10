@@ -25,7 +25,7 @@ const absence = (over: Partial<Absence>): Absence => ({
   id: '1', days: [{ date: '2026-11-13', part: 'full' }], label: 'le vendredi 13 novembre 2026', cancelled: false, createdAt: '', steps: [], ...over,
 });
 const listOf = (absences: Absence[], online = true, kinds: AbsenceList['executor']['kinds'] = []): AbsenceList =>
-  ({ absences, executor: { online, lastSeenAt: null, kinds } });
+  ({ absences, executor: { online, lastSeenAt: null, kinds }, executors: [] });
 const step = (status: 'pending' | 'running' | 'done' | 'failed') => ({ id: status, kind: 'mail_employer' as const, status, detail: '', finishedAt: null });
 
 describe('the absence robot', () => {
