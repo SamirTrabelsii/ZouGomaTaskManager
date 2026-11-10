@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { absenceMails, awayWindows, cleanDays, dayCount, describeDays, mailHtml, planningCells, type AbsenceDay, type DayPart } from './absenceText';
+import { absenceMails, awayWindows, cleanDays, dayCount, describeDays, mailHtml, planningCells, planningReady, type AbsenceDay, type DayPart } from './absenceText';
 
 const d = (date: string, part: DayPart = 'full'): AbsenceDay => ({ date, part });
 const say = (...days: AbsenceDay[]) => describeDays(cleanDays(days) as AbsenceDay[]);
@@ -75,5 +75,20 @@ describe('absence mails', () => {
   });
   it('writes only whole weekdays to the planning', () => {
     expect(planningCells([d('2026-11-12', 'am'), d('2026-11-13'), d('2026-11-14')])).toEqual([{ date: '2026-11-13', value: 'Absent' }]);
+  });
+});
+
+describe('planning timing', () => {
+  const cells = (...dates: string[]) => dates.map((date) => ({ date }));
+  it('waits until the week is this week or next week in the workbook', () => {
+    expect(planningReady(cells('2026-11-20'), '2026-11-10')).toBe(true);      // next week
+    expect(planningReady(cells('2026-11-11'), '2026-11-10')).toBe(true);      // this week
+    expect(planningReady(cells('2026-11-23'), '2026-11-16')).toBe(true);      // Monday 16: the 23rd is next week
+    expect(planningReady(cells('2026-11-23'), '2026-11-15')).toBe(false);     // Sunday 15 still belongs to the week of the 9th
+    expect(planningReady(cells('2026-11-23'), '2026-11-13')).toBe(false);     // two weeks ahead
+    expect(planningReady(cells('2026-12-18', '2026-11-30'), '2026-11-23')).toBe(true); // the first cell decides
+  });
+  it('lets a step with no cell through', () => {
+    expect(planningReady([], '2026-11-10')).toBe(true);
   });
 });

@@ -189,3 +189,18 @@ export function mailHtml(mail: AbsenceMail): string {
 export function planningCells(days: AbsenceDay[]): { date: string; value: 'Absent' }[] {
   return days.filter((d) => d.part === 'full' && !isWeekend(d.date)).map((d) => ({ date: d.date, value: 'Absent' as const }));
 }
+
+const DAY = 86_400_000;
+/** Monday of the week of `t` (UTC midnight). */
+const mondayOf = (t: number) => t - ((weekday(t) + 6) % 7) * DAY;
+
+/**
+ * The team workbook only shows "this week" and "next week". A planning step is handed to the executor once the week of
+ * its first cell is one of them (`today` is the owner's date, YYYY-MM-DD); a step with no cell is handed over at once.
+ */
+export function planningReady(cells: { date: string }[], today: string): boolean {
+  const now = dayValue(today);
+  const first = cells.map((c) => dayValue(c.date)).filter((t): t is number => t !== null).sort((a, b) => a - b)[0];
+  if (now === null || first === undefined) return true;
+  return mondayOf(first) <= mondayOf(now) + 7 * DAY;
+}

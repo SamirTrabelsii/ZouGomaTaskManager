@@ -133,6 +133,11 @@ describe.skipIf(!reachable)('absences API', () => {
     expect((await exec('GET', '/api/absences/work?kinds=rm')).status).toBe(400);
   });
 
+  it('keeps a planning step until its week is open in the workbook', async () => {
+    await book([{ date: '2099-06-05', part: 'full' }], ['mail_employer', 'planning']);
+    expect((await work('mail_employer,planning')).map((s) => s.kind)).toEqual(['mail_employer']);
+  });
+
   it('refuses a day already booked, and cancels an untouched absence', async () => {
     const a = await book([{ date: '2026-11-13', part: 'full' }]);
     expect((await book([{ date: '2026-11-13', part: 'am' }])).status).toBe(409);

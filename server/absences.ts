@@ -2,7 +2,7 @@ import { Router, type Request, type RequestHandler } from 'express';
 import type pg from 'pg';
 import { agentTokenOf, agentUserOf, findSecret } from './agent';
 import {
-  ABSENCE_STEPS, ABSENCE_TYPES, absenceMails, awayWindows, cleanDays, describeDays, EMPTY_SETTINGS, mailHtml, planningCells,
+  ABSENCE_STEPS, ABSENCE_TYPES, absenceMails, awayWindows, cleanDays, describeDays, EMPTY_SETTINGS, mailHtml, planningCells, planningReady,
   type AbsenceDay, type AbsenceSettings, type AbsenceStep, type AbsenceType, type Recipients,
 } from './absenceText';
 
@@ -264,9 +264,12 @@ export function absenceRouter(pool: pg.Pool, requireAuth: RequestHandler, userId
       const { rows } = await pool.query(
         `SELECT s.id, s.kind, a.id AS absence_id, a.days, a.label, a.payload FROM absence_steps s JOIN absences a ON a.id=s.absence_id
          WHERE a.user_id=$1 AND a.cancelled_at IS NULL AND s.status='pending' AND s.kind = ANY($2::text[])
-         ORDER BY a.first_day, s.id LIMIT 20`, [userId, kinds]);
+         ORDER BY a.first_day, s.id LIMIT 100`, [userId, kinds]);
+      // the team workbook only opens this week and next week: a planning step waits until its week is one of them
+      const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
+      const ready = rows.filter((r) => r.kind !== 'planning' || planningReady((r.payload as { planning?: { cells?: { date: string }[] } }).planning?.cells ?? [], today)).slice(0, 20);
       res.json({
-        steps: rows.map((r) => {
+        steps: ready.map((r) => {
           const p = r.payload as { type?: string; mails: { key: string }[]; windows: unknown; planning: unknown };
           const mailKey = r.kind === 'mail_employer' ? 'employer' : r.kind === 'mail_client' ? 'client' : null;
           return {
