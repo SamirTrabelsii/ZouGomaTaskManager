@@ -15,6 +15,8 @@ import { TreasureChestSpot } from './onepiece';
 import { CardShowcase, SHOWCASE_SPOT } from './showcase';
 import { AGENT_SPOT, AgentConsole } from './agentConsole';
 import { useAgent } from '../state/agent';
+import { ABSENCE_SPOT, AbsenceBot } from './absenceBot';
+import { useAbsences } from '../state/absences';
 import { agentConfigured } from '../domain/agent';
 
 const DEFAULT_POS: [number, number, number] = [11.8, 10.8, 11.9]; // isometric-style diagonal view
@@ -31,6 +33,7 @@ const FOCUS: Record<SceneObjectId, { target: [number, number, number]; dist: num
   // never focused: the chest opens the Treasury dialog instead of a panel
   chest: { target: [0.95, 0.3, 2.35], dist: 8.5 },
   agent: { target: AGENT_SPOT, dist: 8.5 },
+  absence: { target: ABSENCE_SPOT, dist: 8 },
 };
 
 /** Reading view for the wall poster: as close and as square-on as the orbit limits allow. */
@@ -175,6 +178,7 @@ export default function Scene({ onContextLost }: { onContextLost?: () => void })
   const q = resolveQuality(scene.quality);
   const evening = useNight();
   const hasAgent = useAgent((s) => agentConfigured(s.overview));
+  const hasAbsences = useAbsences((s) => s.list !== null);
 
   return (
     <Canvas
@@ -201,6 +205,7 @@ export default function Scene({ onContextLost }: { onContextLost?: () => void })
       <TreasureChestSpot evening={evening} reduceMotion={scene.reduceMotion} />
       <CardShowcase reduceMotion={scene.reduceMotion} />
       {hasAgent && <AgentConsole evening={evening} reduceMotion={scene.reduceMotion} />}
+      {hasAbsences && <AbsenceBot reduceMotion={scene.reduceMotion} />}
       {q !== 'low' && (
         <EffectComposer multisampling={0}>
           <Bloom intensity={evening ? 0.8 : 0.25} luminanceThreshold={0.92} luminanceSmoothing={0.25} mipmapBlur />

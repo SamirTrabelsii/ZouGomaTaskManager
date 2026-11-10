@@ -161,17 +161,15 @@ export function newAgentToken(): string {
 }
 
 type AgentReq = Request & { agentUserId: number };
+/** The account an agent token belongs to (only after `makeRequireAgent` let the request through). */
+export const agentUserOf = (req: Request) => (req as AgentReq).agentUserId;
 
-export function agentRouter(
-  pool: pg.Pool,
-  requireAuth: RequestHandler,
-  userIdOf: (req: Request) => number,
-  limits: { perToken: Limiter; failures: Limiter },
-) {
-  const router = Router();
-
-  /** Bearer-token auth for the agent. Ignores cookies on purpose, so a browser session can never act as the agent. */
-  const requireAgent = async (req: Request, res: Response, next: NextFunction) => {
+/**
+ * Bearer-token auth for the agent and the other local executors (n8n). Ignores cookies on purpose, so a browser session can
+ * never act as the agent. Pass the same `limits` everywhere so one token has one budget.
+ */
+export function makeRequireAgent(pool: pg.Pool, limits: { perToken: Limiter; failures: Limiter }): RequestHandler {
+  return async (req: Request, res: Response, next: NextFunction) => {
     try {
       const m = /^Bearer (\S+)$/.exec(req.headers.authorization ?? '');
       const hash = m && m[1].startsWith(TOKEN_PREFIX) && m[1].length < 200 ? sha(m[1]) : null;
@@ -190,6 +188,16 @@ export function agentRouter(
       next();
     } catch (e) { next(e); }
   };
+}
+
+export function agentRouter(
+  pool: pg.Pool,
+  requireAuth: RequestHandler,
+  userIdOf: (req: Request) => number,
+  limits: { perToken: Limiter; failures: Limiter },
+) {
+  const router = Router();
+  const requireAgent = makeRequireAgent(pool, limits);
 
   /* ── owner (signed-in session) ── */
 
@@ -259,7 +267,7 @@ export function agentRouter(
 
   /* ── alerts, diagnoses and proposed fixes ── */
 
-  const agentUser = (req: Request) => (req as AgentReq).agentUserId;
+  const agentUser = agentUserOf;
   const idOf = (v: unknown) => { const s = String(v); return /^\d{1,18}$/.test(s) ? s : null; };
   /** A trimmed string of 1..max characters, else null. */
   const str = (v: unknown, max: number) => (typeof v === 'string' && v.trim().length > 0 && v.trim().length <= max ? v.trim() : null);
