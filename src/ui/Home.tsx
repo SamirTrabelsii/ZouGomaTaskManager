@@ -16,18 +16,19 @@ import { AbsencePanel } from './panels/AbsencePanel';
 import { useAbsences } from '../state/absences';
 import { useAgent } from '../state/agent';
 import { agentConfigured } from '../domain/agent';
+import { ChopperAvatar, NamiAvatar } from './common/CrewAvatar';
 
 const Scene = lazy(() => import('../scene/Scene'));
 
-export const OBJECTS: { id: SceneObjectId; label: string; icon: string }[] = [
+export const OBJECTS: { id: SceneObjectId; label: string; icon: ReactNode }[] = [
   { id: 'desk', label: 'Desk · Tasks', icon: '🖥️' },
   { id: 'bookshelf', label: 'Shelf · Projects', icon: '📚' },
   { id: 'plants', label: 'Plants · Habits', icon: '🌿' },
   { id: 'calendar', label: 'Calendar', icon: '🗓️' },
   { id: 'notebook', label: 'Notebook', icon: '📓' },
   { id: 'chest', label: 'Chest · Treasury', icon: '💰' },
-  { id: 'agent', label: 'Agent · Alerts', icon: '⚡' },
-  { id: 'absence', label: 'Absences', icon: '🌴' },
+  { id: 'agent', label: 'Chopper Bot · Alerts', icon: <ChopperAvatar /> },
+  { id: 'absence', label: 'Nami Bot · Absences', icon: <NamiAvatar /> },
 ];
 
 class SceneBoundary extends Component<{ onError: () => void; children: ReactNode }, { failed: boolean }> {

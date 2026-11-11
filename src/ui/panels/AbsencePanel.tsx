@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { PanelShell, Section, Tabs } from './PanelShell';
+import { NamiAvatar } from '../common/CrewAvatar';
 import { useAbsences } from '../../state/absences';
 import { useToday } from '../../state/hooks';
 import {
@@ -35,7 +36,7 @@ export function AbsencePanel() {
   const listening = list?.executors.filter((e) => e.online).map((e) => e.name) ?? [];
   return (
     <PanelShell
-      title="Absences" icon="🌴"
+      title="Nami Bot" icon={<NamiAvatar />}
       subtitle={!exec ? 'Loading…' : exec.online ? `${listening.join(' and ')} listening` : `No executor connected · last seen ${ago(exec.lastSeenAt)}`}
     >
       <Tabs<Tab> value={tab} onChange={setTab} tabs={[
