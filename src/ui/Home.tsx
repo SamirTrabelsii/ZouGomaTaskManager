@@ -12,6 +12,8 @@ import { PlantsPanel } from './panels/PlantsPanel';
 import { CalendarPanel } from './panels/CalendarPanel';
 import { NotesPanel } from './panels/NotesPanel';
 import { AgentPanel } from './panels/AgentPanel';
+import { AbsencePanel } from './panels/AbsencePanel';
+import { useAbsences } from '../state/absences';
 import { useAgent } from '../state/agent';
 import { agentConfigured } from '../domain/agent';
 
@@ -25,6 +27,7 @@ export const OBJECTS: { id: SceneObjectId; label: string; icon: string }[] = [
   { id: 'notebook', label: 'Notebook', icon: '📓' },
   { id: 'chest', label: 'Chest · Treasury', icon: '💰' },
   { id: 'agent', label: 'Agent · Alerts', icon: '⚡' },
+  { id: 'absence', label: 'Absences', icon: '🌴' },
 ];
 
 class SceneBoundary extends Component<{ onError: () => void; children: ReactNode }, { failed: boolean }> {
@@ -42,6 +45,7 @@ function Panel({ id }: { id: SceneObjectId }) {
     case 'calendar': return <CalendarPanel />;
     case 'notebook': return <NotesPanel />;
     case 'agent': return <AgentPanel />;
+    case 'absence': return <AbsencePanel />;
     case 'chest': return null; // opens the Treasury dialog instead
   }
 }
@@ -52,9 +56,10 @@ function Dock({ big }: { big?: boolean }) {
   const select = useStore((s) => s.select);
   const hover = useStore((s) => s.hover);
   const hasAgent = useAgent((s) => agentConfigured(s.overview));
+  const hasAbsences = useAbsences((s) => s.list !== null);
   return (
     <nav aria-label="Room objects" className={`pointer-events-auto flex gap-1 rounded-2xl border border-cream-300 bg-cream-50/90 p-1 shadow-soft backdrop-blur-md ${big ? 'flex-wrap justify-center' : ''}`}>
-      {OBJECTS.filter((o) => o.id !== 'agent' || hasAgent).map((o) => (
+      {OBJECTS.filter((o) => (o.id !== 'agent' || hasAgent) && (o.id !== 'absence' || hasAbsences)).map((o) => (
         <button
           key={o.id} aria-pressed={selected === o.id} title={o.label}
           onClick={() => select(selected === o.id ? null : o.id)}

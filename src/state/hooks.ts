@@ -3,6 +3,7 @@ import { isNightLook, todayStr } from '../domain/dates';
 import { useStore } from './store';
 import { useFeeds } from './feeds';
 import { useAgent } from './agent';
+import { absenceInFlight, useAbsences } from './absences';
 
 /** Current local date; rolls over at midnight without a reload. */
 export function useToday(): string {
@@ -56,6 +57,22 @@ export function useAgentSync(enabled: boolean) {
     document.addEventListener('visibilitychange', tick);
     return () => { clearInterval(id); document.removeEventListener('visibilitychange', tick); };
   }, [enabled]);
+}
+
+/**
+ * Keeps the absence robot current: every 20 seconds while an absence is being carried out (so each ✓ shows soon after
+ * n8n reports it), every 5 minutes otherwise.
+ */
+export function useAbsenceSync(enabled: boolean) {
+  const busy = useAbsences((s) => absenceInFlight(s.list));
+  useEffect(() => {
+    if (!enabled) { useAbsences.getState().reset(); return; }
+    const tick = () => { if (document.visibilityState === 'visible') void useAbsences.getState().sync(); };
+    tick();
+    const id = setInterval(tick, busy ? 20_000 : 5 * 60_000);
+    document.addEventListener('visibilitychange', tick);
+    return () => { clearInterval(id); document.removeEventListener('visibilitychange', tick); };
+  }, [enabled, busy]);
 }
 
 /** Whether the room is in its night look: explicit 'evening', or 'auto' following the local clock. */

@@ -3,6 +3,7 @@ import { PUSH_SCHEMA } from './push';
 import { FEEDS_SCHEMA } from './feeds';
 import { CATALOG_SCHEMA } from './catalog';
 import { AGENT_SCHEMA } from './agent';
+import { ABSENCE_SCHEMA } from './absences';
 
 const DEV_URL = 'postgres://lifeos:lifeos-dev-password@localhost:5433/lifeos';
 
@@ -57,4 +58,5 @@ export async function migrate(pool: pg.Pool) {
   await pool.query(FEEDS_SCHEMA);
   await pool.query(CATALOG_SCHEMA);
   await pool.query(AGENT_SCHEMA);
+  await pool.query(ABSENCE_SCHEMA);
 }

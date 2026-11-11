@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useStore } from '../state/store';
-import { useAgentSync, useFeedSync, useReminderEngine } from '../state/hooks';
+import { useAbsenceSync, useAgentSync, useFeedSync, useReminderEngine } from '../state/hooks';
 import { useCatalogSync } from '../state/catalog';
 import { registerNotificationWorker } from '../state/notify';
 import { refreshPushTimezone } from '../state/push';
@@ -43,6 +43,7 @@ export default function App() {
   const cloudEmail = useStore((s) => s.cloud.email);
   useFeedSync(status === 'ready' && !!cloudEmail);
   useAgentSync(status === 'ready' && !!cloudEmail);
+  useAbsenceSync(status === 'ready' && !!cloudEmail);
   useCatalogSync(status === 'ready' && !!cloudEmail);
   useEffect(() => { if (status === 'ready' && cloudEmail) void refreshPushTimezone(); }, [status, cloudEmail]);
   useEffect(() => { document.documentElement.dataset.reduceMotion = String(reduce); }, [reduce]);
