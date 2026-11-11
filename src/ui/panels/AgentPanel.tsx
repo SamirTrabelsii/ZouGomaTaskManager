@@ -5,6 +5,7 @@ import { CATEGORY_LABEL, SEVERITY_LABEL, STATUS_LABEL, TICKET_SCOPE, VERDICT_LAB
 import type { AgentAlert, AgentAlertDetail, AgentCommand, AgentCommandKind, AgentPatch, AlertSeverity } from '../../domain/types';
 import { ConfirmButton, EmptyState } from '../common/ui';
 import { PanelShell, Section } from './PanelShell';
+import { ChopperAvatar } from '../common/CrewAvatar';
 
 const REFRESH_MS = 20_000;
 const SEVERITY_CLASS: Record<AlertSeverity, string> = {
@@ -98,8 +99,8 @@ function AlertView({ id, onBack }: { id: string; onBack: () => void }) {
   const tasks = useStore((s) => s.data.tasks);
   const back = <button className="btn btn-ghost text-xs" onClick={onBack}>← All alerts</button>;
 
-  if (detail === undefined) return <PanelShell title="Alert" icon="⚡" actions={back}><p className="text-sm text-ink-500">Loading…</p></PanelShell>;
-  if (detail === null) return <PanelShell title="Alert" icon="⚡" actions={back}><EmptyState icon="🍃" title="This alert is gone" hint="It may have expired." /></PanelShell>;
+  if (detail === undefined) return <PanelShell title="Alert" icon={<ChopperAvatar />} actions={back}><p className="text-sm text-ink-500">Loading…</p></PanelShell>;
+  if (detail === null) return <PanelShell title="Alert" icon={<ChopperAvatar />} actions={back}><EmptyState icon="🍃" title="This alert is gone" hint="It may have expired." /></PanelShell>;
   const { alert, findings, patches } = detail;
   const { verdict, todo, more } = readFindings(findings);
   const existing = findTicket(tasks, alert.externalId, new Date());
@@ -112,7 +113,7 @@ function AlertView({ id, onBack }: { id: string; onBack: () => void }) {
   };
 
   return (
-    <PanelShell title={alert.title} icon="⚡" subtitle={meta(alert)} actions={back}>
+    <PanelShell title={alert.title} icon={<ChopperAvatar />} subtitle={meta(alert)} actions={back}>
       <div className="flex flex-wrap items-center gap-2"><Severity value={alert.severity} /><span className="text-xs text-ink-500">first seen {relativeTime(alert.firstSeenAt)}</span></div>
       {alert.summary && <p className="whitespace-pre-wrap text-sm">{alert.summary}</p>}
 
@@ -222,7 +223,7 @@ export function AgentPanel() {
   );
 
   return (
-    <PanelShell title="AI agent" icon="⚡" subtitle={status}>
+    <PanelShell title="Chopper Bot" icon={<ChopperAvatar />} subtitle={status}>
       {stale && <p role="status" className="text-xs text-ink-500">Can’t reach the server right now — showing the last list we have.</p>}
       {open.length === 0 ? (
         <EmptyState icon={overview?.lastSeenAt ? '🌿' : '📡'} title={overview?.lastSeenAt ? 'All quiet' : 'Waiting for the agent'}

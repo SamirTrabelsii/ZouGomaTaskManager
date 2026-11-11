@@ -2,7 +2,7 @@ import { useEffect, type ReactNode } from 'react';
 import { useStore } from '../../state/store';
 
 /** Side panel on desktop, bottom sheet on small screens. Esc closes. */
-export function PanelShell({ title, icon, subtitle, children, actions }: { title: string; icon: string; subtitle?: string; children: ReactNode; actions?: ReactNode }) {
+export function PanelShell({ title, icon, subtitle, children, actions }: { title: string; icon: ReactNode; subtitle?: string; children: ReactNode; actions?: ReactNode }) {
   const select = useStore((s) => s.select);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -18,7 +18,7 @@ export function PanelShell({ title, icon, subtitle, children, actions }: { title
                  md:inset-y-16 md:bottom-4 md:left-auto md:right-4 md:max-h-none md:w-[26rem] md:rounded-2xl lg:w-[28rem]"
     >
       <header className="flex items-start gap-3 border-b border-cream-300 px-4 py-3">
-        <div className="text-2xl" aria-hidden>{icon}</div>
+        <div className="text-2xl leading-none" aria-hidden>{icon}</div>
         <div className="min-w-0 flex-1">
           <h2 className="font-serif text-lg font-semibold leading-tight">{title}</h2>
           {subtitle && <p className="truncate text-xs text-ink-500">{subtitle}</p>}

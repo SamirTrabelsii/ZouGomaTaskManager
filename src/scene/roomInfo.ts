@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { createElement, useMemo, type ReactNode } from 'react';
 import { useStore } from '../state/store';
 import { useToday } from '../state/hooks';
 import { dailyProgress, habitCompletionToday, nextUp } from '../domain/services';
@@ -10,9 +10,11 @@ import { agentSummary, unseenAlerts } from '../domain/agent';
 import { useAgent } from '../state/agent';
 import { useAbsences } from '../state/absences';
 import { absenceSummary } from '../domain/absence';
+import { ChopperAvatar, NamiAvatar } from '../ui/common/CrewAvatar';
 
-export const PIN_ICON: Record<SceneObjectId, string> = {
-  desk: '✓', bookshelf: '📖', plants: '🌿', calendar: '📅', notebook: '✎', chest: '฿', agent: '⚡', absence: '🌴',
+export const PIN_ICON: Record<SceneObjectId, ReactNode> = {
+  desk: '✓', bookshelf: '📖', plants: '🌿', calendar: '📅', notebook: '✎', chest: '฿',
+  agent: createElement(ChopperAvatar), absence: createElement(NamiAvatar),
 };
 
 /** True when the user has no data at all — the room then guides them with prompts. */

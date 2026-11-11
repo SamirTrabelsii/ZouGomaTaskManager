@@ -30,8 +30,8 @@ async function signIn(page: Page) {
   await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible();
 }
 const dock = (page: Page) => page.getByRole('navigation', { name: 'Room objects' });
-const agentButton = (page: Page) => dock(page).getByRole('button', { name: /Agent/ });
-// the panel is named after what it shows: "AI agent" for the list, the alert's title for one alert
+const agentButton = (page: Page) => dock(page).getByRole('button', { name: /Chopper Bot/ });
+// the panel is named after what it shows: "Chopper Bot" for the list, the alert's title for one alert
 const panel = (page: Page) => page.getByRole('complementary');
 // A two-step button arms itself for 4 seconds, and the 3D scene is slow to draw here (software WebGL), so a slow page can miss
 // that window. Try again until both clicks land inside it.
@@ -70,7 +70,7 @@ test('the console appears only once the agent is set up, and lists alerts worst 
 
   await page.reload();
   await expect(agentButton(page)).toBeVisible();
-  await expect(page.getByRole('button', { name: /^Agent console: 2 open alerts · 1 critical/ })).toBeAttached();
+  await expect(page.getByRole('button', { name: /^Chopper Bot: 2 open alerts · 1 critical/ })).toBeAttached();
 
   await agentButton(page).click();
   await expect(panel(page)).toContainText('Online');
@@ -137,12 +137,12 @@ test('give the agent an order, follow it to its result, then ignore the alert', 
 test('the room flags alerts you have not seen yet, until you open the agent panel', async ({ page }) => {
   await signIn(page);
   // the first look in a browser counts what is there as seen: nothing is new
-  await expect(page.getByRole('button', { name: /^Agent console: 1 open alert/ })).toBeAttached();
+  await expect(page.getByRole('button', { name: /^Chopper Bot: 1 open alert/ })).toBeAttached();
   await expect(page.getByRole('button', { name: /new$/ })).toHaveCount(0);
 
   await page.request.post('/api/agent/alerts', { headers: asAgent(), data: { externalId: 'rb-3', title: 'Duplicate rows in dim_customers', category: 'data_quality', severity: 'high', occurrences: 2 } });
   await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange'))); // the room checks again when the tab is shown
-  await expect(page.getByRole('button', { name: /^Agent console: 2 open alerts · 1 new/ })).toBeAttached();
+  await expect(page.getByRole('button', { name: /^Chopper Bot: 2 open alerts · 1 new/ })).toBeAttached();
 
   await agentButton(page).click();
   const fresh = panel(page).getByRole('list', { name: 'Open alerts' }).getByRole('listitem').filter({ hasText: 'Duplicate rows in dim_customers' });
@@ -151,13 +151,13 @@ test('the room flags alerts you have not seen yet, until you open the agent pane
   await expect(page.getByRole('button', { name: /new$/ })).toHaveCount(0); // looking at the list put the beacon out
 
   await page.reload(); // and it stays out
-  await expect(page.getByRole('button', { name: /^Agent console: 2 open alerts/ })).toBeAttached();
+  await expect(page.getByRole('button', { name: /^Chopper Bot: 2 open alerts/ })).toBeAttached();
   await expect(page.getByRole('button', { name: /new$/ })).toHaveCount(0);
 
   // an alert that happens again is new again
   await page.request.post('/api/agent/alerts', { headers: asAgent(), data: { externalId: 'rb-3', title: 'Duplicate rows in dim_customers', category: 'data_quality', severity: 'high', occurrences: 7 } });
   await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
-  await expect(page.getByRole('button', { name: /^Agent console: 2 open alerts · 1 new/ })).toBeAttached();
+  await expect(page.getByRole('button', { name: /^Chopper Bot: 2 open alerts · 1 new/ })).toBeAttached();
 });
 
 test('each open alert says whether the agent found something, and the demo alerts can be deleted', async ({ page }) => {
