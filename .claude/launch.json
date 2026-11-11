@@ -1,6 +1,18 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "lifeos", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev", "--", "--port", "5173"], "port": 5173 }
+    { "name": "lifeos", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev", "--", "--port", "5173"], "port": 5173 },
+    {
+      "name": "preview-api",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "set DATABASE_URL=postgres://lifeos:lifeos-dev-password@localhost:5433/lifeos_preview&& set PORT=3002&& npx tsx server/index.ts"],
+      "port": 3002
+    },
+    {
+      "name": "preview-web",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "set LIFEOS_API_URL=http://localhost:3002&& npx vite --port 5174 --strictPort"],
+      "port": 5174
+    }
   ]
 }

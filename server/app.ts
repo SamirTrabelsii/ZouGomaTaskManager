@@ -8,7 +8,8 @@ import { feedRouter } from './feeds';
 import { safeFetchText, type FeedFetcher } from './feedFetch';
 import { cardImageRouter, fetchImage, type ImageFetcher } from './cardImages';
 import { catalogRouter } from './catalog';
-import { agentRouter } from './agent';
+import { agentRouter, makeRequireAgent } from './agent';
+import { absenceRouter } from './absences';
 
 const COOKIE = 'lifeos_session';
 const SESSION_DAYS = 30;
@@ -446,8 +447,12 @@ export function createApp(opts: AppOptions) {
   app.use('/api/cards', catalogRouter(pool, requireAuth));
 
   /* ── local AI agent (bearer token; the owner manages tokens with the normal session) ── */
-  app.use('/api/agent', agentRouter(pool, requireAuth, (req) => (req as Authed).userId,
-    { perToken: makeLimiter(120, 60_000), failures: makeLimiter(30, 10 * 60_000) }));
+  // one budget per token, shared by the agent's routes and the absence executor's
+  const agentLimits = { perToken: makeLimiter(120, 60_000), failures: makeLimiter(30, 10 * 60_000) };
+  app.use('/api/agent', agentRouter(pool, requireAuth, (req) => (req as Authed).userId, agentLimits));
+
+  /* ── absences (the owner books them; a local executor such as n8n runs their steps with an agent token) ── */
+  app.use('/api/absences', absenceRouter(pool, requireAuth, (req) => (req as Authed).userId, makeRequireAgent(pool, agentLimits)));
 
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));
 

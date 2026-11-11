@@ -11,7 +11,7 @@ export type CertStatus = 'planned' | 'studying' | 'earned';
 /** How advanced a certification is; sets its Berries reward (see CERT_REWARD). */
 export type CertLevel = 'badge' | 'foundational' | 'associate' | 'professional' | 'expert';
 export type NoteKind = 'note' | 'idea' | 'journal' | 'reflection' | 'review' | 'lesson';
-export type SceneObjectId = 'desk' | 'bookshelf' | 'plants' | 'calendar' | 'notebook' | 'chest' | 'agent';
+export type SceneObjectId = 'desk' | 'bookshelf' | 'plants' | 'calendar' | 'notebook' | 'chest' | 'agent' | 'absence';
 export type ViewId = 'home' | 'tasks' | 'calendar' | 'insights';
 
 export interface Task {
