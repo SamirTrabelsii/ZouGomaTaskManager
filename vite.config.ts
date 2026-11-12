@@ -16,5 +16,5 @@ export default defineConfig({
   },
   server: { proxy: { '/api': { target: api, changeOrigin: false } } },
   preview: { proxy: { '/api': { target: api, changeOrigin: false } } },
-  test: { environment: 'node', fileParallelism: false, include: ['src/**/*.test.ts', 'server/**/*.test.ts'] },
+  test: { environment: 'node', fileParallelism: false, include: ['src/**/*.test.ts', 'server/**/*.test.ts', 'extension/**/*.test.js'] },
 });
