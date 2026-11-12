@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "LifeOS Tasks",
+  "short_name": "LifeOS",
+  "version": "1.0.0",
+  "description": "Your LifeOS tasks one click away: what is due, tick it off, add one.",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "LifeOS tasks",
+    "default_icon": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png" }
+  },
+  "icons": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png", "128": "icons/128.png" },
+  "permissions": ["storage"],
+  "optional_host_permissions": ["https://*/*", "http://localhost/*", "http://127.0.0.1/*"],
+  "commands": {
+    "_execute_action": {
+      "suggested_key": { "default": "Alt+Shift+L" },
+      "description": "Open LifeOS tasks"
+    }
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'; base-uri 'none'"
+  }
+}

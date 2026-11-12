@@ -58,6 +58,7 @@ export const cloud = {
   },
   logout: () => api<{ ok: true }>('/auth/logout', { method: 'POST', body: {} }),
   getData: () => api<{ data: unknown | null; revision: number }>('/data'),
+  getRevision: () => api<{ revision: number }>('/data/revision'),
   putData: (data: unknown, baseRevision: number, force = false) =>
     api<{ revision: number }>('/data', { method: 'PUT', body: { data, baseRevision, force } }),
   listBackups: () => api<{ backups: CloudBackup[] }>('/data/backups'),
@@ -72,6 +73,10 @@ export const cloud = {
   updateFeed: (id: string, patch: { name?: string; color?: string; remindBefore?: number | null }) => api<{ feed: CalendarFeed }>(`/feeds/${encodeURIComponent(id)}`, { method: 'PATCH', body: patch }),
   removeFeed: (id: string) => api<{ ok: true }>(`/feeds/${encodeURIComponent(id)}`, { method: 'DELETE', body: {} }),
   refreshFeed: (id: string) => api<{ feed: CalendarFeed }>(`/feeds/${encodeURIComponent(id)}/refresh`, { method: 'POST', body: {}, timeoutMs: 40_000 }),
+  /** Tokens of the browser extension (scope 'tasks': they open the task list only). */
+  extensionTokens: () => api<{ tokens: AgentOverview['tokens'] }>('/extension/tokens'),
+  createExtensionToken: (name: string) => api<{ id: string; name: string; hint: string; createdAt: string; token: string }>('/extension/tokens', { method: 'POST', body: { name } }),
+  revokeExtensionToken: (id: string) => api<{ ok: true }>(`/extension/tokens/${encodeURIComponent(id)}`, { method: 'DELETE', body: {} }),
   agent: () => api<AgentOverview>('/agent'),
   /** The token comes back once, here, and is never readable again. */
   createAgentToken: (name: string) => api<{ id: string; name: string; hint: string; createdAt: string; token: string }>('/agent/tokens', { method: 'POST', body: { name } }),

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>LifeOS tasks</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header class="bar">
+    <img src="icons/32.png" alt="" width="20" height="20">
+    <strong>LifeOS</strong>
+    <span id="summary" class="muted"></span>
+    <span class="grow"></span>
+    <select id="scope" class="scope" aria-label="Show tasks of" hidden></select>
+    <button id="open" class="icon" title="Open LifeOS" aria-label="Open LifeOS">↗</button>
+    <button id="gear" class="icon" title="Settings" aria-label="Settings">⚙</button>
+  </header>
+
+  <main id="main" hidden>
+    <form id="add" class="add" autocomplete="off">
+      <input id="title" maxlength="200" placeholder="Add a task…  (end with ! for high priority)" aria-label="New task">
+      <select id="due" aria-label="Due">
+        <option value="">No date</option>
+        <option value="today">Today</option>
+        <option value="tomorrow">Tomorrow</option>
+      </select>
+    </form>
+    <p id="status" class="status" role="status" hidden></p>
+    <div id="lists"></div>
+  </main>
+
+  <section id="setup" class="setup" hidden>
+    <h1>Connect LifeOS</h1>
+    <p class="muted">In LifeOS, open <b>Settings → Browser extension</b>, create a token and paste it here. It opens your task list only.</p>
+    <form id="setupForm" autocomplete="off">
+      <label>Server <input id="server" type="url" required placeholder="https://your-lifeos.onrender.com"></label>
+      <label>Token <input id="token" type="password" required placeholder="lifeos_agent_…" spellcheck="false"></label>
+      <p id="setupError" class="error" role="alert" hidden></p>
+      <div class="row">
+        <button id="cancelSetup" type="button" class="btn ghost" hidden>Cancel</button>
+        <span class="grow"></span>
+        <button id="disconnect" type="button" class="btn ghost danger" hidden>Disconnect</button>
+        <button class="btn primary" id="connect">Connect</button>
+      </div>
+    </form>
+  </section>
+
+  <script src="popup.js" type="module"></script>
+</body>
+</html>

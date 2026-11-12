@@ -10,11 +10,11 @@ import { cardImageRouter, fetchImage, type ImageFetcher } from './cardImages';
 import { catalogRouter } from './catalog';
 import { agentRouter, makeRequireAgent } from './agent';
 import { absenceRouter } from './absences';
+import { backupBeforeWrite, MAX_BACKUPS } from './documents';
+import { extensionRouter } from './extension';
 
 const COOKIE = 'lifeos_session';
 const SESSION_DAYS = 30;
-const MAX_BACKUPS = 20;
-const BACKUP_EVERY_MS = 60 * 60 * 1000;
 /** Real bcrypt hash of a random string; compared against when the email is unknown so timing doesn't reveal accounts. */
 const DUMMY_HASH = bcrypt.hashSync(crypto.randomBytes(16).toString('hex'), 12);
 
@@ -91,6 +91,9 @@ export function createApp(opts: AppOptions) {
   app.use((req, res, next) => {
     if (req.method === 'GET' || req.method === 'HEAD') return next();
     if (!req.is('application/json')) return res.status(415).json({ error: 'JSON required' });
+    // The extension's task routes accept a bearer token only (never a cookie), so a forged cross-site request has
+    // nothing to ride on. They are called from a chrome-extension:// origin.
+    if (req.path.startsWith('/api/extension/tasks') && /^Bearer /.test(req.headers.authorization ?? '')) return next();
     const origin = req.headers.origin;
     if (origin) {
       let host = '';
@@ -103,7 +106,7 @@ export function createApp(opts: AppOptions) {
 
   if (opts.onChange) {
     const notify = opts.onChange;
-    app.use(['/api/data', '/api/push', '/api/feeds'], (req, res, next) => {
+    app.use(['/api/data', '/api/push', '/api/feeds', '/api/extension'], (req, res, next) => {
       if (req.method !== 'GET' && req.method !== 'HEAD') res.on('finish', () => { if (res.statusCode < 400) notify(); });
       next();
     });
@@ -358,14 +361,7 @@ export function createApp(opts: AppOptions) {
       if (current) {
         revision = current.revision + 1;
         // hourly rotating backup of what we're about to replace (always when overwriting a conflict)
-        const last = await client.query('SELECT saved_at FROM document_backups WHERE user_id=$1 ORDER BY saved_at DESC LIMIT 1', [userId]);
-        if (!last.rows[0] || Date.now() - new Date(last.rows[0].saved_at).getTime() > BACKUP_EVERY_MS || force === true) {
-          await client.query('INSERT INTO document_backups (user_id, reason, revision, data) VALUES ($1,$2,$3,$4)',
-            [userId, force === true ? 'before overwrite' : 'automatic', current.revision, JSON.stringify(current.data)]);
-          await client.query(
-            `DELETE FROM document_backups WHERE user_id=$1 AND id NOT IN
-             (SELECT id FROM document_backups WHERE user_id=$1 ORDER BY saved_at DESC LIMIT ${MAX_BACKUPS})`, [userId]);
-        }
+        await backupBeforeWrite(client, userId, current, force === true ? 'before overwrite' : 'automatic', force === true);
         await client.query('UPDATE documents SET data=$2, revision=$3, updated_at=now() WHERE user_id=$1', [userId, JSON.stringify(data), revision]);
       } else {
         await client.query('INSERT INTO documents (user_id, data, revision) VALUES ($1,$2,1)', [userId, JSON.stringify(data)]);
@@ -376,6 +372,14 @@ export function createApp(opts: AppOptions) {
       await client.query('ROLLBACK').catch(() => {});
       next(e);
     } finally { client.release(); }
+  });
+
+  /** Just the revision, so an open tab can cheaply tell whether another device (or the extension) changed the data. */
+  app.get('/api/data/revision', requireAuth, async (req, res, next) => {
+    try {
+      const { rows } = await pool.query('SELECT revision FROM documents WHERE user_id=$1', [(req as Authed).userId]);
+      res.json({ revision: rows[0]?.revision ?? 0 });
+    } catch (e) { next(e); }
   });
 
   app.get('/api/data/backups', requireAuth, async (req, res, next) => {
@@ -453,6 +457,9 @@ export function createApp(opts: AppOptions) {
 
   /* ── absences (the owner books them; a local executor such as n8n runs their steps with an agent token) ── */
   app.use('/api/absences', absenceRouter(pool, requireAuth, (req) => (req as Authed).userId, makeRequireAgent(pool, agentLimits)));
+
+  /* ── browser extension (bearer token of scope 'tasks': the task list only) ── */
+  app.use('/api/extension', extensionRouter(pool, requireAuth, (req) => (req as Authed).userId, agentLimits));
 
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));
 

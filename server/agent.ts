@@ -20,6 +20,8 @@ CREATE TABLE IF NOT EXISTS agent_tokens (
   revoked_at   TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS agent_tokens_user_idx ON agent_tokens(user_id);
+-- what a token opens: 'agent' (the agent and n8n: alerts, orders, absences) or 'tasks' (the browser extension: tasks only)
+ALTER TABLE agent_tokens ADD COLUMN IF NOT EXISTS scope TEXT NOT NULL DEFAULT 'agent';
 -- the agent's last heartbeat: lets the room show "agent online / offline"
 CREATE TABLE IF NOT EXISTS agent_status (
   user_id      BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
@@ -160,6 +162,44 @@ export function newAgentToken(): string {
   return TOKEN_PREFIX + crypto.randomBytes(32).toString('base64url');
 }
 
+/** What a token opens. Each scope has its own list and its own limit of active tokens. */
+export type TokenScope = 'agent' | 'tasks';
+
+export async function listTokens(pool: pg.Pool, userId: number, scope: TokenScope) {
+  const { rows } = await pool.query(
+    'SELECT id, name, hint, created_at, last_used_at FROM agent_tokens WHERE user_id=$1 AND scope=$2 AND revoked_at IS NULL ORDER BY id', [userId, scope]);
+  return rows.map((t) => ({ id: String(t.id), name: t.name as string, hint: t.hint as string, createdAt: t.created_at as Date, lastUsedAt: t.last_used_at as Date | null }));
+}
+
+/** POST /tokens (the token is returned here and never again: only its hash is stored) and DELETE /tokens/:id, for one scope. */
+export function tokenRoutes(router: Router, pool: pg.Pool, requireAuth: RequestHandler, userIdOf: (req: Request) => number, scope: TokenScope) {
+  router.post('/tokens', requireAuth, async (req, res, next) => {
+    try {
+      const userId = userIdOf(req);
+      const raw = (req.body as { name?: unknown } | undefined)?.name;
+      const name = typeof raw === 'string' ? raw.trim() : '';
+      if (!name || name.length > 40) return res.status(400).json({ error: 'Give the token a name of up to 40 characters.' });
+      const { rows: cnt } = await pool.query('SELECT count(*)::int AS n FROM agent_tokens WHERE user_id=$1 AND scope=$2 AND revoked_at IS NULL', [userId, scope]);
+      if (cnt[0].n >= MAX_ACTIVE_TOKENS) return res.status(409).json({ error: `You can have ${MAX_ACTIVE_TOKENS} active tokens. Revoke one first.` });
+      const token = newAgentToken();
+      const { rows } = await pool.query(
+        'INSERT INTO agent_tokens (user_id, name, token_hash, hint, scope) VALUES ($1,$2,$3,$4,$5) RETURNING id, created_at',
+        [userId, name, sha(token), token.slice(-4), scope]);
+      res.status(201).json({ id: String(rows[0].id), name, hint: token.slice(-4), createdAt: rows[0].created_at, token });
+    } catch (e) { next(e); }
+  });
+
+  router.delete('/tokens/:id', requireAuth, async (req, res, next) => {
+    try {
+      const id = String(req.params.id);
+      const r = await pool.query('UPDATE agent_tokens SET revoked_at=now() WHERE id=$1 AND user_id=$2 AND scope=$3 AND revoked_at IS NULL',
+        [/^\d{1,18}$/.test(id) ? id : '0', userIdOf(req), scope]);
+      if (!r.rowCount) return res.status(404).json({ error: 'Token not found' });
+      res.json({ ok: true });
+    } catch (e) { next(e); }
+  });
+}
+
 type AgentReq = Request & { agentUserId: number; agentTokenId: string };
 /** The account an agent token belongs to (only after `makeRequireAgent` let the request through). */
 export const agentUserOf = (req: Request) => (req as AgentReq).agentUserId;
@@ -170,13 +210,13 @@ export const agentTokenOf = (req: Request) => (req as AgentReq).agentTokenId;
  * Bearer-token auth for the agent and the other local executors (n8n). Ignores cookies on purpose, so a browser session can
  * never act as the agent. Pass the same `limits` everywhere so one token has one budget.
  */
-export function makeRequireAgent(pool: pg.Pool, limits: { perToken: Limiter; failures: Limiter }): RequestHandler {
+export function makeRequireAgent(pool: pg.Pool, limits: { perToken: Limiter; failures: Limiter }, scope: TokenScope = 'agent'): RequestHandler {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
       const m = /^Bearer (\S+)$/.exec(req.headers.authorization ?? '');
       const hash = m && m[1].startsWith(TOKEN_PREFIX) && m[1].length < 200 ? sha(m[1]) : null;
       const { rows } = hash
-        ? await pool.query('SELECT id, user_id FROM agent_tokens WHERE token_hash=$1 AND revoked_at IS NULL', [hash])
+        ? await pool.query('SELECT id, user_id FROM agent_tokens WHERE token_hash=$1 AND scope=$2 AND revoked_at IS NULL', [hash, scope])
         : { rows: [] as { id: string; user_id: string }[] };
       if (!rows[0]) {
         if (!limits.failures.hit(req.ip ?? 'unknown')) return res.status(429).json({ error: 'Too many failed attempts.' });
@@ -209,7 +249,7 @@ export function agentRouter(
     try {
       const userId = userIdOf(req);
       const [tokens, status] = await Promise.all([
-        pool.query('SELECT id, name, hint, created_at, last_used_at FROM agent_tokens WHERE user_id=$1 AND revoked_at IS NULL ORDER BY id', [userId]),
+        listTokens(pool, userId, 'agent'),
         pool.query('SELECT last_seen_at, version, state FROM agent_status WHERE user_id=$1', [userId]),
       ]);
       const s = status.rows[0];
@@ -217,37 +257,12 @@ export function agentRouter(
       res.json({
         online: !!lastSeenAt && Date.now() - lastSeenAt.getTime() < ONLINE_WINDOW_MS,
         lastSeenAt, version: s?.version ?? '', state: s?.state ?? 'idle',
-        tokens: tokens.rows.map((t) => ({ id: String(t.id), name: t.name, hint: t.hint, createdAt: t.created_at, lastUsedAt: t.last_used_at })),
+        tokens,
       });
     } catch (e) { next(e); }
   });
 
-  /** The token is returned here and never again: only its hash is stored. */
-  router.post('/tokens', requireAuth, async (req, res, next) => {
-    try {
-      const userId = userIdOf(req);
-      const raw = (req.body as { name?: unknown } | undefined)?.name;
-      const name = typeof raw === 'string' ? raw.trim() : '';
-      if (!name || name.length > 40) return res.status(400).json({ error: 'Give the token a name of up to 40 characters.' });
-      const { rows: cnt } = await pool.query('SELECT count(*)::int AS n FROM agent_tokens WHERE user_id=$1 AND revoked_at IS NULL', [userId]);
-      if (cnt[0].n >= MAX_ACTIVE_TOKENS) return res.status(409).json({ error: `You can have ${MAX_ACTIVE_TOKENS} active tokens. Revoke one first.` });
-      const token = newAgentToken();
-      const { rows } = await pool.query(
-        'INSERT INTO agent_tokens (user_id, name, token_hash, hint) VALUES ($1,$2,$3,$4) RETURNING id, created_at',
-        [userId, name, sha(token), token.slice(-4)]);
-      res.status(201).json({ id: String(rows[0].id), name, hint: token.slice(-4), createdAt: rows[0].created_at, token });
-    } catch (e) { next(e); }
-  });
-
-  router.delete('/tokens/:id', requireAuth, async (req, res, next) => {
-    try {
-      const id = String(req.params.id);
-      const r = await pool.query('UPDATE agent_tokens SET revoked_at=now() WHERE id=$1 AND user_id=$2 AND revoked_at IS NULL',
-        [/^\d{1,18}$/.test(id) ? id : '0', userIdOf(req)]);
-      if (!r.rowCount) return res.status(404).json({ error: 'Token not found' });
-      res.json({ ok: true });
-    } catch (e) { next(e); }
-  });
+  tokenRoutes(router, pool, requireAuth, userIdOf, 'agent');
 
   /* ── agent (bearer token) ── */
 

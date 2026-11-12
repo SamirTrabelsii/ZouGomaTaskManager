@@ -850,6 +850,21 @@ if (typeof window !== 'undefined') {
     const s = useStore.getState();
     if (s.status === 'ready' && s.data !== lastSaved) void storage.save(s.data);
   });
+  // Back on this tab (e.g. after ticking a task in the browser extension): pick up what changed elsewhere.
+  // Only on focus, never on a timer, so an idle tab does not keep a sleeping database awake.
+  let pulling = false;
+  const pull = async () => {
+    if (pulling || document.visibilityState !== 'visible') return;
+    pulling = true;
+    try {
+      const fresh = await syncer.pullIfChanged();
+      const s = useStore.getState();
+      // take it only if nothing was edited here meanwhile (a pending local save counts as an edit)
+      if (fresh && s.status === 'ready' && s.data === lastSaved) { lastSaved = fresh; useStore.setState({ data: fresh }); }
+    } finally { pulling = false; }
+  };
+  window.addEventListener('focus', () => void pull());
+  document.addEventListener('visibilitychange', () => void pull());
 }
 
 export const today = todayStr;

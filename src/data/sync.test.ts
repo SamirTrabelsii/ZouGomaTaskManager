@@ -25,6 +25,7 @@ vi.mock('./cloud', () => ({
     resetPassword: async () => ({ email: 'me@example.com', recoveryCode: 'FFFF-GGGG-HHHH-JJJJ-KKKK' }),
     logout: async () => ({ ok: true }),
     getData: async () => { if (!server.online) throw new Net('offline'); return { data: server.data, revision: server.revision }; },
+    getRevision: async () => { if (!server.online) throw new Net('offline'); return { revision: server.revision }; },
     putData: async (data: unknown, base: number, force = false) => {
       if (!server.online) throw new Net('offline');
       if (!force && base !== server.revision) throw new Api(409, 'conflict', { data: server.data, revision: server.revision });
@@ -89,6 +90,31 @@ describe('cloud sync', () => {
     const r = await t.syncer.start();
     expect(r.kind === 'ready' && r.data.tasks).toHaveLength(4);
     expect(JSON.parse(mem.get('lifeos.v1.sync')!)).toEqual({ revision: 7, dirty: false });
+  });
+
+  it('quietly takes a newer server copy (e.g. from the browser extension) when this tab has nothing unsaved', async () => {
+    server.data = withTasks(2); server.revision = 3;
+    const t = make();
+    await t.syncer.start();
+    expect(await t.syncer.pullIfChanged()).toBeNull(); // same revision: nothing fetched
+    server.data = withTasks(3); server.revision = 4;
+    const pulled = await t.syncer.pullIfChanged();
+    expect(pulled?.tasks).toHaveLength(3);
+    expect(JSON.parse(mem.get('lifeos.v1.sync')!)).toEqual({ revision: 4, dirty: false });
+    // offline: keeps what it has
+    server.revision = 5; server.online = false;
+    expect(await t.syncer.pullIfChanged()).toBeNull();
+  });
+
+  it('never pulls over unsaved local edits', async () => {
+    server.data = withTasks(2); server.revision = 3;
+    const t = make();
+    await t.syncer.start();
+    server.online = false; // the push will fail and the edit stays unsaved
+    t.syncer.queue(withTasks(9));
+    server.data = withTasks(3); server.revision = 4; server.online = true;
+    expect(await t.syncer.pullIfChanged()).toBeNull();
+    expect(server.revision).toBe(4);
   });
 
   it('pushes local edits when the server has not changed since the last sync', async () => {

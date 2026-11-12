@@ -110,6 +110,33 @@ export class Syncer {
     return { start: await this.loadSignedIn(), recoveryCode: r.recoveryCode };
   }
 
+  /**
+   * Another device or the browser extension may have changed the server copy while this tab sat open. When this tab has
+   * nothing unsaved, take the newer copy quietly (no conflict to ask about). Returns it, or null when there is nothing to do.
+   * With unsaved edits it does nothing: the next push then meets the newer revision and the usual conflict choice.
+   */
+  async pullIfChanged(): Promise<AppData | null> {
+    const st = this.ctx.getCloud();
+    if (!st.enabled || st.status !== 'idle' || this.meta.dirty || this.inflight) return null;
+    try {
+      const { revision } = await cloud.getRevision();
+      if (revision === this.meta.revision) return null;
+      const server = await cloud.getData();
+      // an edit may have started while we were asking
+      if (this.meta.dirty || this.inflight || this.ctx.getCloud().status !== 'idle' || server.data === null) return null;
+      const data = normalize(server.data);
+      this.meta = { revision: server.revision, dirty: false };
+      writeMeta(this.meta);
+      this.latest = null;
+      await this.ctx.local.save(data);
+      this.ctx.setCloud({ lastSyncedAt: new Date().toISOString() });
+      return data;
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) this.ctx.setCloud({ status: 'signedout' });
+      return null; // offline or unreadable: keep what we have, the next focus tries again
+    }
+  }
+
   async signOut(): Promise<void> {
     await this.flush();
     try { await cloud.logout(); } catch { /* cookie may already be gone */ }
