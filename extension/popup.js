@@ -3,6 +3,9 @@
 
 const $ = (id) => document.getElementById(id);
 const ext = typeof chrome !== 'undefined' && chrome.storage?.local ? chrome : null;
+/** The same page serves the popup and the side panel (manifest side_panel.default_path adds ?panel=1). */
+const isPanel = new URLSearchParams(location.search).has('panel');
+document.documentElement.classList.toggle('panel', isPanel);
 
 /* ── storage (chrome.storage in the extension, localStorage when the page is opened directly for a preview) ── */
 const store = {
@@ -320,6 +323,26 @@ $('cancelSetup').addEventListener('click', closeSetup);
 $('disconnect').addEventListener('click', () => void disconnect());
 $('gear').addEventListener('click', () => openSetup());
 $('open').addEventListener('click', openApp);
+// Popup → side panel. sidePanel.open must run inside the click itself, so the window id is looked up beforehand.
+let windowId = null;
+if (!isPanel && ext?.sidePanel?.open && ext.windows) {
+  ext.windows.getCurrent().then((w) => { windowId = w.id; $('panel').hidden = false; }).catch(() => {});
+  $('panel').addEventListener('click', () => {
+    if (windowId === null) return;
+    ext.sidePanel.open({ windowId }).then(() => window.close()).catch((e) => showStatus(`Couldn’t open the side panel: ${e.message}`, true));
+  });
+}
+// The side panel stays open while you browse: refresh when you come back to it (never on a timer, so the server can sleep).
+if (isPanel) {
+  let last = Date.now();
+  const again = () => {
+    if (document.visibilityState !== 'visible' || !cfg.token || !$('setup').hidden || Date.now() - last < 15_000) return;
+    last = Date.now();
+    void refresh();
+  };
+  document.addEventListener('visibilitychange', again);
+  window.addEventListener('focus', again);
+}
 $('scope').addEventListener('change', (e) => { scopeFilter = e.target.value; void store.set({ scopeFilter }); render(); });
 
 const saved = await store.get(['server', 'token', 'cache', 'scopeFilter']);
