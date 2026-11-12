@@ -13,6 +13,17 @@ Everything else (notes, projects, the room…) stays in the app. Works in Chrome
 
 After a `git pull` that changes this folder, click the reload icon on the extension's card in `chrome://extensions`.
 
+## Side panel
+
+The same list can stay open beside your pages (Chrome 116+, recent Edge):
+
+- from the popup, click **◨** (top right), or
+- press **Alt+Shift+K**, or
+- in Chrome, open the side panel (the panel icon next to the address bar) and pick **LifeOS Tasks** in its menu.
+
+The panel stays open as you switch tabs and refreshes when you come back to it (at most every 15 s, never on a timer).
+Shortcuts can be changed at `chrome://extensions/shortcuts`.
+
 ## Using it
 
 - Type a task and press Enter. Pick **Today** / **Tomorrow** for a due date; end the title with `!` for high priority.
