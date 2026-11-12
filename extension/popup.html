@@ -20,13 +20,9 @@
 
   <main id="main" hidden>
     <form id="add" class="add" autocomplete="off">
-      <input id="title" maxlength="200" placeholder="Add a task…  (end with ! for high priority)" aria-label="New task">
-      <select id="due" aria-label="Due">
-        <option value="">No date</option>
-        <option value="today">Today</option>
-        <option value="tomorrow">Tomorrow</option>
-      </select>
+      <input id="title" maxlength="300" placeholder="Add a task…  e.g. Call the bank tomorrow #perso !" aria-label="New task" aria-describedby="hint">
     </form>
+    <div id="hint" class="hint" aria-live="polite"></div>
     <p id="status" class="status" role="status" hidden></p>
     <div id="lists"></div>
   </main>
@@ -46,6 +42,8 @@
       </div>
     </form>
   </section>
+
+  <div id="undo" class="undo" role="status" hidden><span id="undoText"></span><button id="undoBtn" type="button">Undo</button></div>
 
   <script src="popup.js" type="module"></script>
 </body>

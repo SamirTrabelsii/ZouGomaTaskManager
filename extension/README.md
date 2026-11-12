@@ -1,7 +1,8 @@
 # LifeOS Tasks: browser extension
 
-A light popup for the task list: see what is overdue, due today, in progress and coming up; tick tasks off; start one; add one.
-Everything else (notes, projects, the room…) stays in the app. Works in Chrome and Edge (Manifest V3); no build step.
+A light popup (or side panel) for the task list: see what is overdue, due today, in progress and coming up; add a task in
+one line or from any page with a right-click; tick off, start, edit or delete. Everything else (notes, projects, the room…)
+stays in the app. Works in Chrome and Edge (Manifest V3); no build step.
 
 ## Install (once per browser)
 
@@ -24,19 +25,52 @@ The same list can stay open beside your pages (Chrome 116+, recent Edge):
 The panel stays open as you switch tabs and refreshes when you come back to it (at most every 15 s, never on a timer).
 Shortcuts can be changed at `chrome://extensions/shortcuts`.
 
-## Using it
+## Adding a task
 
-- Type a task and press Enter. Pick **Today** / **Tomorrow** for a due date; end the title with `!` for high priority.
-  If a scope is selected in the header, the new task goes into it.
+Type it in one go and press Enter; what was understood shows under the field before you send it.
+
+| You type | It means |
+|---|---|
+| `aujourd'hui`, `today`, `demain`, `tomorrow`, `après-demain` | due that day |
+| `lundi` … `dimanche`, `monday` … `sunday` (also `vendredi prochain`, `next friday`) | the next one, never today |
+| `le 20`, `on the 3rd` | that day this month, or next month if it has passed |
+| `24/11`, `24/11/2027`, `2027-01-02` | that date (a past day/month means next year) |
+| `dans 3 jours`, `in 2 weeks`, `semaine prochaine`, `next week` | counted from today; next week = next Monday |
+| `#perso` | the scope named Perso (case and accents ignored; the start of the name is enough) |
+| `!` (alone or at the end) | high priority |
+
+Example: `Appeler la banque demain #perso !`. While you type `#…`, matching scopes are suggested: **Tab** takes the first.
+If a scope is selected in the header and you don't type one, the task goes into it.
+
+## Adding from a page (right-click)
+
+Select text, or right-click a link or anywhere on a page, then **Add to LifeOS** (or **Add to LifeOS, due today**):
+
+- selected text → the title (cut at 200 characters; the whole selection goes in the notes);
+- a link → "Check example.com/…", with the link and the page it was on in the notes;
+- the page → its title.
+
+The page address goes in the task's notes and shows as 🔗 in the list, so you can get back to the mail, ticket or alert.
+The icon flashes ✓ when it is saved (or ! with the reason in its tooltip).
+
+## Editing
+
+- Click a task's title to edit it in place: title, due date, priority, scope, status. **Blocked** asks what it waits on,
+  **On hold** asks when it comes back. Enter or **Save** keeps it, Esc cancels.
+- **Delete** hides it at once with an **Undo** for 5 seconds; only then (or when the popup closes) is it deleted.
 - The circle marks a task done (and back); ▶ / ⏸ moves it to and from *In progress*.
-- Blocked and on-hold tasks are only counted: they need a note or a date, so change them in the app.
+- Blocked and on-hold tasks sit in the collapsed **Waiting** group.
+
+## Good to know
+
 - The icon's badge shows how many tasks are overdue or due today (updated when you open the popup).
 - On Render's free plan the first call after a quiet spell can take up to a minute while the server wakes.
 
 ## How it connects
 
 - It calls `/api/extension/tasks` with `Authorization: Bearer <token>`. That token's scope is `tasks`: it opens the task
-  list and nothing else (no notes, journal, alerts, absences, or the full data). Agent tokens do not work here, and
+  list and nothing else (no notes or journal, alerts, absences, or the full data). A task's own notes are not sent to
+  the extension, only their first web link. Agent tokens do not work here, and
   extension tokens do not work for the agent.
 - The token is kept in the extension's local storage on this computer. Lost the laptop? Revoke the token in Settings.
 - Changes bump the data revision. An open LifeOS tab reloads the newer copy when you come back to it, as long as it

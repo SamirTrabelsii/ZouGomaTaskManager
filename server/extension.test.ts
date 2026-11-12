@@ -109,7 +109,12 @@ describe.skipIf(!reachable)('browser extension API', () => {
     expect((await ext('POST', '/api/extension/tasks', { title: 'x'.repeat(201) })).status).toBe(400);
     expect((await ext('POST', '/api/extension/tasks', { title: 'x', dueDate: '2026-02-30' })).status).toBe(400);
     expect((await ext('POST', '/api/extension/tasks', { title: 'x', priority: 'urgent' })).status).toBe(400);
-    expect((await ext('PATCH', '/api/extension/tasks/a', { status: 'blocked' })).status).toBe(400);
+    expect((await ext('PATCH', '/api/extension/tasks/a', { status: 'archived' })).status).toBe(400);
+    expect((await ext('PATCH', '/api/extension/tasks/a', {})).status).toBe(400);
+    expect((await ext('PATCH', '/api/extension/tasks/a', { title: ' ' })).status).toBe(400);
+    expect((await ext('PATCH', '/api/extension/tasks/a', { resumeOn: 'soon' })).status).toBe(400);
+    expect((await ext('POST', '/api/extension/tasks', { title: 'x', notes: 'n'.repeat(2001) })).status).toBe(400);
+    expect((await ext('DELETE', '/api/extension/tasks/zzz', {})).status).toBe(404);
     expect((await ext('PATCH', '/api/extension/tasks/zzz', { status: 'done' })).status).toBe(404);
     expect((await saved()).revision).toBe(revision);
   });
@@ -125,6 +130,40 @@ describe.skipIf(!reachable)('browser extension API', () => {
     await ext('PATCH', '/api/extension/tasks/b', { status: 'todo' });
     t = (await saved()).data.tasks.find((x) => x.id === 'b')!;
     expect(t).toMatchObject({ status: 'todo', completedAt: null });
+  });
+
+  it('keeps a captured page link in the notes and shows only the link', async () => {
+    const r = await ext('POST', '/api/extension/tasks', { title: 'Read this', notes: 'From: https://example.com/a?b=1 selected text' });
+    expect(r.body.task.link).toBe('https://example.com/a?b=1');
+    expect(r.body.task).not.toHaveProperty('notes');
+    expect((await saved()).data.tasks[0].notes).toBe('From: https://example.com/a?b=1 selected text');
+  });
+
+  it('edits a task with the app’s rules and keeps its reminder title in step', async () => {
+    const reminders = [{ id: 'r1', title: 'Task a', at: '2026-11-12T09:00', link: { type: 'task', id: 'a' }, deliveredAt: null, deliveredVia: null, ackedAt: null }];
+    await pool.query("UPDATE documents SET data = jsonb_set(data, '{reminders}', $1::jsonb)", [JSON.stringify(reminders)]);
+    const r = await ext('PATCH', '/api/extension/tasks/a', { title: 'Renamed', dueDate: null, priority: 'high', scopeId: 's1', status: 'blocked', blockedBy: 'waiting on Bob' });
+    expect(r.status).toBe(200);
+    expect(r.body.task).toMatchObject({ title: 'Renamed', dueDate: null, priority: 'high', scopeId: 's1', status: 'blocked', blockedBy: 'waiting on Bob' });
+    let s = await saved();
+    expect((s.data as unknown as { reminders: { title: string }[] }).reminders[0].title).toBe('Renamed');
+    // on hold drops the blocked note and keeps the resume date
+    await ext('PATCH', '/api/extension/tasks/a', { status: 'onhold', resumeOn: '2026-12-01' });
+    s = await saved();
+    expect(s.data.tasks.find((x) => x.id === 'a')).toMatchObject({ status: 'onhold', blockedBy: '', resumeOn: '2026-12-01' });
+    // an unknown scope is ignored
+    await ext('PATCH', '/api/extension/tasks/a', { scopeId: 'nope' });
+    expect((await saved()).data.tasks.find((x) => x.id === 'a')!.scopeId).toBe('s1');
+  });
+
+  it('deletes a task and its reminder', async () => {
+    const reminders = [{ id: 'r1', title: 'Task a', at: '2026-11-12T09:00', link: { type: 'task', id: 'a' } }, { id: 'r2', title: 'other', at: '2026-11-12T09:00', link: null }];
+    await pool.query("UPDATE documents SET data = jsonb_set(data, '{reminders}', $1::jsonb)", [JSON.stringify(reminders)]);
+    const r = await ext('DELETE', '/api/extension/tasks/a', {});
+    expect(r.status).toBe(200);
+    const s = await saved();
+    expect(s.data.tasks.map((x) => x.id)).toEqual(['b', 'c', 'd']);
+    expect((s.data as unknown as { reminders: { id: string }[] }).reminders.map((x) => x.id)).toEqual(['r2']);
   });
 
   it('makes the app see the change through the revision', async () => {
