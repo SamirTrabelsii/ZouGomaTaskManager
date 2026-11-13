@@ -13,6 +13,7 @@ import {
   bountyEntry, certEntry, economyStart, formatBerries, goalEntry, goalReward, milestoneEntry, milestoneReward, pendingBounties,
   projectEntry, projectReward, PROJECTS_PER_WEEK, CERT_REWARD, welcomeEntry, WELCOME_GIFT,
 } from '../domain/economy';
+import { cleanHabitDays } from '../domain/services';
 import { certReminderAt, certReminderTitle, DEFAULT_CERT_LEVEL, DEFAULT_REMIND_BEFORE, safeUrl } from '../domain/certs';
 import { buySingle, completionRewards, type OpenedPack, openSealed, openSealedMany, purchase, sellCards } from '../domain/shop';
 
@@ -560,12 +561,21 @@ export const useStore = create<Store>((set, get) => {
     addHabit(input) {
       const h: Habit = { id: uid(), frequency: 'daily', target: 1, archived: false, createdAt: nowIso(), origin: null, ...input, title: input.title.trim() };
       if (h.frequency === 'daily') h.target = 1;
+      h.days = h.frequency === 'daily' ? cleanHabitDays(h.days) : null;
       commit((d) => ({ ...d, habits: [...d.habits, h] }));
       pulse('plants');
       return h;
     },
     updateHabit(id, patch) {
-      commit((d) => ({ ...d, habits: d.habits.map((h) => (h.id === id ? { ...h, ...patch, target: (patch.frequency ?? h.frequency) === 'daily' ? 1 : patch.target ?? h.target } : h)) }));
+      commit((d) => ({
+        ...d,
+        habits: d.habits.map((h) => {
+          if (h.id !== id) return h;
+          const n = { ...h, ...patch };
+          const daily = n.frequency === 'daily';
+          return { ...n, target: daily ? 1 : n.target, days: daily ? cleanHabitDays(n.days) : null };
+        }),
+      }));
     },
     deleteHabit(id) {
       const h = get().data.habits.find((x) => x.id === id);

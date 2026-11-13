@@ -25,6 +25,10 @@ export function startOfWeek(s: string): string {
   const dow = (d.getDay() + 6) % 7;
   return addDays(s, -dow);
 }
+/** ISO weekday: 1 = Monday … 7 = Sunday. */
+export function weekday(s: string): number {
+  return ((parseDay(s).getDay() + 6) % 7) + 1;
+}
 export function daysRange(end: string, n: number): string[] {
   return Array.from({ length: n }, (_, i) => addDays(end, i - (n - 1)));
 }

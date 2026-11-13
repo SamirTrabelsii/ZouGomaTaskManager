@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { consistency, dailyProgress, isActive, pointsBetween, readyToResume, sortTasks, pointsByDay, SIZE_POINTS, sumPoints, taskPoints, dueTone, goalProgress, plantGrowth, projectProgress, sortMilestones, streaks, weeklySummary } from './services';
+import { cleanHabitDays, consistency, habitCompletionToday, habitDueOn, habitSatisfied, dailyProgress, isActive, pointsBetween, readyToResume, sortTasks, pointsByDay, SIZE_POINTS, sumPoints, taskPoints, dueTone, goalProgress, plantGrowth, projectProgress, sortMilestones, streaks, weeklySummary } from './services';
 import { emptyData, normalize } from '../data/storage';
 import type { Habit, HabitLog, Task } from './types';
 
@@ -29,6 +29,32 @@ describe('habit streaks', () => {
     // weeks of 2026-03-02 and 2026-03-09 both have 2 logs
     const s = streaks(h, logs('2026-03-02', '2026-03-04', '2026-03-09', '2026-03-11'), '2026-03-12');
     expect(s.current).toBe(2);
+  });
+});
+
+describe('habits on set days', () => {
+  // 2026-03-09 is a Monday
+  const weekdays = habit({ days: [1, 2, 3, 4, 5] });
+  it('the weekend does not break a weekdays-only streak', () => {
+    const l = logs('2026-03-05', '2026-03-06', '2026-03-09');
+    expect(streaks(weekdays, l, '2026-03-09').current).toBe(3);
+  });
+  it('a missed due day still breaks it', () => {
+    expect(streaks(weekdays, logs('2026-03-04', '2026-03-06', '2026-03-09'), '2026-03-09').current).toBe(2);
+  });
+  it('a rest day counts as satisfied and drops out of today\'s total', () => {
+    expect(habitDueOn(weekdays, '2026-03-08')).toBe(false);
+    expect(habitSatisfied(weekdays, [], '2026-03-08')).toBe(true);
+    expect(habitCompletionToday([weekdays, habit({ id: 'x' })], [], '2026-03-08').total).toBe(1);
+  });
+  it('consistency only looks at due days', () => {
+    const h = habit({ days: [1, 2, 3, 4, 5], createdAt: '2026-03-09T00:00:00' });
+    expect(consistency(h, logs('2026-03-09', '2026-03-10', '2026-03-11', '2026-03-12', '2026-03-13'), '2026-03-15')).toBe(1);
+  });
+  it('normalises the day list', () => {
+    expect(cleanHabitDays([5, 1, 1, 9])).toEqual([1, 5]);
+    expect(cleanHabitDays([1, 2, 3, 4, 5, 6, 7])).toBeNull();
+    expect(cleanHabitDays([])).toBeNull();
   });
 });
 

@@ -1,5 +1,5 @@
 import type { AppData, CalEvent, Goal, Habit, HabitLog, Milestone, Project, Task, TaskSize } from './types';
-import { addDays, dateTimeOf, daysRange, diffDays, isoToDay, startOfWeek } from './dates';
+import { addDays, dateTimeOf, daysRange, diffDays, isoToDay, startOfWeek, weekday } from './dates';
 
 /* ───────── Tasks ───────── */
 
@@ -99,6 +99,16 @@ export function goalProgress(goal: Goal) {
 
 const habitDates = (h: Habit, logs: HabitLog[]) => logs.filter((l) => l.habitId === h.id).map((l) => l.date);
 
+/** Normalised day list: sorted 1..7, null when it means every day (or nothing usable). */
+export function cleanHabitDays(days: number[] | null | undefined): number[] | null {
+  const set = [...new Set((days ?? []).filter((d) => Number.isInteger(d) && d >= 1 && d <= 7))].sort((a, b) => a - b);
+  return set.length === 0 || set.length === 7 ? null : set;
+}
+/** Is the habit expected on `day`? Weekly habits can be done any day; daily ones only on their days. */
+export function habitDueOn(h: Habit, day: string) {
+  return h.frequency !== 'daily' || !h.days?.length || h.days.includes(weekday(day));
+}
+
 export function habitDoneOn(h: Habit, logs: HabitLog[], day: string) {
   return logs.some((l) => l.habitId === h.id && l.date === day);
 }
@@ -107,9 +117,10 @@ export function weekCount(h: Habit, logs: HabitLog[], day: string) {
   const we = addDays(ws, 6);
   return habitDates(h, logs).filter((d) => d >= ws && d <= we).length;
 }
-/** "Done for now": daily → logged today; weekly → weekly target met. */
+/** "Done for now": daily → logged today (or today is not one of its days); weekly → weekly target met. */
 export function habitSatisfied(h: Habit, logs: HabitLog[], today: string) {
-  return h.frequency === 'daily' ? habitDoneOn(h, logs, today) : weekCount(h, logs, today) >= h.target;
+  if (h.frequency === 'weekly') return weekCount(h, logs, today) >= h.target;
+  return !habitDueOn(h, today) || habitDoneOn(h, logs, today);
 }
 
 interface Period { met: boolean; current: boolean }
@@ -119,7 +130,8 @@ function periods(h: Habit, logs: HabitLog[], today: string): Period[] {
   const set = new Set(dates);
   const out: Period[] = [];
   if (h.frequency === 'daily') {
-    for (let d = dates[0]; d <= today; d = addDays(d, 1)) out.push({ met: set.has(d), current: d === today });
+    // only the days it is due count: a weekdays-only habit keeps its streak over the weekend
+    for (let d = dates[0]; d <= today; d = addDays(d, 1)) if (habitDueOn(h, d)) out.push({ met: set.has(d), current: d === today });
   } else {
     const thisWeek = startOfWeek(today);
     for (let w = startOfWeek(dates[0]); w <= thisWeek; w = addDays(w, 7)) {
@@ -152,7 +164,10 @@ export function consistency(h: Habit, logs: HabitLog[], today: string, windowDay
   const dates = habitDates(h, logs);
   if (h.frequency === 'daily') {
     const from = addDays(today, -(since - 1));
-    return Math.min(1, dates.filter((d) => d >= from && d <= today).length / since);
+    const logged = new Set(dates);
+    let due = 0, hit = 0;
+    for (let d = from; d <= today; d = addDays(d, 1)) if (habitDueOn(h, d)) { due++; if (logged.has(d)) hit++; }
+    return due ? Math.min(1, hit / due) : 1;
   }
   const weeks = Math.max(1, Math.min(4, Math.ceil(since / 7)));
   const from = addDays(startOfWeek(today), -(weeks - 1) * 7);
@@ -179,8 +194,9 @@ export function plantGrowth(h: Habit, logs: HabitLog[], today: string) {
   return { total, size, vigor, stage, stageName: PLANT_STAGES[stage] };
 }
 
+/** Habits expected today (a weekdays-only habit drops out on Saturday) and how many are done. */
 export function habitCompletionToday(habits: Habit[], logs: HabitLog[], today: string) {
-  const act = habits.filter((h) => !h.archived);
+  const act = habits.filter((h) => !h.archived && habitDueOn(h, today));
   const done = act.filter((h) => habitSatisfied(h, logs, today)).length;
   return { done, total: act.length, ratio: act.length ? done / act.length : 0 };
 }
@@ -267,7 +283,7 @@ export function completedByDay(tasks: Task[], end: string, n: number) {
 export function habitRatioByDay(habits: Habit[], logs: HabitLog[], end: string, n: number) {
   const dailies = habits.filter((h) => !h.archived && h.frequency === 'daily');
   return daysRange(end, n).map((day) => {
-    const created = dailies.filter((h) => isoToDay(h.createdAt) <= day);
+    const created = dailies.filter((h) => isoToDay(h.createdAt) <= day && habitDueOn(h, day));
     const done = created.filter((h) => habitDoneOn(h, logs, day)).length;
     return { day, done, total: created.length, ratio: created.length ? done / created.length : 0 };
   });
