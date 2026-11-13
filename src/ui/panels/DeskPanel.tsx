@@ -57,7 +57,12 @@ export function DeskPanel() {
         </div>
       </div>
 
-      <QuickAdd defaults={{ dueDate: today, scopeId: scope === 'all' ? null : scope }} placeholder="Quick add for today — press Enter" />
+      <div className="flex gap-2">
+        <div className="min-w-0 flex-1">
+          <QuickAdd defaults={{ dueDate: today, scopeId: scope === 'all' ? null : scope }} placeholder="Quick add for today — press Enter" />
+        </div>
+        <button className="btn shrink-0" title="New task with details" onClick={() => dlg.open(undefined, { dueDate: today })}>＋ Details</button>
+      </div>
 
       {pendingReminders.length > 0 && (
         <Section title="Reminders">
@@ -128,7 +133,6 @@ export function DeskPanel() {
           />
         </div>
       </Section>
-      <button className="btn w-full" onClick={() => dlg.open(undefined, { dueDate: today })}>＋ New task with details</button>
       {dlg.node}
     </PanelShell>
   );
