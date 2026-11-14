@@ -156,6 +156,26 @@ describe.skipIf(!reachable)('browser extension API', () => {
     expect((await saved()).data.tasks.find((x) => x.id === 'a')!.scopeId).toBe('s1');
   });
 
+  it('shows checklist steps and saves the whole list, cleaned', async () => {
+    expect((await ext('GET', '/api/extension/tasks')).body.tasks[0].checklist).toEqual([]); // older tasks have none
+    const r = await ext('PATCH', '/api/extension/tasks/a', { checklist: [{ id: 'k1', text: '  Draft   it ', done: true }, { text: 'Send', done: 'yes' }] });
+    expect(r.status).toBe(200);
+    expect(r.body.task.checklist).toHaveLength(2);
+    expect(r.body.task.checklist[0]).toEqual({ id: 'k1', text: 'Draft it', done: true });
+    expect(r.body.task.checklist[1]).toMatchObject({ text: 'Send', done: false });
+    expect(typeof r.body.task.checklist[1].id).toBe('string'); // a step without id gets one
+    const t = (await saved()).data.tasks.find((x) => x.id === 'a') as unknown as { checklist: unknown[]; status: string };
+    expect(t.checklist).toHaveLength(2);
+    expect(t.status).toBe('todo'); // ticking steps never finishes the task
+    // a later edit of another field keeps the steps
+    await ext('PATCH', '/api/extension/tasks/a', { priority: 'high' });
+    expect(((await saved()).data.tasks.find((x) => x.id === 'a') as unknown as { checklist: unknown[] }).checklist).toHaveLength(2);
+    // bad lists are refused
+    expect((await ext('PATCH', '/api/extension/tasks/a', { checklist: 'nope' })).status).toBe(400);
+    expect((await ext('PATCH', '/api/extension/tasks/a', { checklist: [{ text: '   ' }] })).status).toBe(400);
+    expect((await ext('PATCH', '/api/extension/tasks/a', { checklist: Array.from({ length: 51 }, (_, i) => ({ text: `s${i}` })) })).status).toBe(400);
+  });
+
   it('deletes a task and its reminder', async () => {
     const reminders = [{ id: 'r1', title: 'Task a', at: '2026-11-12T09:00', link: { type: 'task', id: 'a' } }, { id: 'r2', title: 'other', at: '2026-11-12T09:00', link: null }];
     await pool.query("UPDATE documents SET data = jsonb_set(data, '{reminders}', $1::jsonb)", [JSON.stringify(reminders)]);

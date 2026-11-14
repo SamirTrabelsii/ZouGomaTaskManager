@@ -16,6 +16,12 @@ export const TASK_SIZES = Object.keys(SIZE_POINTS) as TaskSize[];
 /** Points a task is worth; unsized tasks count 0. */
 export const taskPoints = (t: Pick<Task, 'size'>) => (t.size ? SIZE_POINTS[t.size] ?? 0 : 0);
 export const sumPoints = (tasks: Pick<Task, 'size'>[]) => tasks.reduce((n, t) => n + taskPoints(t), 0);
+/** Ticked and total checklist steps of a task. */
+export function checklistProgress(t: Pick<Task, 'checklist'>) {
+  const items = t.checklist ?? [];
+  const done = items.filter((c) => c.done).length;
+  return { done, total: items.length, complete: items.length > 0 && done === items.length };
+}
 /** Points of the tasks finished between two days (inclusive). */
 export const pointsBetween = (tasks: Task[], from: string, to: string) =>
   sumPoints(tasks.filter((t) => t.completedAt && isoToDay(t.completedAt) >= from && isoToDay(t.completedAt) <= to));

@@ -39,6 +39,11 @@ function normalizeTasks(tasks: any[], scopes: any[]): any[] {
     blockedBy: t.status === 'blocked' && typeof t.blockedBy === 'string' ? t.blockedBy : '',
     resumeOn: t.status === 'onhold' && typeof t.resumeOn === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(t.resumeOn) ? t.resumeOn : null,
     scopeId: typeof t.scopeId === 'string' && ids.has(t.scopeId) ? t.scopeId : null,
+    checklist: Array.isArray(t.checklist)
+      ? t.checklist
+        .filter((c: any) => c && typeof c.id === 'string' && typeof c.text === 'string' && c.text.trim())
+        .map((c: any) => ({ id: c.id, text: c.text, done: c.done === true }))
+      : [],
   }));
 }
 

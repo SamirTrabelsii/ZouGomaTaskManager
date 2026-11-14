@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import {
-  type AppData, type CalEvent, type Certification, type Goal, type LedgerEntry, type Habit, type Milestone, type Note, type Project,
+  type AppData, type CalEvent, type Certification, type ChecklistItem, type Goal, type LedgerEntry, type Habit, type Milestone, type Note, type Project,
   type Reminder, type SceneObjectId, type Scope, type Task, type ViewId, type Prefs,
 } from '../domain/types';
 import { showSystemNotification } from './notify';
@@ -97,6 +97,8 @@ interface Actions {
   addTask(input: Partial<Task> & { title: string }): Task;
   updateTask(id: string, patch: Partial<Task>): void;
   toggleTask(id: string): void;
+  /** Replaces a task's checklist steps (the task form saves ticks as they happen). */
+  setChecklist(taskId: string, checklist: ChecklistItem[]): void;
   deleteTask(id: string): void;
   setTaskReminder(taskId: string, at: string | null): void;
   // scopes
@@ -399,6 +401,9 @@ export const useStore = create<Store>((set, get) => {
     toggleTask(id) {
       const t = get().data.tasks.find((x) => x.id === id);
       if (t) get().updateTask(id, { status: t.status === 'done' ? 'todo' : 'done' });
+    },
+    setChecklist(taskId, checklist) {
+      commit((d) => ({ ...d, tasks: d.tasks.map((x) => (x.id === taskId ? { ...x, checklist } : x)) }));
     },
     deleteTask(id) {
       const t = get().data.tasks.find((x) => x.id === id);

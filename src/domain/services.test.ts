@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cleanHabitDays, consistency, habitCompletionToday, habitDueOn, habitSatisfied, dailyProgress, isActive, pointsBetween, readyToResume, sortTasks, pointsByDay, SIZE_POINTS, sumPoints, taskPoints, dueTone, goalProgress, plantGrowth, projectProgress, sortMilestones, streaks, weeklySummary } from './services';
+import { checklistProgress, cleanHabitDays, consistency, habitCompletionToday, habitDueOn, habitSatisfied, dailyProgress, isActive, pointsBetween, readyToResume, sortTasks, pointsByDay, SIZE_POINTS, sumPoints, taskPoints, dueTone, goalProgress, plantGrowth, projectProgress, sortMilestones, streaks, weeklySummary } from './services';
 import { emptyData, normalize } from '../data/storage';
 import type { Habit, HabitLog, Task } from './types';
 
@@ -160,6 +160,29 @@ describe('task statuses and scopes', () => {
     expect(t.b.status).toBe('todo');
     expect('parentId' in t.b).toBe(false);
     expect(t.c.scopeId).toBeNull();
+  });
+  it('keeps valid checklist steps, drops broken ones, and gives old tasks an empty list', () => {
+    const d = normalize({
+      ...emptyData(),
+      tasks: [
+        { id: 'a', title: 'A', status: 'todo' },
+        { id: 'b', title: 'B', status: 'todo', checklist: [{ id: '1', text: 'Draft', done: true }, { id: '2', text: '  ' }, { text: 'no id' }, { id: '3', text: 'Send', done: 'yes' }] },
+      ],
+    });
+    const t = Object.fromEntries(d.tasks.map((x) => [x.id, x]));
+    expect(t.a.checklist).toEqual([]);
+    expect(t.b.checklist).toEqual([{ id: '1', text: 'Draft', done: true }, { id: '3', text: 'Send', done: false }]);
+  });
+});
+
+describe('checklist progress', () => {
+  it('counts ticked steps and is complete only when every step is ticked', () => {
+    expect(checklistProgress({})).toEqual({ done: 0, total: 0, complete: false });
+    expect(checklistProgress({ checklist: [{ id: '1', text: 'a', done: true }, { id: '2', text: 'b', done: false }] })).toEqual({ done: 1, total: 2, complete: false });
+    expect(checklistProgress({ checklist: [{ id: '1', text: 'a', done: true }] }).complete).toBe(true);
+  });
+  it('steps never change the points of a task', () => {
+    expect(taskPoints({ size: 'M', checklist: [{ id: '1', text: 'a', done: true }] } as Task)).toBe(SIZE_POINTS.M);
   });
 });
 

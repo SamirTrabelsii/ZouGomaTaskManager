@@ -4,7 +4,7 @@ import { useToday } from '../../state/hooks';
 import { relativeDay } from '../../domain/dates';
 import { dueTone } from '../../domain/services';
 import type { Task, TaskStatus } from '../../domain/types';
-import { applyFilters, defaultFilters, FilterBar, QuickAdd, ScopeBar, TaskList, TONE, useTaskDialog } from '../common/tasks';
+import { applyFilters, ChecklistBadge, defaultFilters, FilterBar, QuickAdd, ScopeBar, TaskList, TONE, useTaskDialog } from '../common/tasks';
 import { Segmented } from '../common/ui';
 import { CalendarIcon, PriorityIcon, PRIORITY_NAME, SizeChip, STATUS_COLOR, STATUS_NAME, StatusIcon } from '../common/icons';
 
@@ -83,6 +83,7 @@ function Board({ tasks, onEdit }: { tasks: Task[]; onEdit: (id: string) => void 
                     <span className="chip"><PriorityIcon priority={t.priority} size={12} />{PRIORITY_NAME[t.priority]}</span>
                     {t.size && <SizeChip size={t.size} />}
                     <ScopeChip scopeId={t.scopeId} />
+                    <ChecklistBadge task={t} />
                   </div>
                   <select className="input mt-2 py-1 text-xs" aria-label={`Move “${t.title}” to`} value={t.status} onChange={(e) => update(t.id, { status: e.target.value as TaskStatus })}>
                     {Object.entries(STATUS_NAME).map(([v, l]) => <option key={v} value={v}>{l}</option>)}

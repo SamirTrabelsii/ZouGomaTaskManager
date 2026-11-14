@@ -22,11 +22,16 @@ const MAX_LISTED = 300;
 export const MAX_TITLE = 200;
 export const MAX_NOTES = 2000;
 const MAX_BLOCKED_BY = 200;
+export const MAX_STEPS = 50;
+export const MAX_STEP = 200;
+
+interface Step { id: string; text: string; done: boolean }
 
 interface StoredTask {
   id: string; title: string; notes: string; status: string; priority: string; size: string | null; dueDate: string | null;
   projectId: string | null; milestoneId: string | null; goalId: string | null; scopeId: string | null;
   blockedBy: string; resumeOn: string | null; createdAt: string; completedAt: string | null;
+  checklist?: Step[];
 }
 interface StoredScope { id: string; title: string; icon: string; color: string }
 interface StoredProject { id: string; title: string }
@@ -52,9 +57,10 @@ export function linkOf(notes: string | undefined): string | null {
 const view = (t: StoredTask) => ({
   id: t.id, title: t.title, status: t.status, priority: t.priority, dueDate: t.dueDate, scopeId: t.scopeId, projectId: t.projectId,
   completedAt: t.completedAt, blockedBy: t.blockedBy ?? '', resumeOn: t.resumeOn ?? null, link: linkOf(t.notes),
+  checklist: (Array.isArray(t.checklist) ? t.checklist : []).map((c) => ({ id: c.id, text: c.text, done: c.done === true })),
 });
 
-type Edit = Partial<Pick<StoredTask, 'title' | 'status' | 'priority' | 'dueDate' | 'scopeId' | 'blockedBy' | 'resumeOn'>>;
+type Edit = Partial<Pick<StoredTask, 'title' | 'status' | 'priority' | 'dueDate' | 'scopeId' | 'blockedBy' | 'resumeOn' | 'checklist'>>;
 /** Checks a PATCH body. Returns the edit, or an error message. */
 function parseEdit(b: Record<string, unknown>): Edit | string {
   const e: Edit = {};
@@ -86,6 +92,19 @@ function parseEdit(b: Record<string, unknown>): Edit | string {
   if ('resumeOn' in b) {
     if (b.resumeOn !== null && !isDate(b.resumeOn)) return 'Resume date must be YYYY-MM-DD.';
     e.resumeOn = b.resumeOn as string | null;
+  }
+  if ('checklist' in b) {
+    // the whole list is sent each time: the popup ticks, adds and removes steps one at a time
+    if (!Array.isArray(b.checklist) || b.checklist.length > MAX_STEPS) return `A checklist holds up to ${MAX_STEPS} steps.`;
+    const steps: Step[] = [];
+    for (const raw of b.checklist as unknown[]) {
+      const c = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+      const text = typeof c.text === 'string' ? c.text.trim().replace(/\s+/g, ' ') : '';
+      if (!text || text.length > MAX_STEP) return `Each step needs a text of up to ${MAX_STEP} characters.`;
+      const id = typeof c.id === 'string' && c.id && c.id.length <= 64 ? c.id : crypto.randomUUID();
+      steps.push({ id, text, done: c.done === true });
+    }
+    e.checklist = steps;
   }
   if (!Object.keys(e).length) return 'Nothing to change.';
   return e;

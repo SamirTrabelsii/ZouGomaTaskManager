@@ -34,6 +34,14 @@ export interface Task {
   resumeOn: string | null;
   createdAt: string; // ISO
   completedAt: string | null; // ISO
+  /** Steps to tick off inside the task. Absent on older data = no steps. They carry no status, date or points of their own. */
+  checklist?: ChecklistItem[];
+}
+
+export interface ChecklistItem {
+  id: ID;
+  text: string;
+  done: boolean;
 }
 
 /** A lightweight wrapper that groups tasks. It is not a task itself – just a named, coloured label. */
