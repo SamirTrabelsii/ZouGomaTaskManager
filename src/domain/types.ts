@@ -104,6 +104,8 @@ export interface Habit {
   frequency: 'daily' | 'weekly';
   /** Times per week when weekly. Ignored for daily. */
   target: number;
+  /** Daily only: the weekdays it is due (1 = Monday … 7 = Sunday). Absent/null = every day. */
+  days?: number[] | null;
   archived: boolean;
   createdAt: string;
   origin: string | null; // template starter key, used to avoid duplicates

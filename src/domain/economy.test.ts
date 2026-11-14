@@ -175,6 +175,16 @@ describe('habits kept all week', () => {
     expect(paid.label).toContain('1 habit kept');
     expect(pendingBounties({ ...d, ledger: [opened(), paid], habitLogs: [] }, '2026-10-13')).toEqual([]);
   });
+  it('a weekdays-only habit is kept with Monday to Friday logged, weekend untouched', () => {
+    const h = { ...habit('a', 'daily'), days: [1, 2, 3, 4, 5] };
+    expect(habitsKept([h], logs('a', week.slice(0, 5)), '2026-10-05')).toBe(1);
+    expect(habitsKept([h], logs('a', [...week.slice(0, 4), ...week.slice(5)]), '2026-10-05')).toBe(0); // Friday missed
+  });
+  it('a weekend-only habit is not on track before its first day has come', () => {
+    const h = { ...habit('a', 'daily'), days: [6, 7] };
+    expect(habitsKept([h], [], '2026-10-05', '2026-10-09')).toBe(0);
+    expect(habitsKept([h], logs('a', ['2026-10-10']), '2026-10-05', '2026-10-10')).toBe(1);
+  });
 });
 
 describe('milestone reward', () => {

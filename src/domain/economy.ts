@@ -1,6 +1,6 @@
 import type { AppData, CertLevel, Certification, Goal, GoalTier, Habit, HabitLog, LedgerEntry, Milestone, Project, Task } from './types';
 import { addDays, diffDays, isoToDay, startOfWeek } from './dates';
-import { sumPoints, taskPoints } from './services';
+import { habitDueOn, sumPoints, taskPoints } from './services';
 
 /* ───────── Berries (฿): rewards earned from finished work, spent later in the card store ───────── */
 
@@ -21,7 +21,7 @@ export const PROJECT_REWARD = 200;
 /** At most this many projects (and milestones) pay per week (Mon–Sun), so closing throwaway projects can't print Berries. */
 export const PROJECTS_PER_WEEK = 3;
 export const MILESTONES_PER_WEEK = 5;
-/** Each habit kept for a whole week (every day, or its weekly target) adds this to the week's bounty. */
+/** Each habit kept for a whole week (each of its days, or its weekly target) adds this to the week's bounty. */
 export const HABIT_WEEK_REWARD = 25;
 /** A reached milestone pays this. */
 export const MILESTONE_REWARD = 50;
@@ -131,14 +131,20 @@ function keptIn(a: Activity, weekStart: string, until: string): number {
       for (let d = weekStart; d <= until; d = addDays(d, 1)) if (days.has(d)) n++;
       return n >= h.target;
     }
-    for (let d = weekStart; d <= until; d = addDays(d, 1)) if (!days.has(d)) return false;
-    return true;
+    // daily: every day it is due, up to `until`, must be logged (and at least one such day must have come)
+    let due = 0;
+    for (let d = weekStart; d <= until; d = addDays(d, 1)) {
+      if (!habitDueOn(h, d)) continue;
+      due++;
+      if (!days.has(d)) return false;
+    }
+    return due > 0;
   }).length;
 }
 
 /**
  * Habits kept the week starting `weekStart`, counting days up to `until` (the week's last day once it is over).
- * A habit counts only if it existed when the week began: daily ones need a log every day, weekly ones their target.
+ * A habit counts only if it existed when the week began: daily ones need a log on each of their days, weekly ones their target.
  */
 export function habitsKept(habits: Habit[], logs: HabitLog[], weekStart: string, until = addDays(weekStart, 6)): number {
   return keptIn(activityOf([], habits, logs), weekStart, until);

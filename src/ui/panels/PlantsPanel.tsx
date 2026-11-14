@@ -2,13 +2,27 @@ import { useEffect, useState } from 'react';
 import { useStore } from '../../state/store';
 import { useToday } from '../../state/hooks';
 import { addDays, daysRange, formatDay, LOCALE, parseDay, startOfWeek } from '../../domain/dates';
-import { consistency, habitDoneOn, habitSatisfied, plantGrowth, streaks, weekCount } from '../../domain/services';
+import { cleanHabitDays, consistency, habitDoneOn, habitDueOn, habitSatisfied, plantGrowth, streaks, weekCount } from '../../domain/services';
 import { TEMPLATES } from '../../domain/templates';
 import type { Habit } from '../../domain/types';
 import { ConfirmButton, Dialog, EmptyState, Field, ProgressBar } from '../common/ui';
 import { PanelShell } from './PanelShell';
 
-const freq = (h: Habit) => (h.frequency === 'daily' ? 'Every day' : `${h.target}× per week`);
+const DAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const EVERY_DAY = [1, 2, 3, 4, 5, 6, 7];
+const WEEKDAYS = [1, 2, 3, 4, 5];
+const WEEKEND = [6, 7];
+const same = (a: number[], b: number[]) => a.length === b.length && a.every((x, i) => x === b[i]);
+
+/** "Every day", "Weekdays", "Weekends", "Mon, Wed, Fri" or "3× per week". */
+function freq(h: Pick<Habit, 'frequency' | 'target' | 'days'>) {
+  if (h.frequency === 'weekly') return `${h.target}× per week`;
+  const days = cleanHabitDays(h.days);
+  if (!days) return 'Every day';
+  if (same(days, WEEKDAYS)) return 'Weekdays';
+  if (same(days, WEEKEND)) return 'Weekends';
+  return days.map((d) => DAY_SHORT[d - 1]).join(', ');
+}
 
 export function PlantsPanel() {
   const { habits, habitLogs, prefs } = useStore((s) => s.data);
@@ -40,6 +54,7 @@ export function PlantsPanel() {
           {active.map((h) => {
             const done = habitDoneOn(h, habitLogs, today);
             const sat = habitSatisfied(h, habitLogs, today);
+            const due = habitDueOn(h, today);
             const g = plantGrowth(h, habitLogs, today);
             const s = streaks(h, habitLogs, today);
             return (
@@ -55,21 +70,22 @@ export function PlantsPanel() {
                     <div className="text-xs text-ink-500">
                       {freq(h)} · 🌿 {g.stageName} · 🔥 {s.current} {h.frequency === 'daily' ? 'day' : 'week'} streak
                       {h.frequency === 'weekly' && ` · ${weekCount(h, habitLogs, today)}/${h.target} this week`}
-                      {sat && !done && ' · ✓ week target met'}
+                      {sat && !done && (due ? ' · ✓ week target met' : ' · 😴 rest day')}
                     </div>
                   </button>
                 </div>
                 <div className="mt-2 flex gap-1" role="group" aria-label={`Last 7 days for ${h.title}`}>
                   {week.map((d) => {
                     const on = habitDoneOn(h, habitLogs, d);
+                    const off = !habitDueOn(h, d);
                     return (
                       <button
                         key={d} onClick={() => st.toggleHabitLog(h.id, d)} aria-pressed={on}
-                        aria-label={`${formatDay(d)}: ${on ? 'logged' : 'not logged'}`} title={formatDay(d)}
-                        className={`flex h-7 flex-1 flex-col items-center justify-center rounded-md text-[10px] leading-none transition ${on ? 'bg-moss-500 text-white' : 'bg-cream-200 text-ink-500 hover:bg-cream-300'}`}
+                        aria-label={`${formatDay(d)}: ${on ? 'logged' : off ? 'rest day' : 'not logged'}`} title={off ? `${formatDay(d)} · rest day` : formatDay(d)}
+                        className={`flex h-7 flex-1 flex-col items-center justify-center rounded-md text-[10px] leading-none transition ${on ? 'bg-moss-500 text-white' : off ? 'border border-dashed border-cream-300 text-ink-400 opacity-60 hover:opacity-100' : 'bg-cream-200 text-ink-500 hover:bg-cream-300'}`}
                       >
                         <span>{parseDay(d).toLocaleDateString(LOCALE, { weekday: 'narrow' })}</span>
-                        <span>{on ? '●' : '○'}</span>
+                        <span>{on ? '●' : off ? '–' : '○'}</span>
                       </button>
                     );
                   })}
@@ -101,14 +117,19 @@ export function PlantsPanel() {
 
 function HabitForm({ habit, onClose }: { habit?: Habit; onClose: () => void }) {
   const st = useStore.getState();
-  const [f, setF] = useState({ title: habit?.title ?? '', frequency: habit?.frequency ?? ('daily' as Habit['frequency']), target: habit?.target ?? 3 });
+  const [f, setF] = useState({
+    title: habit?.title ?? '', frequency: habit?.frequency ?? ('daily' as Habit['frequency']), target: habit?.target ?? 3,
+    days: cleanHabitDays(habit?.days) ?? EVERY_DAY,
+  });
+  const toggleDay = (d: number) => setF({ ...f, days: f.days.includes(d) ? f.days.filter((x) => x !== d) : [...f.days, d].sort((a, b) => a - b) });
   const [err, setErr] = useState('');
   return (
     <Dialog title={habit ? 'Edit habit' : 'New habit'} onClose={onClose}>
       <form className="space-y-3" onSubmit={(e) => {
         e.preventDefault();
         if (!f.title.trim()) return setErr('Name your habit.');
-        const patch = { title: f.title.trim(), frequency: f.frequency, target: Math.min(7, Math.max(1, f.target)) };
+        if (f.frequency === 'daily' && f.days.length === 0) return setErr('Pick at least one day.');
+        const patch = { title: f.title.trim(), frequency: f.frequency, target: Math.min(7, Math.max(1, f.target)), days: f.frequency === 'daily' ? cleanHabitDays(f.days) : null };
         if (habit) st.updateHabit(habit.id, patch); else st.addHabit(patch);
         st.toast(habit ? 'Habit saved' : 'Habit planted 🌱');
         onClose();
@@ -117,13 +138,37 @@ function HabitForm({ habit, onClose }: { habit?: Habit; onClose: () => void }) {
         <div className="grid grid-cols-2 gap-3">
           <Field label="Frequency">
             <select className="input" value={f.frequency} onChange={(e) => setF({ ...f, frequency: e.target.value as Habit['frequency'] })}>
-              <option value="daily">Daily</option><option value="weekly">Weekly target</option>
+              <option value="daily">On set days</option><option value="weekly">X times a week</option>
             </select>
           </Field>
           {f.frequency === 'weekly' && (
             <Field label="Times per week"><input type="number" min={1} max={7} className="input" value={f.target} onChange={(e) => setF({ ...f, target: Number(e.target.value) })} /></Field>
           )}
         </div>
+        {f.frequency === 'daily' && (
+          <fieldset className="space-y-2">
+            <legend className="mb-1 text-xs font-medium text-ink-500">Days</legend>
+            <div className="flex gap-1" role="group" aria-label="Days the habit is due">
+              {DAY_SHORT.map((label, i) => {
+                const on = f.days.includes(i + 1);
+                return (
+                  <button key={label} type="button" aria-pressed={on} aria-label={label} onClick={() => { toggleDay(i + 1); setErr(''); }}
+                    className={`h-8 flex-1 rounded-md text-xs font-medium transition ${on ? 'bg-moss-600 text-white' : 'bg-cream-200 text-ink-500 hover:bg-cream-300'}`}>{label.slice(0, 2)}</button>
+                );
+              })}
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {([['Every day', EVERY_DAY], ['Weekdays', WEEKDAYS], ['Weekends', WEEKEND]] as const).map(([label, days]) => (
+                <button key={label} type="button" className={`btn px-2 py-1 text-xs ${same(f.days, days) ? 'btn-primary' : ''}`} onClick={() => { setF({ ...f, days: [...days] }); setErr(''); }}>{label}</button>
+              ))}
+            </div>
+          </fieldset>
+        )}
+        <p className="text-xs text-ink-500">
+          {f.frequency === 'daily'
+            ? 'Kept for the week when it is logged on each of these days. Other days are rest days: logging them is a bonus, skipping them never breaks the streak.'
+            : `Kept for the week once logged ${Math.min(7, Math.max(1, f.target))} times, on any days.`}
+        </p>
         <div className="flex justify-end gap-2"><button type="button" className="btn" onClick={onClose}>Cancel</button><button className="btn btn-primary" type="submit">Save</button></div>
       </form>
     </Dialog>
@@ -162,10 +207,11 @@ function HabitDetail({ id, onBack }: { id: string; onBack: () => void }) {
           {cells.map((d) => {
             const on = habitDoneOn(h, habitLogs, d);
             const future = d > today;
+            const off = !habitDueOn(h, d);
             return (
               <button key={d} disabled={future} aria-pressed={on} aria-label={`${formatDay(d)}: ${on ? 'logged' : 'not logged'}`} title={formatDay(d)}
                 onClick={() => st.toggleHabitLog(id, d)}
-                className={`aspect-square rounded-[4px] text-[8px] ${future ? 'opacity-20' : ''} ${on ? 'bg-moss-500 text-white' : 'bg-cream-200 hover:bg-cream-300'} ${d === today ? 'ring-2 ring-sky-500' : ''}`}>{on ? '✓' : ''}</button>
+                className={`aspect-square rounded-[4px] text-[8px] ${future ? 'opacity-20' : ''} ${on ? 'bg-moss-500 text-white' : off ? 'border border-dashed border-cream-300' : 'bg-cream-200 hover:bg-cream-300'} ${d === today ? 'ring-2 ring-sky-500' : ''}`}>{on ? '✓' : ''}</button>
             );
           })}
         </div>
