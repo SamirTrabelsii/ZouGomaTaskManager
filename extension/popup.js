@@ -147,6 +147,11 @@ function taskItem(t) {
   const project = state.projects.find((p) => p.id === t.projectId);
   if (project) bits.push(el('span', { text: `▣ ${project.title}` }));
   if (t.priority === 'high' && t.status !== 'done') bits.push(el('span', { class: 'late', text: 'High' }));
+  const steps = t.checklist ?? [];
+  if (steps.length) {
+    const n = steps.filter((c) => c.done).length;
+    bits.push(el('span', { class: n === steps.length ? 'steps-all' : '', title: `Checklist: ${n} of ${steps.length} steps done`, text: `☑ ${n}/${steps.length}` }));
+  }
   if (t.link) bits.push(el('a', { class: 'link', href: t.link, target: '_blank', rel: 'noopener noreferrer', title: t.link, text: `🔗 ${hostOf(t.link)}` }));
 
   const body = el('div', { class: 'body' },
@@ -202,6 +207,7 @@ function editor(t) {
     title,
     el('div', { class: 'three' }, el('label', {}, 'Due', due), el('label', {}, 'Priority', priority), el('label', {}, 'Scope', scope)),
     el('div', { class: 'two' }, el('label', {}, 'Status', status), blockedRow, resumeRow),
+    stepsSection(t, () => { status.value = 'done'; syncStatus(); form.requestSubmit(); }),
     el('div', { class: 'actions' },
       el('button', { type: 'button', class: 'btn ghost danger', text: 'Delete', onclick: () => remove(t) }),
       el('span', { class: 'grow' }),
@@ -212,6 +218,60 @@ function editor(t) {
   return form;
 }
 function startEdit(id) { editingId = id; render(); }
+
+/* ── checklist steps: only inside the editor, saved as you tick them ── */
+function stepsSection(t, markDone) {
+  const box = el('div', { class: 'steps', role: 'group', 'aria-label': 'Checklist' });
+  let busy = Promise.resolve();
+  const update = (items, refocus = false) => {
+    const prev = t.checklist ?? [];
+    t.checklist = items;
+    draw(refocus);
+    // one request at a time, each sending the whole list as it is now
+    busy = busy.then(async () => {
+      try {
+        await api(`/tasks/${encodeURIComponent(t.id)}`, { method: 'PATCH', body: { checklist: t.checklist } });
+        void saveCache();
+      } catch (e) {
+        t.checklist = prev;
+        draw();
+        fail(e);
+      }
+    });
+  };
+  function draw(refocus = false) {
+    const items = t.checklist ?? [];
+    const done = items.filter((c) => c.done).length;
+    const input = el('input', {
+      maxlength: '200', 'aria-label': 'New step', placeholder: items.length ? 'Add another step, then Enter' : 'Break it into steps: type one, then Enter',
+      onkeydown: (e) => {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        const text = input.value.trim().replace(/\s+/g, ' ');
+        if (text) update([...items, { id: crypto.randomUUID(), text, done: false }], true);
+      },
+    });
+    box.replaceChildren(...[
+      el('div', { class: 'steps-head' },
+        el('span', { text: 'Checklist' }),
+        items.length ? el('span', { class: 'meter', 'aria-hidden': 'true' }, el('i', { style: `width:${(done / items.length) * 100}%` })) : null,
+        items.length ? el('span', { class: 'n', text: `${done}/${items.length}` }) : null),
+      items.length ? el('ul', {}, ...items.map((c) => el('li', { class: c.done ? 'on' : '' },
+        el('label', {},
+          el('input', { type: 'checkbox', checked: c.done, onchange: () => update(items.map((x) => (x.id === c.id ? { ...x, done: !x.done } : x))) }),
+          el('span', { text: c.text })),
+        el('button', { type: 'button', class: 'x', text: '✕', title: 'Remove step', 'aria-label': `Remove step: ${c.text}`, onclick: () => update(items.filter((x) => x.id !== c.id)) }),
+      ))) : null,
+      input,
+      items.length && done === items.length && t.status !== 'done'
+        ? el('button', { type: 'button', class: 'btn all-done', text: '✓ All steps done · mark the task done', onclick: markDone })
+        : null,
+    ].filter(Boolean)); // replaceChildren would print a null as text
+    if (refocus) queueMicrotask(() => input.focus());
+  }
+  draw();
+  return box;
+}
 
 /* ── lists ── */
 function group(label, tasks, cls = '', collapsible = false) {

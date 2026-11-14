@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
-import type { Priority, Scope, Task, TaskSize, TaskStatus } from '../../domain/types';
-import { useStore } from '../../state/store';
+import type { ChecklistItem, Priority, Scope, Task, TaskSize, TaskStatus } from '../../domain/types';
+import { uid, useStore } from '../../state/store';
 import { useToday } from '../../state/hooks';
 import { relativeDay } from '../../domain/dates';
-import { dueTone, SIZE_POINTS, sortTasks, TASK_SIZES, type DueTone } from '../../domain/services';
+import { checklistProgress, dueTone, SIZE_POINTS, sortTasks, TASK_SIZES, type DueTone } from '../../domain/services';
 import { resolveTemplates } from '../../domain/templates';
 import { ConfirmButton, Dialog, EmptyState, Field } from './ui';
 import {
@@ -14,7 +14,7 @@ import {
 
 export function TaskDialog({ taskId, defaults, onClose }: { taskId?: string; defaults?: Partial<Task>; onClose: () => void }) {
   const { tasks, projects, milestones, goals, reminders, prefs } = useStore((s) => s.data);
-  const { addTask, updateTask, deleteTask, setTaskReminder, toast } = useStore.getState();
+  const { addTask, updateTask, deleteTask, setTaskReminder, setChecklist, toast } = useStore.getState();
   const existing = taskId ? tasks.find((t) => t.id === taskId) : undefined;
   const cfg = resolveTemplates(prefs.templates);
   const rem = taskId ? reminders.find((r) => r.link?.type === 'task' && r.link.id === taskId) : undefined;
@@ -32,8 +32,9 @@ export function TaskDialog({ taskId, defaults, onClose }: { taskId?: string; def
     const title = (f.title ?? '').trim();
     if (!title) return setError('Give the task a title.');
     let id = taskId;
-    if (existing) updateTask(existing.id, { ...f, title });
-    else id = addTask({ ...f, title } as Task & { title: string }).id;
+    const checklist = cleanSteps(f.checklist ?? []);
+    if (existing) updateTask(existing.id, { ...f, title, checklist });
+    else id = addTask({ ...f, title, checklist } as Task & { title: string }).id;
     if (id) setTaskReminder(id, remindAt || null);
     toast(existing ? 'Task saved' : 'Task added');
     onClose();
@@ -49,6 +50,16 @@ export function TaskDialog({ taskId, defaults, onClose }: { taskId?: string; def
         <Field label="Notes">
           <textarea className="input min-h-[64px]" value={f.notes ?? ''} onChange={(e) => set('notes', e.target.value)} />
         </Field>
+        <ChecklistEditor
+          items={f.checklist ?? []} savesLive={!!existing}
+          onChange={(v) => { set('checklist', v); if (existing) setChecklist(existing.id, cleanSteps(v)); }}
+        />
+        {checklistProgress(f).complete && f.status !== 'done' && (
+          <p className="flex items-center justify-between gap-2 rounded-lg bg-moss-400/10 px-3 py-2 text-xs">
+            <span>All steps are ticked.</span>
+            <button type="button" className="btn px-2 py-1 text-xs" onClick={() => set('status', 'done')}>Mark task done</button>
+          </p>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <Field label="Status">
             <select className="input" value={f.status} onChange={(e) => set('status', e.target.value as TaskStatus)}>
@@ -127,6 +138,88 @@ export function TaskDialog({ taskId, defaults, onClose }: { taskId?: string; def
         </div>
       </form>
     </Dialog>
+  );
+}
+
+/* ───────── Checklist ───────── */
+
+/** Trims steps and drops the empty ones. */
+const cleanSteps = (items: ChecklistItem[]) => items.map((c) => ({ ...c, text: c.text.trim() })).filter((c) => c.text);
+
+/**
+ * The steps of a task. They only live here, in the task form, so the lists stay simple. Tick a step, click its text to
+ * rename it, ✕ to remove it, type and press Enter to add the next one.
+ */
+function ChecklistEditor({ items, onChange, savesLive }: { items: ChecklistItem[]; onChange: (v: ChecklistItem[]) => void; savesLive: boolean }) {
+  const [draft, setDraft] = useState('');
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const p = checklistProgress({ checklist: items });
+  const edit = (id: string, patch: Partial<ChecklistItem>) => onChange(items.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+  const remove = (id: string) => onChange(items.filter((c) => c.id !== id));
+  const add = () => {
+    const text = draft.trim();
+    if (!text) return;
+    onChange([...items, { id: uid(), text, done: false }]);
+    setDraft('');
+  };
+  return (
+    <section aria-label="Checklist">
+      <div className="mb-1 flex items-center gap-2">
+        <span className="label !mb-0">Checklist</span>
+        {p.total > 0 && (
+          <>
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-cream-200" aria-hidden>
+              <div className="h-full rounded-full bg-moss-500 transition-all" style={{ width: `${(p.done / p.total) * 100}%` }} />
+            </div>
+            <span className="text-xs tabular-nums text-ink-500" aria-label={`${p.done} of ${p.total} steps done`}>{p.done}/{p.total}</span>
+          </>
+        )}
+      </div>
+      {items.length > 0 && (
+        <ul className="mb-1.5 space-y-0.5">
+          {items.map((c) => (
+            <li key={c.id} className="flex items-center gap-2 rounded-md px-1 hover:bg-cream-100">
+              <input
+                type="checkbox" className="h-4 w-4 shrink-0 cursor-pointer accent-moss-600" checked={c.done}
+                onChange={() => edit(c.id, { done: !c.done })} aria-label={`${c.done ? 'Untick' : 'Tick'}: ${c.text}`}
+              />
+              {renaming === c.id ? (
+                <input
+                  className="input py-0.5 text-sm" defaultValue={c.text} autoFocus aria-label="Rename step"
+                  onBlur={(e) => { const text = e.target.value.trim(); if (text) edit(c.id, { text }); else remove(c.id); setRenaming(null); }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); }
+                    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setRenaming(null); }
+                  }}
+                />
+              ) : (
+                <button
+                  type="button" title="Click to rename" onClick={() => setRenaming(c.id)}
+                  className={`min-w-0 flex-1 py-1 text-left text-sm [overflow-wrap:anywhere] ${c.done ? 'text-ink-400 line-through' : ''}`}
+                >{c.text}</button>
+              )}
+              <button type="button" className="shrink-0 rounded px-1.5 py-1 text-xs text-ink-400 hover:text-clay-600" onClick={() => remove(c.id)} aria-label={`Remove step: ${c.text}`}>✕</button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <input
+        className="input py-1 text-sm" value={draft} onChange={(e) => setDraft(e.target.value)} aria-label="New checklist step"
+        placeholder={items.length ? 'Add another step, then Enter' : 'Break it into steps: type one, then Enter'}
+        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
+        onBlur={add}
+      />
+      {savesLive && items.length > 0 && <p className="mt-1 text-[11px] text-ink-400">Steps are saved as you tick them.</p>}
+    </section>
+  );
+}
+
+/** Read-only "☑ 2/5" in a task's chips: the steps themselves only show when the task is opened. */
+export function ChecklistBadge({ task }: { task: Task }) {
+  const p = checklistProgress(task);
+  if (!p.total) return null;
+  return (
+    <span className={`chip ${p.complete ? 'border-moss-500 text-moss-400' : ''}`} title={`Checklist: ${p.done} of ${p.total} steps done`}>☑ {p.done}/{p.total}</span>
   );
 }
 
@@ -335,6 +428,7 @@ export function TaskRow({ task, onEdit, compact, shortDays }: { task: Task; onEd
               </span>
             )}
             {project && <span className="chip">📘 {project.title}</span>}
+            <ChecklistBadge task={task} />
           </div>
         )}
       </button>
