@@ -61,3 +61,21 @@ export function NamiAvatar({ className }: { className?: string }) {
     </svg>
   );
 }
+
+export function BrookAvatar({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 48 48" width="1.2em" height="1.2em" className={className} aria-hidden focusable="false">
+      {/* the big afro */}
+      <circle cx="24" cy="24" r="17" fill="#1a1520" />
+      <circle cx="10" cy="26" r="6" fill="#1a1520" /><circle cx="38" cy="26" r="6" fill="#1a1520" />
+      {/* face shell and visor */}
+      <ellipse cx="24" cy="33" rx="12" ry="11" fill={SHELL} />
+      <rect x="14" y="28.5" width="20" height="10" rx="5" fill={VISOR} />
+      <HappyEyes cx={24} cy={33.5} />
+      {/* top hat with its red band */}
+      <rect x="9" y="13" width="30" height="3" rx="1.5" fill="#111" />
+      <rect x="15" y="2" width="18" height="12" rx="1.5" fill="#111" />
+      <rect x="15" y="10" width="18" height="3" fill="#8e2236" />
+    </svg>
+  );
+}

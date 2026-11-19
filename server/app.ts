@@ -12,6 +12,7 @@ import { agentRouter, makeRequireAgent } from './agent';
 import { absenceRouter } from './absences';
 import { backupBeforeWrite, MAX_BACKUPS } from './documents';
 import { extensionRouter } from './extension';
+import { deckRouter } from './deck';
 
 const COOKIE = 'lifeos_session';
 const SESSION_DAYS = 30;
@@ -460,6 +461,9 @@ export function createApp(opts: AppOptions) {
 
   /* ── browser extension (bearer token of scope 'tasks': the task list only) ── */
   app.use('/api/extension', extensionRouter(pool, requireAuth, (req) => (req as Authed).userId, agentLimits));
+
+  /* ── stream deck on the PC (bearer token of scope 'deck': its own buttons only) ── */
+  app.use('/api/deck', deckRouter(pool, requireAuth, (req) => (req as Authed).userId, agentLimits));
 
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));
 

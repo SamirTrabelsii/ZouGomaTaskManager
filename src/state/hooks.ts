@@ -4,6 +4,7 @@ import { useStore } from './store';
 import { useFeeds } from './feeds';
 import { useAgent } from './agent';
 import { absenceInFlight, useAbsences } from './absences';
+import { useDeck } from './deck';
 
 /** Current local date; rolls over at midnight without a reload. */
 export function useToday(): string {
@@ -73,6 +74,21 @@ export function useAbsenceSync(enabled: boolean) {
     document.addEventListener('visibilitychange', tick);
     return () => { clearInterval(id); document.removeEventListener('visibilitychange', tick); };
   }, [enabled, busy]);
+}
+
+/**
+ * Keeps Brook Bot current: the deck only changes when the owner saves or the PC syncs, so a look when the tab comes back
+ * and every 10 minutes is plenty (the panel checks more often while it is open).
+ */
+export function useDeckSync(enabled: boolean) {
+  useEffect(() => {
+    if (!enabled) { useDeck.getState().reset(); return; }
+    const tick = () => { if (document.visibilityState === 'visible') void useDeck.getState().sync(); };
+    tick();
+    const id = setInterval(tick, 10 * 60_000);
+    document.addEventListener('visibilitychange', tick);
+    return () => { clearInterval(id); document.removeEventListener('visibilitychange', tick); };
+  }, [enabled]);
 }
 
 /** Whether the room is in its night look: explicit 'evening', or 'auto' following the local clock. */
