@@ -8,7 +8,7 @@ import { cloud, ApiError } from '../../data/cloud';
 import { ago } from '../FeedsSettings';
 import {
   ACTION_LABELS, BUTTON_COLORS, MAX_BUTTONS, MAX_COLUMNS, MAX_LABEL, MIN_COLUMNS, blankAction, buttonProblem, deckMood, describeAction,
-  moveItem, newButton, starterButtons, type DeckActionType, type DeckButton, type DeckOverview,
+  moveItem, newButton, starterButtons, type ChromeProfile, type DeckActionType, type DeckButton, type DeckOverview,
 } from '../../domain/deck';
 
 type Tab = 'buttons' | 'connect';
@@ -191,11 +191,13 @@ function ButtonEditor({ b, overview, onChange }: { b: DeckButton; overview: Deck
             </div>
             {a.browser === 'chrome' && (
               <Field label="Chrome profile" className="min-w-[8rem] flex-1">
-                <input className="input" value={a.profile} placeholder="Default" onChange={(e) => onChange({ action: { ...a, profile: e.target.value } })} />
+                <ChromeProfilePicker value={a.profile} profiles={overview.deck.chromeProfiles ?? []} onChange={(profile) => onChange({ action: { ...a, profile } })} />
               </Field>
             )}
           </div>
-          {a.browser === 'chrome' && <p className="text-xs text-ink-500">The profile is the last folder of “Profile Path” in <code>chrome://version</code>: <code>Default</code> for the first one, then <code>Profile 1</code>, <code>Profile 2</code>…</p>}
+          {a.browser === 'chrome' && (overview.deck.chromeProfiles?.length
+            ? <p className="text-xs text-ink-500">The profiles of Chrome on your PC, as the deck last saw them. If that profile already has a window open, the page opens as a new tab in it.</p>
+            : <p className="text-xs text-ink-500">Connect the deck to pick from your Chrome profiles. Meanwhile: the last folder of “Profile Path” in <code>chrome://version</code> (<code>Default</code>, <code>Profile 1</code>, <code>Profile 2</code>…).</p>)}
         </>
       )}
 
@@ -249,6 +251,20 @@ function FilePicker({ value, files, placeholder, onChange }: { value: string; fi
     <select className="input" value={known ? value : ''} onChange={(e) => onChange(e.target.value)}>
       {!known && <option value="">{value ? `${value} (not on the PC)` : 'Pick a file…'}</option>}
       {files.map((f) => <option key={f} value={f}>{f}</option>)}
+    </select>
+  );
+}
+
+/** Chrome's profiles by name and account, as the deck reported them; free text until the deck has connected. */
+function ChromeProfilePicker({ value, profiles, onChange }: { value: string; profiles: ChromeProfile[]; onChange: (v: string) => void }) {
+  if (!profiles.length) {
+    return <input className="input" value={value} placeholder="Default" onChange={(e) => onChange(e.target.value)} />;
+  }
+  const known = profiles.some((p) => p.dir === value);
+  return (
+    <select className="input" value={known ? value : ''} onChange={(e) => onChange(e.target.value)}>
+      {!known && <option value="">{value ? `${value} (not on the PC)` : 'Pick a profile…'}</option>}
+      {profiles.map((p) => <option key={p.dir} value={p.dir}>{p.name}{p.account ? ` · ${p.account}` : ''} ({p.dir})</option>)}
     </select>
   );
 }

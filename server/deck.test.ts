@@ -108,12 +108,17 @@ describe.skipIf(!reachable)('stream deck API', () => {
   });
 
   it('the deck syncs with its token: reports its files, gets the buttons', async () => {
-    const r = await call('POST', '/api/deck/sync', { bearer: deckToken, body: { version: '0.1.0', scripts: ['backup.ps1', '../x.ps1', 'b.exe'], sounds: ['applause.wav'] } });
+    const r = await call('POST', '/api/deck/sync', { bearer: deckToken, body: {
+      version: '0.1.0', scripts: ['backup.ps1', '../x.ps1', 'b.exe'], sounds: ['applause.wav'],
+      chromeProfiles: [{ dir: 'Profile 2', name: 'Perso', account: 's…@example.com' }, { dir: 'Default', name: 'Other', account: 'someone@example.com' }, { dir: '--x', name: 'bad' }],
+    } });
     expect(r.status).toBe(200);
     expect(r.body.revision).toBe(2);
     expect(r.body.buttons.map((b: { label: string }) => b.label)).toEqual(['Applause', 'Capture', 'LifeOS']);
     const o = await call('GET', '/api/deck');
     expect(o.body.deck).toMatchObject({ syncedRevision: 2, version: '0.1.0', scripts: ['backup.ps1'], sounds: ['applause.wav'] });
+    // a full address is never stored, and a folder that reads as a switch is dropped
+    expect(o.body.deck.chromeProfiles).toEqual([{ dir: 'Profile 2', name: 'Perso', account: 's…@example.com' }, { dir: 'Default', name: 'Other', account: '' }]);
     expect(o.body.deck.syncedAt).toBeTruthy();
   });
 
