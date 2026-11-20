@@ -20,7 +20,8 @@ CREATE TABLE IF NOT EXISTS agent_tokens (
   revoked_at   TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS agent_tokens_user_idx ON agent_tokens(user_id);
--- what a token opens: 'agent' (the agent and n8n: alerts, orders, absences) or 'tasks' (the browser extension: tasks only)
+-- what a token opens: 'agent' (the agent and n8n: alerts, orders, absences), 'tasks' (the browser extension: tasks only)
+-- or 'deck' (the stream deck on the PC: its own buttons only)
 ALTER TABLE agent_tokens ADD COLUMN IF NOT EXISTS scope TEXT NOT NULL DEFAULT 'agent';
 -- the agent's last heartbeat: lets the room show "agent online / offline"
 CREATE TABLE IF NOT EXISTS agent_status (
@@ -163,7 +164,7 @@ export function newAgentToken(): string {
 }
 
 /** What a token opens. Each scope has its own list and its own limit of active tokens. */
-export type TokenScope = 'agent' | 'tasks';
+export type TokenScope = 'agent' | 'tasks' | 'deck';
 
 export async function listTokens(pool: pg.Pool, userId: number, scope: TokenScope) {
   const { rows } = await pool.query(

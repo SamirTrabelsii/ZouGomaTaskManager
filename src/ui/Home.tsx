@@ -16,7 +16,9 @@ import { AbsencePanel } from './panels/AbsencePanel';
 import { useAbsences } from '../state/absences';
 import { useAgent } from '../state/agent';
 import { agentConfigured } from '../domain/agent';
-import { ChopperAvatar, NamiAvatar } from './common/CrewAvatar';
+import { BrookAvatar, ChopperAvatar, NamiAvatar } from './common/CrewAvatar';
+import { DeckPanel } from './panels/DeckPanel';
+import { useDeck } from '../state/deck';
 
 const Scene = lazy(() => import('../scene/Scene'));
 
@@ -29,6 +31,7 @@ export const OBJECTS: { id: SceneObjectId; label: string; icon: ReactNode }[] = 
   { id: 'chest', label: 'Chest · Treasury', icon: '💰' },
   { id: 'agent', label: 'Chopper Bot · Alerts', icon: <ChopperAvatar /> },
   { id: 'absence', label: 'Nami Bot · Absences', icon: <NamiAvatar /> },
+  { id: 'deck', label: 'Brook Bot · Stream deck', icon: <BrookAvatar /> },
 ];
 
 class SceneBoundary extends Component<{ onError: () => void; children: ReactNode }, { failed: boolean }> {
@@ -47,6 +50,7 @@ function Panel({ id }: { id: SceneObjectId }) {
     case 'notebook': return <NotesPanel />;
     case 'agent': return <AgentPanel />;
     case 'absence': return <AbsencePanel />;
+    case 'deck': return <DeckPanel />;
     case 'chest': return null; // opens the Treasury dialog instead
   }
 }
@@ -58,9 +62,10 @@ function Dock({ big }: { big?: boolean }) {
   const hover = useStore((s) => s.hover);
   const hasAgent = useAgent((s) => agentConfigured(s.overview));
   const hasAbsences = useAbsences((s) => s.list !== null);
+  const hasDeck = useDeck((s) => s.overview !== null);
   return (
     <nav aria-label="Room objects" className={`pointer-events-auto flex gap-1 rounded-2xl border border-cream-300 bg-cream-50/90 p-1 shadow-soft backdrop-blur-md ${big ? 'flex-wrap justify-center' : ''}`}>
-      {OBJECTS.filter((o) => (o.id !== 'agent' || hasAgent) && (o.id !== 'absence' || hasAbsences)).map((o) => (
+      {OBJECTS.filter((o) => (o.id !== 'agent' || hasAgent) && (o.id !== 'absence' || hasAbsences) && (o.id !== 'deck' || hasDeck)).map((o) => (
         <button
           key={o.id} aria-pressed={selected === o.id} title={o.label}
           onClick={() => select(selected === o.id ? null : o.id)}

@@ -10,11 +10,13 @@ import { agentSummary, unseenAlerts } from '../domain/agent';
 import { useAgent } from '../state/agent';
 import { useAbsences } from '../state/absences';
 import { absenceSummary } from '../domain/absence';
-import { ChopperAvatar, NamiAvatar } from '../ui/common/CrewAvatar';
+import { BrookAvatar, ChopperAvatar, NamiAvatar } from '../ui/common/CrewAvatar';
+import { useDeck } from '../state/deck';
+import { deckSummary } from '../domain/deck';
 
 export const PIN_ICON: Record<SceneObjectId, ReactNode> = {
   desk: '✓', bookshelf: '📖', plants: '🌿', calendar: '📅', notebook: '✎', chest: '฿',
-  agent: createElement(ChopperAvatar), absence: createElement(NamiAvatar),
+  agent: createElement(ChopperAvatar), absence: createElement(NamiAvatar), deck: createElement(BrookAvatar),
 };
 
 /** True when the user has no data at all — the room then guides them with prompts. */
@@ -34,6 +36,7 @@ export function useRoomInfo(id: SceneObjectId): { summary: string; prompt: strin
   const alerts = useAgent((s) => s.alerts);
   const seen = useAgent((s) => s.seen);
   const absences = useAbsences((s) => s.list);
+  const deck = useDeck((s) => s.overview);
   return useMemo(() => {
     switch (id) {
       case 'desk': {
@@ -66,6 +69,7 @@ export function useRoomInfo(id: SceneObjectId): { summary: string; prompt: strin
         return { summary: `${data.notes.length} note${data.notes.length === 1 ? '' : 's'}`, prompt: data.notes.length ? null : 'Write your first note' };
       case 'agent': return agentSummary(agent, alerts, unseenAlerts(seen, alerts).length);
       case 'absence': return absenceSummary(absences, today);
+      case 'deck': return deckSummary(deck);
       case 'chest': {
         if (!economyStart(data.ledger)) return { summary: 'Earn Berries from your work', prompt: 'Open the treasure chest' };
         const ready = pendingBounties(data, today).length;
@@ -74,5 +78,5 @@ export function useRoomInfo(id: SceneObjectId): { summary: string; prompt: strin
         return { summary: `${formatBerries(balance(data.ledger))} · ${extra}`, prompt: null };
       }
     }
-  }, [id, data, today, imported, agent, alerts, seen, absences]);
+  }, [id, data, today, imported, agent, alerts, seen, absences, deck]);
 }

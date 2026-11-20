@@ -31,6 +31,7 @@ async function api<T>(path: string, init: { method?: string; body?: unknown; tim
 
 import type { AgentAlert, AgentAlertDetail, AgentCommand, AgentCommandKind, AgentOverview, CalendarFeed, ExternalEvent } from '../domain/types';
 import type { AbsenceDay, AbsenceList, AbsenceSettings, AbsenceStep, AbsenceType } from '../domain/absence';
+import type { DeckButton, DeckOverview } from '../domain/deck';
 
 export interface Health { ok: true; hasUser: boolean; registrationOpen: boolean }
 export interface CloudBackup { id: string; reason: string; revision: number; savedAt: string }
@@ -84,6 +85,12 @@ export const cloud = {
   sendAgentCommand: (kind: AgentCommandKind, alertId?: string) =>
     api<{ id: string; alreadyQueued?: boolean }>('/agent/commands', { method: 'POST', body: alertId ? { kind, alertId } : { kind } }),
   agentAlerts: () => api<{ alerts: AgentAlert[] }>('/agent/alerts'),
+  /** The stream deck's buttons, what the deck on the PC last reported, and its tokens (scope 'deck'). */
+  deck: () => api<DeckOverview>('/deck'),
+  saveDeck: (columns: number, buttons: DeckButton[]) =>
+    api<{ columns: number; buttons: DeckButton[]; revision: number; updatedAt: string }>('/deck', { method: 'PUT', body: { columns, buttons } }),
+  createDeckToken: (name: string) => api<{ id: string; name: string; hint: string; createdAt: string; token: string }>('/deck/tokens', { method: 'POST', body: { name } }),
+  revokeDeckToken: (id: string) => api<{ ok: true }>(`/deck/tokens/${encodeURIComponent(id)}`, { method: 'DELETE', body: {} }),
   absences: () => api<AbsenceList>('/absences'),
   absenceSettings: () => api<AbsenceSettings>('/absences/settings'),
   saveAbsenceSettings: (s: AbsenceSettings) => api<AbsenceSettings>('/absences/settings', { method: 'PUT', body: s }),

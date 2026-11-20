@@ -18,6 +18,8 @@ import { useAgent } from '../state/agent';
 import { ABSENCE_SPOT, AbsenceBot } from './absenceBot';
 import { useAbsences } from '../state/absences';
 import { agentConfigured } from '../domain/agent';
+import { BrookBot, DECK_SPOT } from './brookBot';
+import { useDeck } from '../state/deck';
 
 const DEFAULT_POS: [number, number, number] = [11.8, 10.8, 11.9]; // isometric-style diagonal view
 const DEFAULT_TARGET: [number, number, number] = [0.2, 0.8, 0.3];
@@ -34,6 +36,7 @@ const FOCUS: Record<SceneObjectId, { target: [number, number, number]; dist: num
   chest: { target: [0.95, 0.3, 2.35], dist: 8.5 },
   agent: { target: AGENT_SPOT, dist: 8.5 },
   absence: { target: ABSENCE_SPOT, dist: 8 },
+  deck: { target: DECK_SPOT, dist: 8 },
 };
 
 /** Reading view for the wall poster: as close and as square-on as the orbit limits allow. */
@@ -179,6 +182,7 @@ export default function Scene({ onContextLost }: { onContextLost?: () => void })
   const evening = useNight();
   const hasAgent = useAgent((s) => agentConfigured(s.overview));
   const hasAbsences = useAbsences((s) => s.list !== null);
+  const hasDeck = useDeck((s) => s.overview !== null);
 
   return (
     <Canvas
@@ -206,6 +210,7 @@ export default function Scene({ onContextLost }: { onContextLost?: () => void })
       <CardShowcase reduceMotion={scene.reduceMotion} />
       {hasAgent && <AgentConsole evening={evening} reduceMotion={scene.reduceMotion} />}
       {hasAbsences && <AbsenceBot reduceMotion={scene.reduceMotion} />}
+      {hasDeck && <BrookBot reduceMotion={scene.reduceMotion} />}
       {q !== 'low' && (
         <EffectComposer multisampling={0}>
           <Bloom intensity={evening ? 0.8 : 0.25} luminanceThreshold={0.92} luminanceSmoothing={0.25} mipmapBlur />
