@@ -13,6 +13,9 @@ export type DeckAction =
 
 export interface DeckButton { id: string; label: string; icon: string; color: string; action: DeckAction }
 
+/** A Chrome profile on the PC, as the deck reports it: its folder, its name in Chrome, and the account partly hidden. */
+export interface ChromeProfile { dir: string; name: string; account: string }
+
 export interface DeckToken { id: string; name: string; hint: string; createdAt: string; lastUsedAt: string | null }
 
 export interface DeckOverview {
@@ -22,7 +25,7 @@ export interface DeckOverview {
   revision: number;
   updatedAt: string | null;
   /** What the deck on the PC last reported. */
-  deck: { syncedAt: string | null; syncedRevision: number; version: string; scripts: string[]; sounds: string[] };
+  deck: { syncedAt: string | null; syncedRevision: number; version: string; scripts: string[]; sounds: string[]; chromeProfiles?: ChromeProfile[] };
   tokens: DeckToken[];
 }
 

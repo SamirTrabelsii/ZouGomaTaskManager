@@ -8,7 +8,7 @@ import { listTokens, makeRequireAgent, tokenRoutes, agentUserOf, type Limiter } 
  * its layout; the deck runs every action itself, on the PC.
  *
  * The deck signs in with a bearer token of scope 'deck', which opens one route: POST /sync. That call reports what the PC
- * has (the scripts and sounds in its folders, never their content) and returns the buttons. The deck makes it when it starts
+ * has (the scripts and sounds in its folders, never their content, and its Chrome profiles by name) and returns the buttons. The deck makes it when it starts
  * and when the owner clicks refresh, never on a timer, so it does not keep a sleeping database awake.
  *
  * LifeOS never sends a command line. A script is named, and the deck only runs files from its own scripts folder. The deck
@@ -120,6 +120,23 @@ export function parseDeck(body: unknown): { columns: number; buttons: DeckButton
   return { columns: columns as number, buttons };
 }
 
+export interface ChromeProfile { dir: string; name: string; account: string }
+/**
+ * The Chrome profiles the deck reports: folder, name, and the account with all but its first letter hidden (the deck masks
+ * it; anything still looking like a full address is dropped here).
+ */
+function cleanProfiles(v: unknown): ChromeProfile[] {
+  if (!Array.isArray(v)) return [];
+  const out: ChromeProfile[] = [];
+  for (const p of v.slice(0, 50)) {
+    if (!isObj(p) || typeof p.dir !== 'string' || !CHROME_PROFILE.test(p.dir)) continue;
+    const name = typeof p.name === 'string' ? p.name.trim().slice(0, 60) : '';
+    const account = typeof p.account === 'string' && /^[^@\s]…@[^@\s]{1,70}$/.test(p.account) ? p.account : '';
+    out.push({ dir: p.dir, name: name || p.dir, account });
+  }
+  return out;
+}
+
 /** The file names the deck reports, kept only when they are plain names of the right kind. */
 function cleanList(v: unknown, re: RegExp): string[] {
   if (!Array.isArray(v)) return [];
@@ -140,7 +157,7 @@ export function deckRouter(
       'SELECT columns, buttons, revision, updated_at, synced_at, synced_revision, deck_version, inventory FROM deck_config WHERE user_id=$1', [userId]);
     return rows[0] as undefined | {
       columns: number; buttons: DeckButton[]; revision: number; updated_at: Date; synced_at: Date | null;
-      synced_revision: number; deck_version: string; inventory: { scripts?: string[]; sounds?: string[] };
+      synced_revision: number; deck_version: string; inventory: { scripts?: string[]; sounds?: string[]; chromeProfiles?: ChromeProfile[] };
     };
   };
 
@@ -155,7 +172,7 @@ export function deckRouter(
         columns: row?.columns ?? 4, buttons: row?.buttons ?? [], revision: row?.revision ?? 0, updatedAt: row?.updated_at ?? null,
         deck: {
           syncedAt: row?.synced_at ?? null, syncedRevision: row?.synced_revision ?? 0, version: row?.deck_version ?? '',
-          scripts: row?.inventory.scripts ?? [], sounds: row?.inventory.sounds ?? [],
+          scripts: row?.inventory.scripts ?? [], sounds: row?.inventory.sounds ?? [], chromeProfiles: row?.inventory.chromeProfiles ?? [],
         },
         tokens,
       });
@@ -184,7 +201,7 @@ export function deckRouter(
       const userId = agentUserOf(req);
       const b = isObj(req.body) ? req.body : {};
       const version = typeof b.version === 'string' ? b.version.slice(0, 40) : '';
-      const inventory = { scripts: cleanList(b.scripts, SCRIPT_FILE), sounds: cleanList(b.sounds, SOUND_FILE) };
+      const inventory = { scripts: cleanList(b.scripts, SCRIPT_FILE), sounds: cleanList(b.sounds, SOUND_FILE), chromeProfiles: cleanProfiles(b.chromeProfiles) };
       const { rows } = await pool.query(
         `INSERT INTO deck_config (user_id, synced_at, deck_version, inventory) VALUES ($1, now(), $2, $3)
          ON CONFLICT (user_id) DO UPDATE SET synced_at=now(), synced_revision=deck_config.revision, deck_version=$2, inventory=$3
