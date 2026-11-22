@@ -1,18 +1,22 @@
 import crypto from 'node:crypto';
 import { Router, type Request, type RequestHandler } from 'express';
 import type pg from 'pg';
-import { listTokens, makeRequireAgent, tokenRoutes, agentUserOf, type Limiter } from './agent';
+import { findSecret, listTokens, makeRequireAgent, tokenRoutes, agentUserOf, type Limiter } from './agent';
+import { IMAGE_FILE } from './catalog';
+import { fetchImage, imageSourceUrl, type ImageFetcher } from './cardImages';
 
 /**
  * The stream deck: a small window of buttons floating on the owner's PC (the `deck/` app of lifeos-agent). LifeOS only keeps
  * its layout; the deck runs every action itself, on the PC.
  *
- * The deck signs in with a bearer token of scope 'deck', which opens one route: POST /sync. That call reports what the PC
- * has (the scripts and sounds in its folders, never their content, and its Chrome profiles by name) and returns the buttons. The deck makes it when it starts
- * and when the owner clicks refresh, never on a timer, so it does not keep a sleeping database awake.
+ * The deck signs in with a bearer token of scope 'deck', which opens three routes and nothing else: POST /sync reports what
+ * the PC has (the scripts and sounds in its folders, never their content, and its Chrome profiles by name) and returns the
+ * buttons and the list of uploaded files; GET /files/:kind/:name and GET /card/:file then fetch what the deck lacks. The
+ * deck syncs when it starts and when the owner clicks refresh, never on a timer, so it does not keep a sleeping database awake.
  *
- * LifeOS never sends a command line. A script is named, and the deck only runs files from its own scripts folder. The deck
- * also asks the owner once, on the PC, before it runs any action it has not seen before.
+ * LifeOS never sends a command line. A script is named, and the deck only runs files from its own scripts folder. Scripts
+ * uploaded here land in that folder, and the deck asks on the PC before running any action, or any script content, it has
+ * not run before.
  */
 
 export const DECK_SCHEMA = `
@@ -26,6 +30,17 @@ CREATE TABLE IF NOT EXISTS deck_config (
   synced_revision INTEGER NOT NULL DEFAULT 0,
   deck_version    TEXT NOT NULL DEFAULT '',
   inventory       JSONB NOT NULL DEFAULT '{"scripts":[],"sounds":[]}'
+);
+-- sounds and scripts the owner uploads in LifeOS; the deck downloads them into its folders when it syncs
+CREATE TABLE IF NOT EXISTS deck_files (
+  user_id    BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind       TEXT NOT NULL,
+  name       TEXT NOT NULL,
+  data       BYTEA NOT NULL,
+  sha256     TEXT NOT NULL,
+  size       INTEGER NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, kind, name)
 );
 `;
 
@@ -50,7 +65,38 @@ export type DeckAction =
   | { type: 'script'; file: string }
   | { type: 'sound'; file: string; volume: number };
 
-export interface DeckButton { id: string; label: string; icon: string; color: string; action: DeckAction }
+/** A One Piece card from the binder shown as the button's face: its art file on optcgapi.com and its name. */
+export interface DeckCard { img: string; name: string }
+export interface DeckButton { id: string; label: string; icon: string; color: string; card?: DeckCard; action: DeckAction }
+
+export type FileKind = 'sound' | 'script';
+export const MAX_SOUND_BYTES = 3 * 1024 * 1024;
+export const MAX_SCRIPT_BYTES = 64 * 1024;
+export const MAX_FILES = 60;
+export const MAX_FILES_BYTES = 25 * 1024 * 1024;
+const FILE_NAME: Record<FileKind, RegExp> = { sound: SOUND_FILE, script: SCRIPT_FILE };
+
+/** A file really is what its name says: a WAV, MP3 or Ogg header for sounds, plain text without secrets for scripts. */
+export function fileProblem(kind: FileKind, name: string, data: Buffer): string | null {
+  if (!FILE_NAME[kind].test(name)) {
+    return kind === 'sound' ? 'A sound is a .wav, .mp3 or .ogg file with a plain name.' : 'A script is a .ps1, .bat or .cmd file with a plain name.';
+  }
+  if (!data.length) return 'The file is empty.';
+  if (kind === 'sound') {
+    if (data.length > MAX_SOUND_BYTES) return `A sound can be at most ${MAX_SOUND_BYTES / 1024 / 1024} MB.`;
+    const ext = name.split('.').pop()!.toLowerCase();
+    const head = (a: number, b: number) => data.subarray(a, b).toString('latin1');
+    const ok = ext === 'wav' ? head(0, 4) === 'RIFF' && head(8, 12) === 'WAVE'
+      : ext === 'ogg' ? head(0, 4) === 'OggS'
+        : head(0, 3) === 'ID3' || (data[0] === 0xff && (data[1] & 0xe0) === 0xe0);
+    return ok ? null : `This is not a real .${ext} file.`;
+  }
+  if (data.length > MAX_SCRIPT_BYTES) return `A script can be at most ${MAX_SCRIPT_BYTES / 1024} KB.`;
+  if (data.includes(0)) return 'A script must be plain text.';
+  const secret = findSecret(data.toString('utf8'));
+  if (secret) return `This script looks like it contains a ${secret}. Keep secrets on the PC, not in LifeOS.`;
+  return null;
+}
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const text = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
@@ -115,7 +161,13 @@ export function parseDeck(body: unknown): { columns: number; buttons: DeckButton
     ids.add(id);
     const action = parseAction(raw.action);
     if (typeof action === 'string') return `${n} (${label}): ${action}`;
-    buttons.push({ id, label, icon, color: color.toLowerCase(), action });
+    let card: DeckCard | undefined;
+    if (raw.card !== undefined && raw.card !== null) {
+      const c = isObj(raw.card) ? raw.card : {};
+      if (typeof c.img !== 'string' || !IMAGE_FILE.test(c.img)) return `${n} (${label}): unknown card.`;
+      card = { img: c.img, name: text(c.name).slice(0, 80) };
+    }
+    buttons.push({ id, label, icon, color: color.toLowerCase(), ...(card ? { card } : {}), action });
   }
   return { columns: columns as number, buttons };
 }
@@ -148,9 +200,15 @@ export function deckRouter(
   requireAuth: RequestHandler,
   userIdOf: (req: Request) => number,
   limits: { perToken: Limiter; failures: Limiter },
+  fetchCard: ImageFetcher = fetchImage,
 ) {
   const router = Router();
   const requireDeck = makeRequireAgent(pool, limits, 'deck');
+  const listFiles = async (userId: number) => {
+    const { rows } = await pool.query('SELECT kind, name, sha256, size, updated_at FROM deck_files WHERE user_id=$1 ORDER BY kind, name', [userId]);
+    return rows.map((r) => ({ kind: r.kind as FileKind, name: r.name as string, sha256: r.sha256 as string, size: r.size as number, updatedAt: r.updated_at as Date }));
+  };
+  const kindOf = (v: unknown): FileKind | null => (v === 'sound' || v === 'script' ? v : null);
 
   const read = async (userId: number) => {
     const { rows } = await pool.query(
@@ -167,7 +225,7 @@ export function deckRouter(
   router.get('/', requireAuth, async (req, res, next) => {
     try {
       const userId = userIdOf(req);
-      const [row, tokens] = await Promise.all([read(userId), listTokens(pool, userId, 'deck')]);
+      const [row, tokens, files] = await Promise.all([read(userId), listTokens(pool, userId, 'deck'), listFiles(userId)]);
       res.json({
         columns: row?.columns ?? 4, buttons: row?.buttons ?? [], revision: row?.revision ?? 0, updatedAt: row?.updated_at ?? null,
         deck: {
@@ -175,7 +233,42 @@ export function deckRouter(
           scripts: row?.inventory.scripts ?? [], sounds: row?.inventory.sounds ?? [], chromeProfiles: row?.inventory.chromeProfiles ?? [],
         },
         tokens,
+        files,
       });
+    } catch (e) { next(e); }
+  });
+
+  /** Uploads (or replaces) a sound or script, sent as base64 in JSON. */
+  router.put('/files/:kind/:name', requireAuth, async (req, res, next) => {
+    try {
+      const userId = userIdOf(req);
+      const kind = kindOf(req.params.kind);
+      const name = String(req.params.name);
+      const b64 = isObj(req.body) && typeof req.body.data === 'string' ? req.body.data : '';
+      if (!kind) return res.status(404).json({ error: 'Not found' });
+      if (!/^[A-Za-z0-9+/]*={0,2}$/.test(b64)) return res.status(400).json({ error: 'Send the file as base64 in { data }.' });
+      const data = Buffer.from(b64, 'base64');
+      const problem = fileProblem(kind, name, data);
+      if (problem) return res.status(400).json({ error: problem });
+      const { rows } = await pool.query(
+        'SELECT count(*)::int AS n, coalesce(sum(size), 0)::bigint AS bytes FROM deck_files WHERE user_id=$1 AND NOT (kind=$2 AND name=$3)', [userId, kind, name]);
+      if (rows[0].n >= MAX_FILES) return res.status(409).json({ error: `You can keep at most ${MAX_FILES} files. Delete some first.` });
+      if (Number(rows[0].bytes) + data.length > MAX_FILES_BYTES) return res.status(409).json({ error: `Your files would pass ${MAX_FILES_BYTES / 1024 / 1024} MB. Delete some first.` });
+      const sha256 = crypto.createHash('sha256').update(data).digest('hex');
+      await pool.query(
+        `INSERT INTO deck_files (user_id, kind, name, data, sha256, size, updated_at) VALUES ($1,$2,$3,$4,$5,$6, now())
+         ON CONFLICT (user_id, kind, name) DO UPDATE SET data=$4, sha256=$5, size=$6, updated_at=now()`,
+        [userId, kind, name, data, sha256, data.length]);
+      res.json({ files: await listFiles(userId) });
+    } catch (e) { next(e); }
+  });
+
+  router.delete('/files/:kind/:name', requireAuth, async (req, res, next) => {
+    try {
+      const userId = userIdOf(req);
+      const r = await pool.query('DELETE FROM deck_files WHERE user_id=$1 AND kind=$2 AND name=$3', [userId, String(req.params.kind), String(req.params.name)]);
+      if (!r.rowCount) return res.status(404).json({ error: 'File not found' });
+      res.json({ files: await listFiles(userId) });
     } catch (e) { next(e); }
   });
 
@@ -207,8 +300,32 @@ export function deckRouter(
          ON CONFLICT (user_id) DO UPDATE SET synced_at=now(), synced_revision=deck_config.revision, deck_version=$2, inventory=$3
          RETURNING columns, buttons, revision`,
         [userId, version, JSON.stringify(inventory)]);
-      res.json({ columns: rows[0].columns, buttons: rows[0].buttons, revision: rows[0].revision });
+      const files = (await listFiles(userId)).map(({ kind, name, sha256, size }) => ({ kind, name, sha256, size }));
+      res.json({ columns: rows[0].columns, buttons: rows[0].buttons, revision: rows[0].revision, files });
     } catch (e) { next(e); }
+  });
+
+  /** One uploaded file, for the deck to save into its folder. Only asked for at sync, when the deck lacks it. */
+  router.get('/files/:kind/:name', requireDeck, async (req, res, next) => {
+    try {
+      const { rows } = await pool.query('SELECT data, sha256 FROM deck_files WHERE user_id=$1 AND kind=$2 AND name=$3',
+        [agentUserOf(req), String(req.params.kind), String(req.params.name)]);
+      if (!rows[0]) return res.status(404).json({ error: 'File not found' });
+      res.set('X-Content-SHA256', rows[0].sha256).type('application/octet-stream').send(rows[0].data);
+    } catch (e) { next(e); }
+  });
+
+  /** A card's art for a button face. Only card images from optcgapi.com's card folder; the deck keeps each one for good. */
+  router.get('/card/:file', requireDeck, async (req, res) => {
+    const file = String(req.params.file);
+    if (!IMAGE_FILE.test(file)) return res.status(400).json({ error: 'Unknown card' });
+    try {
+      const img = await fetchCard(imageSourceUrl(file));
+      res.set('Cache-Control', 'private, max-age=31536000, immutable').type(img.type).send(img.body);
+    } catch (e) {
+      const status = (e as { status?: number }).status ?? 502;
+      res.status(status).json({ error: status === 404 ? 'Unknown card' : 'Card image unavailable right now' });
+    }
   });
 
   return router;

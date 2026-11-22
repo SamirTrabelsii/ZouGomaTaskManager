@@ -1,17 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import { PanelShell, Section, Tabs } from './PanelShell';
 import { BrookAvatar } from '../common/CrewAvatar';
-import { ConfirmButton, Field, Segmented } from '../common/ui';
+import { ConfirmButton, Dialog, Field, Segmented } from '../common/ui';
+import { cardById, cardImageUrl, type Card } from '../../domain/cards';
 import { useDeck } from '../../state/deck';
 import { useStore } from '../../state/store';
 import { cloud, ApiError } from '../../data/cloud';
 import { ago } from '../FeedsSettings';
 import {
   ACTION_LABELS, BUTTON_COLORS, MAX_BUTTONS, MAX_COLUMNS, MAX_LABEL, MIN_COLUMNS, blankAction, buttonProblem, deckMood, describeAction,
-  moveItem, newButton, starterButtons, type ChromeProfile, type DeckActionType, type DeckButton, type DeckOverview,
+  MAX_SCRIPT_BYTES, MAX_SOUND_BYTES, fileKindOf, layoutKey, offeredFiles, moveItem, newButton, starterButtons,
+  type ChromeProfile, type DeckActionType, type DeckButton, type DeckCard, type DeckFileKind, type DeckOverview,
 } from '../../domain/deck';
 
-type Tab = 'buttons' | 'connect';
+type Tab = 'buttons' | 'files' | 'connect';
 const MAX_TOKENS = 3;
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : `b${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`);
 const messageOf = (e: unknown) => (e instanceof ApiError ? e.message : 'Cannot reach the LifeOS server.');
@@ -39,9 +41,10 @@ export function DeckPanel() {
     <PanelShell title="Brook Bot" icon={<BrookAvatar />} subtitle={subtitle(overview)}>
       <Tabs<Tab> value={tab} onChange={setTab} tabs={[
         { id: 'buttons', label: 'Buttons', count: overview?.buttons.length },
+        { id: 'files', label: 'Files', count: overview?.files?.length },
         { id: 'connect', label: deckMood(overview) === 'unplugged' ? 'Connect ⚠' : 'Connect' },
       ]} />
-      {!overview ? <p className="text-sm text-ink-500">Loading…</p> : tab === 'buttons' ? <ButtonsTab overview={overview} /> : <ConnectTab overview={overview} />}
+      {!overview ? <p className="text-sm text-ink-500">Loading…</p> : tab === 'buttons' ? <ButtonsTab overview={overview} /> : tab === 'files' ? <FilesTab overview={overview} /> : <ConnectTab overview={overview} />}
     </PanelShell>
   );
 }
@@ -53,12 +56,14 @@ function Key({ b, selected, onClick }: { b: DeckButton; selected: boolean; onCli
   return (
     <button
       type="button" onClick={onClick} aria-pressed={selected} title={`${b.label} · ${describeAction(b.action)}`}
-      className={`relative flex aspect-square min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl p-1 text-white shadow-sm transition
+      className={`relative flex aspect-square min-w-0 flex-col items-center gap-0.5 overflow-hidden rounded-xl p-1 text-white shadow-sm transition
+        ${b.card ? 'justify-end bg-cover' : 'justify-center'}
         ${selected ? 'ring-2 ring-offset-2 ring-offset-cream-50 ring-moss-600' : 'hover:brightness-110'}`}
-      style={{ background: b.color }}
+      style={b.card ? { backgroundImage: `url(${cardImageUrl(b.card.img, true)})`, backgroundPosition: '50% 18%', backgroundColor: b.color } : { background: b.color }}
     >
-      <span aria-hidden className="text-xl leading-none">{b.icon || b.label.slice(0, 1).toUpperCase()}</span>
-      <span className="w-full truncate text-center text-[10px] font-medium leading-tight">{b.label || '…'}</span>
+      {b.card && <span aria-hidden className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 to-transparent" />}
+      {!b.card && <span aria-hidden className="text-xl leading-none">{b.icon || b.label.slice(0, 1).toUpperCase()}</span>}
+      <span className="relative w-full truncate text-center text-[10px] font-medium leading-tight [text-shadow:0_1px_2px_rgba(0,0,0,.7)]">{b.label || '…'}</span>
       {bad && <span className="absolute right-1 top-0.5 text-[10px]" aria-label="needs fixing">⚠</span>}
     </button>
   );
@@ -73,8 +78,8 @@ function ButtonsTab({ overview }: { overview: DeckOverview }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   // a save elsewhere (another tab) replaces the draft only while nothing is being edited here
-  const savedKey = JSON.stringify([overview.columns, overview.buttons]);
-  const dirty = JSON.stringify([columns, buttons]) !== savedKey;
+  const savedKey = layoutKey(overview.columns, overview.buttons);
+  const dirty = layoutKey(columns, buttons) !== savedKey;
   useEffect(() => {
     if (dirty) return;
     setColumns(overview.columns); setButtons(overview.buttons);
@@ -153,17 +158,32 @@ function ButtonEditor({ b, overview, onChange }: { b: DeckButton; overview: Deck
   const a = b.action;
   const problem = buttonProblem(b);
   const setType = (t: DeckActionType) => { if (t !== a.type) onChange({ action: blankAction(t) }); };
+  const [picking, setPicking] = useState(false);
   return (
     <div className="card space-y-3 text-sm">
+      <div>
+        <span className="label">Face</span>
+        <Segmented label="Button face" value={b.card ? 'card' : 'emoji'} onChange={(v) => (v === 'emoji' ? onChange({ card: undefined }) : setPicking(true))}
+          options={[{ value: 'emoji', label: 'Emoji' }, { value: 'card', label: 'One Piece card' }]} />
+      </div>
       <div className="flex gap-2">
-        <Field label="Icon" className="w-20">
-          <input className="input text-center text-lg" value={b.icon} maxLength={8} onChange={(e) => onChange({ icon: e.target.value })} aria-describedby="deck-icon-hint" />
-        </Field>
+        {b.card ? (
+          <button type="button" onClick={() => setPicking(true)} title="Change the card"
+            className="h-[3.4rem] w-10 shrink-0 overflow-hidden rounded-md border border-cream-300 bg-cover bg-top"
+            style={{ backgroundImage: `url(${cardImageUrl(b.card.img, true)})` }} aria-label={`Card ${b.card.name}, change it`} />
+        ) : (
+          <Field label="Icon" className="w-20">
+            <input className="input text-center text-lg" value={b.icon} maxLength={8} onChange={(e) => onChange({ icon: e.target.value })} aria-describedby="deck-icon-hint" />
+          </Field>
+        )}
         <Field label="Label" className="flex-1">
           <input className="input" value={b.label} maxLength={MAX_LABEL} onChange={(e) => onChange({ label: e.target.value })} />
         </Field>
       </div>
-      <p id="deck-icon-hint" className="-mt-2 text-xs text-ink-500">Icon: one emoji (Windows key + . opens the emoji picker).</p>
+      <p id="deck-icon-hint" className="-mt-2 text-xs text-ink-500">
+        {b.card ? <>The card’s art fills the button, with the label over it. <button type="button" className="underline" onClick={() => setPicking(true)}>Change card</button></> : 'Icon: one emoji (Windows key + . opens the emoji picker).'}
+      </p>
+      {picking && <CardPicker current={b.card?.img ?? null} onClose={() => setPicking(false)} onPick={(card) => { onChange({ card }); setPicking(false); }} />}
       <div>
         <span className="label">Colour</span>
         <div className="flex flex-wrap items-center gap-1.5">
@@ -218,21 +238,21 @@ function ButtonEditor({ b, overview, onChange }: { b: DeckButton; overview: Deck
       {a.type === 'script' && (
         <>
           <Field label="Script">
-            <FilePicker value={a.file} files={overview.deck.scripts} placeholder="backup.ps1" onChange={(file) => onChange({ action: { ...a, file } })} />
+            <FilePicker value={a.file} files={offeredFiles(overview, 'script')} placeholder="backup.ps1" onChange={(file) => onChange({ action: { ...a, file } })} />
           </Field>
-          <p className="text-xs text-ink-500">Only files in the deck’s <code>Documents\LifeOS Deck\scripts</code> folder on your PC can run: LifeOS just names them. The deck asks you once before running a new one.</p>
+          <p className="text-xs text-ink-500">Only files in the deck’s <code>Documents\LifeOS Deck\scripts</code> folder on your PC can run. Send one from the <b>Files</b> tab, or drop it in that folder. The deck shows you a new or changed script and asks before running it.</p>
         </>
       )}
 
       {a.type === 'sound' && (
         <>
           <Field label="Sound">
-            <FilePicker value={a.file} files={overview.deck.sounds} placeholder="applause.wav" onChange={(file) => onChange({ action: { ...a, file } })} />
+            <FilePicker value={a.file} files={offeredFiles(overview, 'sound')} placeholder="applause.wav" onChange={(file) => onChange({ action: { ...a, file } })} />
           </Field>
           <Field label={`Volume · ${a.volume}%`}>
             <input type="range" min={0} max={100} step={5} className="w-full accent-moss-600" value={a.volume} onChange={(e) => onChange({ action: { ...a, volume: Number(e.target.value) } })} />
           </Field>
-          <p className="text-xs text-ink-500">Sounds play on your PC only (your speakers or headset), never into a call. Add your own .wav, .mp3 or .ogg to <code>Documents\LifeOS Deck\sounds</code>.</p>
+          <p className="text-xs text-ink-500">Sounds play on your PC only (your speakers or headset), never into a call. Send your own .wav, .mp3 or .ogg from the <b>Files</b> tab.</p>
         </>
       )}
 
@@ -252,6 +272,118 @@ function FilePicker({ value, files, placeholder, onChange }: { value: string; fi
       {!known && <option value="">{value ? `${value} (not on the PC)` : 'Pick a file…'}</option>}
       {files.map((f) => <option key={f} value={f}>{f}</option>)}
     </select>
+  );
+}
+
+/** Picks a card you own from the binder, for a button's face. */
+function CardPicker({ current, onPick, onClose }: { current: string | null; onPick: (c: DeckCard) => void; onClose: () => void }) {
+  const owned = useStore((s) => s.data.cards.owned);
+  const [q, setQ] = useState('');
+  const cards = useMemo(() => {
+    const list = Object.entries(owned).filter(([, n]) => n > 0).map(([id]) => cardById(id)).filter((c): c is Card => !!c);
+    const seen = new Set<string>();
+    return list.filter((c) => (seen.has(c.img) ? false : (seen.add(c.img), true))).sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+  }, [owned]);
+  const shown = q.trim() ? cards.filter((c) => `${c.name} ${c.number}`.toLowerCase().includes(q.trim().toLowerCase())) : cards;
+  return (
+    <Dialog title="Pick a card for the button" onClose={onClose} wide>
+      {cards.length === 0 ? (
+        <p className="text-sm text-ink-500">Your binder is empty. Open packs from the treasure chest, then come back to put a card on a button.</p>
+      ) : (
+        <>
+          <input className="input mb-3" placeholder={`Search your ${cards.length} cards…`} value={q} onChange={(e) => setQ(e.target.value)} />
+          <div className="grid max-h-[55vh] grid-cols-4 gap-2 overflow-y-auto sm:grid-cols-6">
+            {shown.map((c) => (
+              <button key={c.id} type="button" onClick={() => onPick({ img: c.img, name: c.name })} title={`${c.name} · ${c.number}`}
+                className={`overflow-hidden rounded-md border-2 ${current === c.img ? 'border-moss-600' : 'border-transparent hover:border-cream-300'}`}>
+                <img src={cardImageUrl(c.img, true)} alt={c.name} loading="lazy" className="aspect-[5/7] w-full object-cover" />
+              </button>
+            ))}
+            {!shown.length && <p className="col-span-full text-sm text-ink-500">No card matches.</p>}
+          </div>
+        </>
+      )}
+    </Dialog>
+  );
+}
+
+/* ── files sent to the deck ── */
+
+const kb = (n: number) => (n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
+
+function readBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).replace(/^data:[^,]*,/, ''));
+    r.onerror = () => reject(new Error('Could not read the file.'));
+    r.readAsDataURL(file);
+  });
+}
+
+function FilesTab({ overview }: { overview: DeckOverview }) {
+  const toast = useStore.getState().toast;
+  const upload = useDeck((s) => s.upload);
+  const removeFile = useDeck((s) => s.removeFile);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const files = overview.files ?? [];
+
+  const onFiles = async (list: FileList | null) => {
+    if (!list?.length) return;
+    setBusy(true); setErr('');
+    for (const f of [...list]) {
+      const kind = fileKindOf(f.name);
+      if (!kind) { setErr(`${f.name}: only .wav, .mp3, .ogg sounds and .ps1, .bat, .cmd scripts, with a plain name (letters, digits, spaces, . _ - ( )).`); continue; }
+      const max = kind === 'sound' ? MAX_SOUND_BYTES : MAX_SCRIPT_BYTES;
+      if (f.size > max) { setErr(`${f.name} is too big (${kb(f.size)}, at most ${kb(max)}).`); continue; }
+      try {
+        const e = await upload(kind, f.name, await readBase64(f));
+        if (e) setErr(`${f.name}: ${e}`); else toast(`${f.name} sent. Click ⟳ on the deck to get it.`);
+      } catch (x) { setErr(x instanceof Error ? x.message : String(x)); }
+    }
+    setBusy(false);
+  };
+
+  const group = (kind: DeckFileKind, title: string) => {
+    const mine = files.filter((f) => f.kind === kind);
+    return (
+      <Section title={title}>
+        {mine.length === 0 ? <p className="text-xs text-ink-500">None sent from LifeOS yet.</p> : (
+          <ul className="space-y-1.5">
+            {mine.map((f) => (
+              <li key={f.name} className="flex items-center gap-2 rounded-lg bg-cream-100 px-2 py-1.5 text-sm">
+                <span aria-hidden>{kind === 'sound' ? '🔊' : '📜'}</span>
+                <span className="min-w-0 flex-1 truncate font-mono text-xs">{f.name}</span>
+                <span className="text-xs text-ink-500">{kb(f.size)} · {ago(f.updatedAt)}</span>
+                <ConfirmButton className="btn btn-ghost px-2 text-xs text-clay-600" confirmLabel="Delete?" onConfirm={async () => {
+                  const e = await removeFile(kind, f.name); if (e) toast(e, 'error'); else toast(`Deleted ${f.name}`);
+                }}>Delete</ConfirmButton>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Section>
+    );
+  };
+
+  return (
+    <div className="space-y-4 text-sm">
+      <label className={`flex cursor-pointer flex-col items-center gap-1 rounded-xl border-2 border-dashed border-cream-300 p-4 text-center hover:border-moss-600 ${busy ? 'opacity-60' : ''}`}
+        onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); void onFiles(e.dataTransfer.files); }}>
+        <span className="text-2xl" aria-hidden>📤</span>
+        <span className="font-medium">{busy ? 'Sending…' : 'Drop sounds or scripts here, or click to choose'}</span>
+        <span className="text-xs text-ink-500">Sounds .wav .mp3 .ogg up to 3 MB · scripts .ps1 .bat .cmd up to 64 KB</span>
+        <input type="file" multiple className="sr-only" accept=".wav,.mp3,.ogg,.ps1,.bat,.cmd" disabled={busy} onChange={(e) => { void onFiles(e.target.files); e.target.value = ''; }} />
+      </label>
+      {err && <p role="alert" className="text-xs text-clay-600">{err}</p>}
+      {group('sound', 'Sounds')}
+      {group('script', 'Scripts')}
+      <p className="text-xs text-ink-500">
+        The deck copies these into <code>Documents\LifeOS Deck</code> when it syncs (⟳), and removes them there when you delete them here.
+        A file of the same name that you put in that folder yourself is never overwritten. Before running a script it has not run in
+        this exact version, the deck shows you its first lines and asks. Keep passwords out of scripts sent here.
+      </p>
+    </div>
   );
 }
 
@@ -351,9 +483,9 @@ function ConnectTab({ overview }: { overview: DeckOverview }) {
 
       <Section title="Set up">
         <ol className="card list-decimal space-y-1.5 pl-8 text-ink-700">
-          <li>In the <code>lifeos-agent</code> folder: <code>cd deck</code>, <code>npm install</code>, then <code>npm start</code>.</li>
+          <li>Install the deck: run <code>LifeOS-Deck-Setup.exe</code> (built in <code>lifeos-agent\deck</code> with <code>npm run dist</code>, in <code>release\</code>). It starts with Windows from then on.</li>
           <li>On first start the deck asks for the server <button type="button" className="font-mono text-xs underline" onClick={() => void copy(window.location.origin)}>{window.location.origin}</button> and a token from above.</li>
-          <li>Drop your scripts and sounds into <code>Documents\LifeOS Deck\scripts</code> and <code>…\sounds</code>, then click ⟳ on the deck.</li>
+          <li>Send sounds and scripts from the <b>Files</b> tab (or drop them into <code>Documents\LifeOS Deck\scripts</code> and <code>…\sounds</code>), then click ⟳ on the deck.</li>
         </ol>
       </Section>
     </div>

@@ -31,7 +31,7 @@ async function api<T>(path: string, init: { method?: string; body?: unknown; tim
 
 import type { AgentAlert, AgentAlertDetail, AgentCommand, AgentCommandKind, AgentOverview, CalendarFeed, ExternalEvent } from '../domain/types';
 import type { AbsenceDay, AbsenceList, AbsenceSettings, AbsenceStep, AbsenceType } from '../domain/absence';
-import type { DeckButton, DeckOverview } from '../domain/deck';
+import type { DeckButton, DeckFile, DeckFileKind, DeckOverview } from '../domain/deck';
 
 export interface Health { ok: true; hasUser: boolean; registrationOpen: boolean }
 export interface CloudBackup { id: string; reason: string; revision: number; savedAt: string }
@@ -89,6 +89,10 @@ export const cloud = {
   deck: () => api<DeckOverview>('/deck'),
   saveDeck: (columns: number, buttons: DeckButton[]) =>
     api<{ columns: number; buttons: DeckButton[]; revision: number; updatedAt: string }>('/deck', { method: 'PUT', body: { columns, buttons } }),
+  /** Uploads a sound or script (base64), which the deck downloads at its next sync. */
+  uploadDeckFile: (kind: DeckFileKind, name: string, data: string) =>
+    api<{ files: DeckFile[] }>(`/deck/files/${kind}/${encodeURIComponent(name)}`, { method: 'PUT', body: { data }, timeoutMs: 60_000 }),
+  deleteDeckFile: (kind: DeckFileKind, name: string) => api<{ files: DeckFile[] }>(`/deck/files/${kind}/${encodeURIComponent(name)}`, { method: 'DELETE', body: {} }),
   createDeckToken: (name: string) => api<{ id: string; name: string; hint: string; createdAt: string; token: string }>('/deck/tokens', { method: 'POST', body: { name } }),
   revokeDeckToken: (id: string) => api<{ ok: true }>(`/deck/tokens/${encodeURIComponent(id)}`, { method: 'DELETE', body: {} }),
   absences: () => api<AbsenceList>('/absences'),

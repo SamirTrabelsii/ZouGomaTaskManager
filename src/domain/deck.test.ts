@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blankAction, buttonProblem, deckMood, deckSummary, describeAction, moveItem, newButton, starterButtons, type DeckOverview } from './deck';
+import { blankAction, buttonProblem, deckMood, deckSummary, describeAction, fileKindOf, layoutKey, moveItem, newButton, offeredFiles, starterButtons, type DeckOverview } from './deck';
 
 const overview = (o: Partial<DeckOverview> = {}, deck: Partial<DeckOverview['deck']> = {}): DeckOverview => ({
   columns: 4, buttons: [], revision: 0, updatedAt: null, tokens: [],
@@ -49,5 +49,34 @@ describe('moveItem', () => {
     expect(moveItem([1, 2, 3], 0, 1)).toEqual([2, 1, 3]);
     expect(moveItem([1, 2, 3], 2, 1)).toEqual([1, 2, 3]);
     expect(moveItem([1, 2, 3], 1, -5)).toEqual([2, 1, 3]);
+  });
+});
+
+describe('files sent to the deck', () => {
+  it('sorts names into sounds and scripts', () => {
+    expect(fileKindOf('Cheer (loud).mp3')).toBe('sound');
+    expect(fileKindOf('morning.ps1')).toBe('script');
+    expect(fileKindOf('photo.png')).toBeNull();
+    expect(fileKindOf('a&b.ps1')).toBeNull();
+  });
+  it('offers what the PC has and what was uploaded, once each', () => {
+    const o = overview({ files: [
+      { kind: 'sound', name: 'cheer.mp3', sha256: 'x', size: 1, updatedAt: '' },
+      { kind: 'sound', name: 'applause.wav', sha256: 'y', size: 1, updatedAt: '' },
+      { kind: 'script', name: 'morning.ps1', sha256: 'z', size: 1, updatedAt: '' },
+    ] }, { sounds: ['applause.wav', 'boo.ogg'] });
+    expect(offeredFiles(o, 'sound')).toEqual(['applause.wav', 'boo.ogg', 'cheer.mp3']);
+    expect(offeredFiles(o, 'script')).toEqual(['morning.ps1']);
+  });
+});
+
+describe('layoutKey', () => {
+  it('ignores key order and cards left undefined', () => {
+    const b = newButton('a');
+    const fromEditor = { ...b, card: { img: 'OP01-001.jpg', name: 'Zoro' } };
+    const fromServer = { id: b.id, label: b.label, icon: b.icon, color: b.color, card: { name: 'Zoro', img: 'OP01-001.jpg' }, action: b.action };
+    expect(layoutKey(4, [fromEditor])).toBe(layoutKey(4, [fromServer]));
+    expect(layoutKey(4, [{ ...b, card: undefined }])).toBe(layoutKey(4, [b]));
+    expect(layoutKey(4, [b])).not.toBe(layoutKey(5, [b]));
   });
 });
