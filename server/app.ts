@@ -463,7 +463,7 @@ export function createApp(opts: AppOptions) {
   app.use('/api/extension', extensionRouter(pool, requireAuth, (req) => (req as Authed).userId, agentLimits));
 
   /* ── stream deck on the PC (bearer token of scope 'deck': its own buttons only) ── */
-  app.use('/api/deck', deckRouter(pool, requireAuth, (req) => (req as Authed).userId, agentLimits, opts.fetchCardImage ?? fetchImage));
+  app.use('/api/deck', deckRouter(pool, requireAuth, (req) => (req as Authed).userId, agentLimits));
 
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));
 

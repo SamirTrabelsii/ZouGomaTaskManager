@@ -2,15 +2,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { PanelShell, Section, Tabs } from './PanelShell';
 import { BrookAvatar } from '../common/CrewAvatar';
 import { ConfirmButton, Dialog, Field, Segmented } from '../common/ui';
-import { cardById, cardImageUrl, type Card } from '../../domain/cards';
 import { useDeck } from '../../state/deck';
 import { useStore } from '../../state/store';
 import { cloud, ApiError } from '../../data/cloud';
 import { ago } from '../FeedsSettings';
 import {
   ACTION_LABELS, BUTTON_COLORS, MAX_BUTTONS, MAX_COLUMNS, MAX_LABEL, MIN_COLUMNS, blankAction, buttonProblem, deckMood, describeAction,
-  MAX_SCRIPT_BYTES, MAX_SOUND_BYTES, fileKindOf, layoutKey, offeredFiles, moveItem, newButton, starterButtons,
-  type ChromeProfile, type DeckActionType, type DeckButton, type DeckCard, type DeckFileKind, type DeckOverview,
+  MAX_SCRIPT_BYTES, MAX_SOUND_BYTES, PICTURE_SIZE, coverCrop, fileKindOf, layoutKey, newPictureName, offeredFiles, pictureUrl, moveItem,
+  newButton, starterButtons, type ChromeProfile, type DeckActionType, type DeckButton, type DeckFileKind, type DeckOverview,
 } from '../../domain/deck';
 
 type Tab = 'buttons' | 'files' | 'connect';
@@ -57,12 +56,12 @@ function Key({ b, selected, onClick }: { b: DeckButton; selected: boolean; onCli
     <button
       type="button" onClick={onClick} aria-pressed={selected} title={`${b.label} · ${describeAction(b.action)}`}
       className={`relative flex aspect-square min-w-0 flex-col items-center gap-0.5 overflow-hidden rounded-xl p-1 text-white shadow-sm transition
-        ${b.card ? 'justify-end bg-cover' : 'justify-center'}
+        ${b.picture ? 'justify-end bg-cover bg-center' : 'justify-center'}
         ${selected ? 'ring-2 ring-offset-2 ring-offset-cream-50 ring-moss-600' : 'hover:brightness-110'}`}
-      style={b.card ? { backgroundImage: `url(${cardImageUrl(b.card.img, true)})`, backgroundPosition: '50% 18%', backgroundColor: b.color } : { background: b.color }}
+      style={b.picture ? { backgroundImage: `url(${pictureUrl(b.picture)})`, backgroundColor: b.color } : { background: b.color }}
     >
-      {b.card && <span aria-hidden className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 to-transparent" />}
-      {!b.card && <span aria-hidden className="text-xl leading-none">{b.icon || b.label.slice(0, 1).toUpperCase()}</span>}
+      {b.picture && <span aria-hidden className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/75 to-transparent" />}
+      {!b.picture && <span aria-hidden className="text-xl leading-none">{b.icon || b.label.slice(0, 1).toUpperCase()}</span>}
       <span className="relative w-full truncate text-center text-[10px] font-medium leading-tight [text-shadow:0_1px_2px_rgba(0,0,0,.7)]">{b.label || '…'}</span>
       {bad && <span className="absolute right-1 top-0.5 text-[10px]" aria-label="needs fixing">⚠</span>}
     </button>
@@ -96,7 +95,11 @@ function ButtonsTab({ overview }: { overview: DeckOverview }) {
     setBusy(true); setErr('');
     const e = await save(columns, buttons);
     setBusy(false);
-    if (e) setErr(e); else toast('Saved. Click ⟳ on the deck to load the buttons.');
+    if (e) return setErr(e);
+    // take back what the server stored: it tidies labels and colours and drops faces from older versions
+    const saved = useDeck.getState().overview;
+    if (saved) { setColumns(saved.columns); setButtons(saved.buttons); }
+    toast('Saved. Click ⟳ on the deck to load the buttons.');
   };
 
   return (
@@ -163,14 +166,14 @@ function ButtonEditor({ b, overview, onChange }: { b: DeckButton; overview: Deck
     <div className="card space-y-3 text-sm">
       <div>
         <span className="label">Face</span>
-        <Segmented label="Button face" value={b.card ? 'card' : 'emoji'} onChange={(v) => (v === 'emoji' ? onChange({ card: undefined }) : setPicking(true))}
-          options={[{ value: 'emoji', label: 'Emoji' }, { value: 'card', label: 'One Piece card' }]} />
+        <Segmented label="Button face" value={b.picture ? 'picture' : 'emoji'} onChange={(v) => (v === 'emoji' ? onChange({ picture: undefined }) : setPicking(true))}
+          options={[{ value: 'emoji', label: 'Emoji' }, { value: 'picture', label: 'Picture' }]} />
       </div>
       <div className="flex gap-2">
-        {b.card ? (
-          <button type="button" onClick={() => setPicking(true)} title="Change the card"
-            className="h-[3.4rem] w-10 shrink-0 overflow-hidden rounded-md border border-cream-300 bg-cover bg-top"
-            style={{ backgroundImage: `url(${cardImageUrl(b.card.img, true)})` }} aria-label={`Card ${b.card.name}, change it`} />
+        {b.picture ? (
+          <button type="button" onClick={() => setPicking(true)} title="Change the picture"
+            className="h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-cream-300 bg-cover bg-center"
+            style={{ backgroundImage: `url(${pictureUrl(b.picture)})`, backgroundColor: b.color }} aria-label="Change the picture" />
         ) : (
           <Field label="Icon" className="w-20">
             <input className="input text-center text-lg" value={b.icon} maxLength={8} onChange={(e) => onChange({ icon: e.target.value })} aria-describedby="deck-icon-hint" />
@@ -181,9 +184,9 @@ function ButtonEditor({ b, overview, onChange }: { b: DeckButton; overview: Deck
         </Field>
       </div>
       <p id="deck-icon-hint" className="-mt-2 text-xs text-ink-500">
-        {b.card ? <>The card’s art fills the button, with the label over it. <button type="button" className="underline" onClick={() => setPicking(true)}>Change card</button></> : 'Icon: one emoji (Windows key + . opens the emoji picker).'}
+        {b.picture ? <>The picture fills the button, with the label over it. <button type="button" className="underline" onClick={() => setPicking(true)}>Change picture</button></> : 'Icon: one emoji (Windows key + . opens the emoji picker).'}
       </p>
-      {picking && <CardPicker current={b.card?.img ?? null} onClose={() => setPicking(false)} onPick={(card) => { onChange({ card }); setPicking(false); }} />}
+      {picking && <PicturePicker overview={overview} current={b.picture ?? null} onClose={() => setPicking(false)} onPick={(picture) => { onChange({ picture }); setPicking(false); }} />}
       <div>
         <span className="label">Colour</span>
         <div className="flex flex-wrap items-center gap-1.5">
@@ -275,31 +278,74 @@ function FilePicker({ value, files, placeholder, onChange }: { value: string; fi
   );
 }
 
-/** Picks a card you own from the binder, for a button's face. */
-function CardPicker({ current, onPick, onClose }: { current: string | null; onPick: (c: DeckCard) => void; onClose: () => void }) {
-  const owned = useStore((s) => s.data.cards.owned);
-  const [q, setQ] = useState('');
-  const cards = useMemo(() => {
-    const list = Object.entries(owned).filter(([, n]) => n > 0).map(([id]) => cardById(id)).filter((c): c is Card => !!c);
-    const seen = new Set<string>();
-    return list.filter((c) => (seen.has(c.img) ? false : (seen.add(c.img), true))).sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
-  }, [owned]);
-  const shown = q.trim() ? cards.filter((c) => `${c.name} ${c.number}`.toLowerCase().includes(q.trim().toLowerCase())) : cards;
+/* ── pictures ── */
+
+function readBase64(file: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).replace(/^data:[^,]*,/, ''));
+    r.onerror = () => reject(new Error('Could not read the file.'));
+    r.readAsDataURL(file);
+  });
+}
+
+/**
+ * Turns any picture the browser can open (photo, logo, screenshot, GIF's first frame…) into a small square for a button: the
+ * centred square, at most 256 px, as WebP (PNG where the browser cannot write WebP). Transparency is kept, so a logo sits on
+ * the button's colour.
+ */
+async function preparePicture(file: Blob): Promise<{ name: string; data: string }> {
+  let bmp: ImageBitmap;
+  try { bmp = await createImageBitmap(file); } catch { throw new Error('This is not a picture the browser can open (try PNG, JPEG or WebP).'); }
+  const { sx, sy, side } = coverCrop(bmp.width, bmp.height);
+  const size = Math.max(1, Math.min(PICTURE_SIZE, side));
+  const canvas = Object.assign(document.createElement('canvas'), { width: size, height: size });
+  const g = canvas.getContext('2d')!;
+  g.imageSmoothingQuality = 'high';
+  g.drawImage(bmp, sx, sy, side, side, 0, 0, size, size);
+  bmp.close();
+  const toBlob = (type: string, q?: number) => new Promise<Blob | null>((r) => canvas.toBlob(r, type, q));
+  const webp = await toBlob('image/webp', 0.9);
+  const out = webp?.type === 'image/webp' ? webp : await toBlob('image/png');
+  if (!out) throw new Error('Could not prepare the picture.');
+  return { name: newPictureName(out.type === 'image/webp' ? 'webp' : 'png', uid), data: await readBase64(out) };
+}
+
+/** Picks a picture for a button: one already sent, or a new one from the PC (cropped to a square and shrunk first). */
+function PicturePicker({ overview, current, onPick, onClose }: { overview: DeckOverview; current: string | null; onPick: (name: string) => void; onClose: () => void }) {
+  const upload = useDeck((s) => s.upload);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const pictures = (overview.files ?? []).filter((f) => f.kind === 'picture').sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const add = async (file: File | undefined) => {
+    if (!file) return;
+    setBusy(true); setErr('');
+    try {
+      const p = await preparePicture(file);
+      const e = await upload('picture', p.name, p.data);
+      if (e) setErr(e); else onPick(p.name);
+    } catch (x) { setErr(x instanceof Error ? x.message : String(x)); } finally { setBusy(false); }
+  };
   return (
-    <Dialog title="Pick a card for the button" onClose={onClose} wide>
-      {cards.length === 0 ? (
-        <p className="text-sm text-ink-500">Your binder is empty. Open packs from the treasure chest, then come back to put a card on a button.</p>
-      ) : (
+    <Dialog title="Picture for the button" onClose={onClose} wide>
+      <label className={`mb-3 flex cursor-pointer flex-col items-center gap-1 rounded-xl border-2 border-dashed border-cream-300 p-4 text-center text-sm hover:border-moss-600 ${busy ? 'opacity-60' : ''}`}
+        onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); void add(e.dataTransfer.files[0]); }}>
+        <span className="text-2xl" aria-hidden>🖼️</span>
+        <span className="font-medium">{busy ? 'Preparing…' : 'Drop a picture here, or click to choose one'}</span>
+        <span className="text-xs text-ink-500">Any photo, logo or screenshot. It is cropped to its centre square and shrunk to {PICTURE_SIZE} px.</span>
+        <input type="file" accept="image/*" className="sr-only" disabled={busy} onChange={(e) => { void add(e.target.files?.[0]); e.target.value = ''; }} />
+      </label>
+      {err && <p role="alert" className="mb-2 text-xs text-clay-600">{err}</p>}
+      {pictures.length > 0 && (
         <>
-          <input className="input mb-3" placeholder={`Search your ${cards.length} cards…`} value={q} onChange={(e) => setQ(e.target.value)} />
-          <div className="grid max-h-[55vh] grid-cols-4 gap-2 overflow-y-auto sm:grid-cols-6">
-            {shown.map((c) => (
-              <button key={c.id} type="button" onClick={() => onPick({ img: c.img, name: c.name })} title={`${c.name} · ${c.number}`}
-                className={`overflow-hidden rounded-md border-2 ${current === c.img ? 'border-moss-600' : 'border-transparent hover:border-cream-300'}`}>
-                <img src={cardImageUrl(c.img, true)} alt={c.name} loading="lazy" className="aspect-[5/7] w-full object-cover" />
+          <p className="mb-2 text-xs text-ink-500">Or reuse one you sent before:</p>
+          <div className="grid max-h-[45vh] grid-cols-5 gap-2 overflow-y-auto sm:grid-cols-7">
+            {pictures.map((p) => (
+              <button key={p.name} type="button" onClick={() => onPick(p.name)} title={p.name}
+                className={`aspect-square overflow-hidden rounded-lg border-2 ${current === p.name ? 'border-moss-600' : 'border-transparent hover:border-cream-300'}`}>
+                <img src={pictureUrl(p.name)} alt="" className="h-full w-full object-cover" />
               </button>
             ))}
-            {!shown.length && <p className="col-span-full text-sm text-ink-500">No card matches.</p>}
           </div>
         </>
       )}
@@ -310,15 +356,6 @@ function CardPicker({ current, onPick, onClose }: { current: string | null; onPi
 /* ── files sent to the deck ── */
 
 const kb = (n: number) => (n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
-
-function readBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(String(r.result).replace(/^data:[^,]*,/, ''));
-    r.onerror = () => reject(new Error('Could not read the file.'));
-    r.readAsDataURL(file);
-  });
-}
 
 function FilesTab({ overview }: { overview: DeckOverview }) {
   const toast = useStore.getState().toast;
@@ -333,13 +370,19 @@ function FilesTab({ overview }: { overview: DeckOverview }) {
     setBusy(true); setErr('');
     for (const f of [...list]) {
       const kind = fileKindOf(f.name);
-      if (!kind) { setErr(`${f.name}: only .wav, .mp3, .ogg sounds and .ps1, .bat, .cmd scripts, with a plain name (letters, digits, spaces, . _ - ( )).`); continue; }
-      const max = kind === 'sound' ? MAX_SOUND_BYTES : MAX_SCRIPT_BYTES;
-      if (f.size > max) { setErr(`${f.name} is too big (${kb(f.size)}, at most ${kb(max)}).`); continue; }
+      if (!kind) { setErr(`${f.name}: only pictures, .wav, .mp3, .ogg sounds and .ps1, .bat, .cmd scripts with a plain name (letters, digits, spaces, . _ - ( )).`); continue; }
       try {
+        if (kind === 'picture') {
+          const p = await preparePicture(f);
+          const e = await upload('picture', p.name, p.data);
+          if (e) setErr(`${f.name}: ${e}`); else toast(`${f.name} added. Pick it as a button's picture.`);
+          continue;
+        }
+        const max = kind === 'sound' ? MAX_SOUND_BYTES : MAX_SCRIPT_BYTES;
+        if (f.size > max) { setErr(`${f.name} is too big (${kb(f.size)}, at most ${kb(max)}).`); continue; }
         const e = await upload(kind, f.name, await readBase64(f));
         if (e) setErr(`${f.name}: ${e}`); else toast(`${f.name} sent. Click ⟳ on the deck to get it.`);
-      } catch (x) { setErr(x instanceof Error ? x.message : String(x)); }
+      } catch (x) { setErr(`${f.name}: ${x instanceof Error ? x.message : String(x)}`); }
     }
     setBusy(false);
   };
@@ -352,7 +395,9 @@ function FilesTab({ overview }: { overview: DeckOverview }) {
           <ul className="space-y-1.5">
             {mine.map((f) => (
               <li key={f.name} className="flex items-center gap-2 rounded-lg bg-cream-100 px-2 py-1.5 text-sm">
-                <span aria-hidden>{kind === 'sound' ? '🔊' : '📜'}</span>
+                {kind === 'picture'
+                  ? <img src={pictureUrl(f.name)} alt="" className="h-7 w-7 rounded object-cover" />
+                  : <span aria-hidden>{kind === 'sound' ? '🔊' : '📜'}</span>}
                 <span className="min-w-0 flex-1 truncate font-mono text-xs">{f.name}</span>
                 <span className="text-xs text-ink-500">{kb(f.size)} · {ago(f.updatedAt)}</span>
                 <ConfirmButton className="btn btn-ghost px-2 text-xs text-clay-600" confirmLabel="Delete?" onConfirm={async () => {
@@ -371,11 +416,12 @@ function FilesTab({ overview }: { overview: DeckOverview }) {
       <label className={`flex cursor-pointer flex-col items-center gap-1 rounded-xl border-2 border-dashed border-cream-300 p-4 text-center hover:border-moss-600 ${busy ? 'opacity-60' : ''}`}
         onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); void onFiles(e.dataTransfer.files); }}>
         <span className="text-2xl" aria-hidden>📤</span>
-        <span className="font-medium">{busy ? 'Sending…' : 'Drop sounds or scripts here, or click to choose'}</span>
-        <span className="text-xs text-ink-500">Sounds .wav .mp3 .ogg up to 3 MB · scripts .ps1 .bat .cmd up to 64 KB</span>
-        <input type="file" multiple className="sr-only" accept=".wav,.mp3,.ogg,.ps1,.bat,.cmd" disabled={busy} onChange={(e) => { void onFiles(e.target.files); e.target.value = ''; }} />
+        <span className="font-medium">{busy ? 'Sending…' : 'Drop sounds, scripts or pictures here, or click to choose'}</span>
+        <span className="text-xs text-ink-500">Sounds .wav .mp3 .ogg up to 3 MB · scripts .ps1 .bat .cmd up to 64 KB · any picture (made square, {PICTURE_SIZE} px)</span>
+        <input type="file" multiple className="sr-only" accept=".wav,.mp3,.ogg,.ps1,.bat,.cmd,image/*" disabled={busy} onChange={(e) => { void onFiles(e.target.files); e.target.value = ''; }} />
       </label>
       {err && <p role="alert" className="text-xs text-clay-600">{err}</p>}
+      {group('picture', 'Pictures')}
       {group('sound', 'Sounds')}
       {group('script', 'Scripts')}
       <p className="text-xs text-ink-500">

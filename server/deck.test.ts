@@ -83,11 +83,7 @@ describe.skipIf(!reachable)('stream deck API', () => {
     if (!/_test$/.test(dbName)) throw new Error(`Refusing to run destructive API tests on database "${dbName}"`);
     await migrate(pool);
     await pool.query('TRUNCATE users, sessions, documents, document_backups RESTART IDENTITY CASCADE');
-    const fetchCardImage = async (url: string) => {
-      if (url.endsWith('/OP01-001.jpg')) return { type: 'image/jpeg', body: Buffer.from('jpeg-bytes') };
-      throw Object.assign(new Error('nope'), { status: 404 });
-    };
-    server = createApp({ pool, fetchCardImage }).listen(0);
+    server = createApp({ pool }).listen(0);
     base = `http://localhost:${(server.address() as AddressInfo).port}`;
     await call('POST', '/api/auth/register', { body: { email: 'me@example.com', password: 'correct horse battery' } });
     deckToken = (await call('POST', '/api/deck/tokens', { body: { name: 'Office PC' } })).body.token;
@@ -189,19 +185,43 @@ describe.skipIf(!reachable)('stream deck API', () => {
     expect((await call('DELETE', '/api/deck/files/script/hello.ps1', { body: {} })).status).toBe(404);
   });
 
-  it('serves card art to the deck only', async () => {
-    const res = await fetch(`${base}/api/deck/card/OP01-001.jpg`, { headers: { authorization: `Bearer ${deckToken}` } });
-    expect(res.status).toBe(200);
-    expect(await res.text()).toBe('jpeg-bytes');
-    expect((await fetch(`${base}/api/deck/card/OP99-999.jpg`, { headers: { authorization: `Bearer ${deckToken}` } })).status).toBe(404);
-    expect((await fetch(`${base}/api/deck/card/..%2Fsecret.jpg`, { headers: { authorization: `Bearer ${deckToken}` } })).status).toBe(400);
-    expect((await fetch(`${base}/api/deck/card/OP01-001.jpg`, { headers: { cookie } })).status).toBe(401);
+  const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(40)]);
+  const webp = Buffer.concat([Buffer.from('RIFF\0\0\0\0WEBPVP8 '), Buffer.alloc(40)]);
+
+  it('uploads button pictures, checking they are real pictures', async () => {
+    expect((await call('PUT', '/api/deck/files/picture/pic-a1.png', { body: { data: b64(png) } })).status).toBe(200);
+    expect((await call('PUT', '/api/deck/files/picture/pic-b2.webp', { body: { data: b64(webp) } })).status).toBe(200);
+    expect((await call('PUT', '/api/deck/files/picture/fake.png', { body: { data: b64('<svg onload=alert(1)>') } })).body.error).toMatch(/not a real/);
+    expect((await call('PUT', '/api/deck/files/picture/logo.svg', { body: { data: b64('<svg/>') } })).status).toBe(400);
+    expect((await call('PUT', '/api/deck/files/picture/my%20photo.png', { body: { data: b64(png) } })).status).toBe(400);
+    expect((await call('PUT', '/api/deck/files/picture/huge.png', { body: { data: b64(Buffer.concat([png, Buffer.alloc(600 * 1024)])) } })).body.error).toMatch(/at most/);
   });
 
-  it('keeps a card face on a button', async () => {
-    const r = await call('PUT', '/api/deck', { body: { columns: 4, buttons: [{ ...applause, card: { img: 'OP01-001.jpg', name: 'Roronoa Zoro' } }] } });
+  it('shows a picture to the owner, typed and never sniffed', async () => {
+    const res = await fetch(`${base}/api/deck/pictures/pic-a1.png`, { headers: { cookie } });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('image/png');
+    expect(res.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(Buffer.from(await res.arrayBuffer()).equals(png)).toBe(true);
+    expect((await fetch(`${base}/api/deck/pictures/nope.png`, { headers: { cookie } })).status).toBe(404);
+    expect((await fetch(`${base}/api/deck/pictures/pic-a1.png`, { headers: { authorization: `Bearer ${deckToken}` } })).status).toBe(401);
+    // only pictures come back to the browser this way, never a sound or a script
+    expect((await fetch(`${base}/api/deck/pictures/cheer.wav`, { headers: { cookie } })).status).toBe(404);
+  });
+
+  it('the deck downloads pictures like the other files', async () => {
+    const s = await call('POST', '/api/deck/sync', { bearer: deckToken, body: {} });
+    expect(s.body.files.filter((f: { kind: string }) => f.kind === 'picture').map((f: { name: string }) => f.name)).toEqual(['pic-a1.png', 'pic-b2.webp']);
+    const res = await fetch(`${base}/api/deck/files/picture/pic-b2.webp`, { headers: { authorization: `Bearer ${deckToken}` } });
+    expect(Buffer.from(await res.arrayBuffer()).equals(webp)).toBe(true);
+  });
+
+  it('keeps a picture face on a button, and drops an old card face', async () => {
+    const r = await call('PUT', '/api/deck', { body: { columns: 4, buttons: [{ ...applause, picture: 'pic-a1.png' }, { ...capture, card: { img: 'OP01-001.jpg', name: 'Zoro' } }] } });
     expect(r.status).toBe(200);
-    expect(r.body.buttons[0].card).toEqual({ img: 'OP01-001.jpg', name: 'Roronoa Zoro' });
-    expect((await call('PUT', '/api/deck', { body: { columns: 4, buttons: [{ ...applause, card: { img: '../x.jpg' } }] } })).status).toBe(400);
+    expect(r.body.buttons[0].picture).toBe('pic-a1.png');
+    expect(r.body.buttons[1]).not.toHaveProperty('card');
+    expect((await call('PUT', '/api/deck', { body: { columns: 4, buttons: [{ ...applause, picture: '../x.png' }] } })).status).toBe(400);
+    expect((await call('PUT', '/api/deck', { body: { columns: 4, buttons: [{ ...applause, picture: '' }] } })).body.buttons[0]).not.toHaveProperty('picture');
   });
 });

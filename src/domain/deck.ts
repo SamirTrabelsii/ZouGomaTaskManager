@@ -11,25 +11,42 @@ export type DeckAction =
   | { type: 'script'; file: string }
   | { type: 'sound'; file: string; volume: number };
 
-/** A One Piece card from the binder as the button's face (its art file and name). */
-export interface DeckCard { img: string; name: string }
-export interface DeckButton { id: string; label: string; icon: string; color: string; card?: DeckCard; action: DeckAction }
+/** A button shows its emoji on its colour, or a picture you uploaded (`picture`: that upload's file name). */
+export interface DeckButton { id: string; label: string; icon: string; color: string; picture?: string; action: DeckAction }
 
-export type DeckFileKind = 'sound' | 'script';
-/** A sound or script uploaded in LifeOS; the deck copies it into its folder when it syncs. */
+export type DeckFileKind = 'sound' | 'script' | 'picture';
+/** A sound, script or button picture uploaded in LifeOS; the deck downloads it when it syncs. */
 export interface DeckFile { kind: DeckFileKind; name: string; sha256: string; size: number; updatedAt: string }
 export const MAX_SOUND_BYTES = 3 * 1024 * 1024;
 export const MAX_SCRIPT_BYTES = 64 * 1024;
+/** Pictures are cropped to a square and shrunk to this many pixels a side before they are sent. */
+export const PICTURE_SIZE = 256;
 
-/** Which folder a file goes to, from its name; null when it is neither a sound nor a script. */
+/** Which kind a file is, from its name; null when it is none of them (pictures are any image the browser can open). */
 export function fileKindOf(name: string): DeckFileKind | null {
   if (/^[\w .()-]{1,80}\.(wav|mp3|ogg)$/i.test(name)) return 'sound';
   if (/^[\w .()-]{1,80}\.(ps1|bat|cmd)$/i.test(name)) return 'script';
+  if (/\.(png|jpe?g|webp|gif|bmp|avif)$/i.test(name)) return 'picture';
   return null;
 }
 
+/** The file name a new picture is stored under: short, random, and always a plain name. */
+export const newPictureName = (ext: 'webp' | 'png', random: () => string) => `pic-${random().replace(/[^a-z0-9]/gi, '').slice(0, 12) || 'x'}.${ext}`;
+
+/** Where the editor shows a picture from. */
+export const pictureUrl = (name: string) => `/api/deck/pictures/${encodeURIComponent(name)}`;
+
+/**
+ * Where a picture's square is taken from: the centred largest square, so a wide photo loses its sides and a tall one its
+ * top and bottom.
+ */
+export function coverCrop(width: number, height: number): { sx: number; sy: number; side: number } {
+  const side = Math.min(width, height);
+  return { sx: Math.round((width - side) / 2), sy: Math.round((height - side) / 2), side };
+}
+
 /** The names a picker offers: what the deck reported from its folder, plus what was uploaded here. */
-export function offeredFiles(o: DeckOverview, kind: DeckFileKind): string[] {
+export function offeredFiles(o: DeckOverview, kind: 'sound' | 'script'): string[] {
   const local = kind === 'sound' ? o.deck.sounds : o.deck.scripts;
   const uploaded = (o.files ?? []).filter((f) => f.kind === kind).map((f) => f.name);
   return [...new Set([...local, ...uploaded])].sort((a, b) => a.localeCompare(b));
@@ -163,8 +180,8 @@ export function moveItem<T>(list: T[], from: number, delta: number): T[] {
 }
 
 /**
- * A layout as a string that only changes when the layout does: key order does not count (the editor adds a card at the end
- * of a button, the server stores it before the action) and neither does a card left as undefined.
+ * A layout as a string that only changes when the layout does: key order does not count (the editor adds a picture at the end
+ * of a button, the server stores it before the action) and neither does a picture left as undefined.
  */
 export function layoutKey(columns: number, buttons: DeckButton[]): string {
   const sorted = (v: unknown): unknown => {
