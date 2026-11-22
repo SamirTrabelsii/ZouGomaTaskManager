@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blankAction, buttonProblem, deckMood, deckSummary, describeAction, fileKindOf, layoutKey, moveItem, newButton, offeredFiles, starterButtons, type DeckOverview } from './deck';
+import { blankAction, buttonProblem, coverCrop, deckMood, deckSummary, describeAction, fileKindOf, layoutKey, moveItem, newButton, newPictureName, offeredFiles, pictureUrl, starterButtons, type DeckOverview } from './deck';
 
 const overview = (o: Partial<DeckOverview> = {}, deck: Partial<DeckOverview['deck']> = {}): DeckOverview => ({
   columns: 4, buttons: [], revision: 0, updatedAt: null, tokens: [],
@@ -53,11 +53,19 @@ describe('moveItem', () => {
 });
 
 describe('files sent to the deck', () => {
-  it('sorts names into sounds and scripts', () => {
+  it('sorts names into sounds, scripts and pictures', () => {
     expect(fileKindOf('Cheer (loud).mp3')).toBe('sound');
     expect(fileKindOf('morning.ps1')).toBe('script');
-    expect(fileKindOf('photo.png')).toBeNull();
+    expect(fileKindOf('My Photo 2024.JPG')).toBe('picture');
+    expect(fileKindOf('logo.svg')).toBeNull();
     expect(fileKindOf('a&b.ps1')).toBeNull();
+  });
+  it('names pictures plainly and crops the centred square', () => {
+    expect(newPictureName('webp', () => 'Ab-12/cd')).toBe('pic-Ab12cd.webp');
+    expect(newPictureName('png', () => '')).toBe('pic-x.png');
+    expect(coverCrop(400, 200)).toEqual({ sx: 100, sy: 0, side: 200 });
+    expect(coverCrop(300, 500)).toEqual({ sx: 0, sy: 100, side: 300 });
+    expect(pictureUrl('pic-a.webp')).toBe('/api/deck/pictures/pic-a.webp');
   });
   it('offers what the PC has and what was uploaded, once each', () => {
     const o = overview({ files: [
@@ -71,12 +79,12 @@ describe('files sent to the deck', () => {
 });
 
 describe('layoutKey', () => {
-  it('ignores key order and cards left undefined', () => {
+  it('ignores key order and pictures left undefined', () => {
     const b = newButton('a');
-    const fromEditor = { ...b, card: { img: 'OP01-001.jpg', name: 'Zoro' } };
-    const fromServer = { id: b.id, label: b.label, icon: b.icon, color: b.color, card: { name: 'Zoro', img: 'OP01-001.jpg' }, action: b.action };
+    const fromEditor = { ...b, picture: 'pic-a.webp' };
+    const fromServer = { id: b.id, label: b.label, icon: b.icon, color: b.color, picture: 'pic-a.webp', action: b.action };
     expect(layoutKey(4, [fromEditor])).toBe(layoutKey(4, [fromServer]));
-    expect(layoutKey(4, [{ ...b, card: undefined }])).toBe(layoutKey(4, [b]));
+    expect(layoutKey(4, [{ ...b, picture: undefined }])).toBe(layoutKey(4, [b]));
     expect(layoutKey(4, [b])).not.toBe(layoutKey(5, [b]));
   });
 });
