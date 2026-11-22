@@ -83,7 +83,11 @@ describe.skipIf(!reachable)('stream deck API', () => {
     if (!/_test$/.test(dbName)) throw new Error(`Refusing to run destructive API tests on database "${dbName}"`);
     await migrate(pool);
     await pool.query('TRUNCATE users, sessions, documents, document_backups RESTART IDENTITY CASCADE');
-    server = createApp({ pool }).listen(0);
+    const fetchCardImage = async (url: string) => {
+      if (url.endsWith('/OP01-001.jpg')) return { type: 'image/jpeg', body: Buffer.from('jpeg-bytes') };
+      throw Object.assign(new Error('nope'), { status: 404 });
+    };
+    server = createApp({ pool, fetchCardImage }).listen(0);
     base = `http://localhost:${(server.address() as AddressInfo).port}`;
     await call('POST', '/api/auth/register', { body: { email: 'me@example.com', password: 'correct horse battery' } });
     deckToken = (await call('POST', '/api/deck/tokens', { body: { name: 'Office PC' } })).body.token;
@@ -142,5 +146,62 @@ describe.skipIf(!reachable)('stream deck API', () => {
     const t = await call('POST', '/api/deck/tokens', { body: { name: 'spare' } });
     await call('DELETE', `/api/deck/tokens/${t.body.id}`, { body: {} });
     expect((await call('POST', '/api/deck/sync', { bearer: t.body.token, body: {} })).status).toBe(401);
+  });
+
+  const wav = Buffer.concat([Buffer.from('RIFF\0\0\0\0WAVEfmt '), Buffer.alloc(32)]);
+  const b64 = (s: string | Buffer) => Buffer.from(s).toString('base64');
+
+  it('uploads sounds and scripts, checking what they really are', async () => {
+    let r = await call('PUT', '/api/deck/files/sound/cheer.wav', { body: { data: b64(wav) } });
+    expect(r.status).toBe(200);
+    expect(r.body.files).toEqual([expect.objectContaining({ kind: 'sound', name: 'cheer.wav', size: wav.length })]);
+    r = await call('PUT', '/api/deck/files/script/hello.ps1', { body: { data: b64('Write-Output "hello"\n') } });
+    expect(r.status).toBe(200);
+    expect(r.body.files.map((f: { name: string }) => f.name)).toEqual(['hello.ps1', 'cheer.wav']);
+
+    expect((await call('PUT', '/api/deck/files/sound/fake.mp3', { body: { data: b64('not really an mp3') } })).body.error).toMatch(/not a real/);
+    expect((await call('PUT', '/api/deck/files/script/run.exe', { body: { data: b64('x') } })).status).toBe(400);
+    expect((await call('PUT', '/api/deck/files/script/bin.ps1', { body: { data: b64(Buffer.from([0x4d, 0x5a, 0, 1])) } })).body.error).toMatch(/plain text/);
+    expect((await call('PUT', '/api/deck/files/script/secret.ps1', { body: { data: b64('$password = "hunter2hunter2"') } })).body.error).toMatch(/secrets/);
+    expect((await call('PUT', '/api/deck/files/script/big.ps1', { body: { data: b64('#'.repeat(70 * 1024)) } })).body.error).toMatch(/at most/);
+    expect((await call('PUT', '/api/deck/files/other/x.wav', { body: { data: b64(wav) } })).status).toBe(404);
+    // only the deck's token downloads, and only the owner uploads
+    expect((await call('PUT', '/api/deck/files/sound/x.wav', { bearer: deckToken, body: { data: b64(wav) } })).status).toBe(401);
+  });
+
+  it('the deck gets the file list at sync, then downloads what it lacks', async () => {
+    const s = await call('POST', '/api/deck/sync', { bearer: deckToken, body: {} });
+    expect(s.body.files).toEqual([
+      expect.objectContaining({ kind: 'script', name: 'hello.ps1' }),
+      expect.objectContaining({ kind: 'sound', name: 'cheer.wav', size: wav.length }),
+    ]);
+    const res = await fetch(`${base}/api/deck/files/sound/cheer.wav`, { headers: { authorization: `Bearer ${deckToken}` } });
+    expect(res.status).toBe(200);
+    expect(Buffer.from(await res.arrayBuffer()).equals(wav)).toBe(true);
+    expect(res.headers.get('x-content-sha256')).toBe(s.body.files[1].sha256);
+    expect((await fetch(`${base}/api/deck/files/sound/cheer.wav`, { headers: { cookie } })).status).toBe(401);
+    expect((await fetch(`${base}/api/deck/files/sound/nope.wav`, { headers: { authorization: `Bearer ${deckToken}` } })).status).toBe(404);
+  });
+
+  it('deletes a file', async () => {
+    const r = await call('DELETE', '/api/deck/files/script/hello.ps1', { body: {} });
+    expect(r.body.files.map((f: { name: string }) => f.name)).toEqual(['cheer.wav']);
+    expect((await call('DELETE', '/api/deck/files/script/hello.ps1', { body: {} })).status).toBe(404);
+  });
+
+  it('serves card art to the deck only', async () => {
+    const res = await fetch(`${base}/api/deck/card/OP01-001.jpg`, { headers: { authorization: `Bearer ${deckToken}` } });
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe('jpeg-bytes');
+    expect((await fetch(`${base}/api/deck/card/OP99-999.jpg`, { headers: { authorization: `Bearer ${deckToken}` } })).status).toBe(404);
+    expect((await fetch(`${base}/api/deck/card/..%2Fsecret.jpg`, { headers: { authorization: `Bearer ${deckToken}` } })).status).toBe(400);
+    expect((await fetch(`${base}/api/deck/card/OP01-001.jpg`, { headers: { cookie } })).status).toBe(401);
+  });
+
+  it('keeps a card face on a button', async () => {
+    const r = await call('PUT', '/api/deck', { body: { columns: 4, buttons: [{ ...applause, card: { img: 'OP01-001.jpg', name: 'Roronoa Zoro' } }] } });
+    expect(r.status).toBe(200);
+    expect(r.body.buttons[0].card).toEqual({ img: 'OP01-001.jpg', name: 'Roronoa Zoro' });
+    expect((await call('PUT', '/api/deck', { body: { columns: 4, buttons: [{ ...applause, card: { img: '../x.jpg' } }] } })).status).toBe(400);
   });
 });

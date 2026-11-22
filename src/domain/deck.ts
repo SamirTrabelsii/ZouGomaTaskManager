@@ -11,7 +11,29 @@ export type DeckAction =
   | { type: 'script'; file: string }
   | { type: 'sound'; file: string; volume: number };
 
-export interface DeckButton { id: string; label: string; icon: string; color: string; action: DeckAction }
+/** A One Piece card from the binder as the button's face (its art file and name). */
+export interface DeckCard { img: string; name: string }
+export interface DeckButton { id: string; label: string; icon: string; color: string; card?: DeckCard; action: DeckAction }
+
+export type DeckFileKind = 'sound' | 'script';
+/** A sound or script uploaded in LifeOS; the deck copies it into its folder when it syncs. */
+export interface DeckFile { kind: DeckFileKind; name: string; sha256: string; size: number; updatedAt: string }
+export const MAX_SOUND_BYTES = 3 * 1024 * 1024;
+export const MAX_SCRIPT_BYTES = 64 * 1024;
+
+/** Which folder a file goes to, from its name; null when it is neither a sound nor a script. */
+export function fileKindOf(name: string): DeckFileKind | null {
+  if (/^[\w .()-]{1,80}\.(wav|mp3|ogg)$/i.test(name)) return 'sound';
+  if (/^[\w .()-]{1,80}\.(ps1|bat|cmd)$/i.test(name)) return 'script';
+  return null;
+}
+
+/** The names a picker offers: what the deck reported from its folder, plus what was uploaded here. */
+export function offeredFiles(o: DeckOverview, kind: DeckFileKind): string[] {
+  const local = kind === 'sound' ? o.deck.sounds : o.deck.scripts;
+  const uploaded = (o.files ?? []).filter((f) => f.kind === kind).map((f) => f.name);
+  return [...new Set([...local, ...uploaded])].sort((a, b) => a.localeCompare(b));
+}
 
 /** A Chrome profile on the PC, as the deck reports it: its folder, its name in Chrome, and the account partly hidden. */
 export interface ChromeProfile { dir: string; name: string; account: string }
@@ -27,6 +49,7 @@ export interface DeckOverview {
   /** What the deck on the PC last reported. */
   deck: { syncedAt: string | null; syncedRevision: number; version: string; scripts: string[]; sounds: string[]; chromeProfiles?: ChromeProfile[] };
   tokens: DeckToken[];
+  files?: DeckFile[];
 }
 
 export const MAX_BUTTONS = 32;
@@ -137,4 +160,19 @@ export function moveItem<T>(list: T[], from: number, delta: number): T[] {
   const [it] = next.splice(from, 1);
   next.splice(to, 0, it);
   return next;
+}
+
+/**
+ * A layout as a string that only changes when the layout does: key order does not count (the editor adds a card at the end
+ * of a button, the server stores it before the action) and neither does a card left as undefined.
+ */
+export function layoutKey(columns: number, buttons: DeckButton[]): string {
+  const sorted = (v: unknown): unknown => {
+    if (Array.isArray(v)) return v.map(sorted);
+    if (v && typeof v === 'object') {
+      return Object.fromEntries(Object.entries(v).filter(([, x]) => x !== undefined).sort(([a], [b]) => a.localeCompare(b)).map(([k, x]) => [k, sorted(x)]));
+    }
+    return v;
+  };
+  return JSON.stringify(sorted([columns, buttons]));
 }
