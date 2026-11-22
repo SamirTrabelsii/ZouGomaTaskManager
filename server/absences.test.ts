@@ -110,6 +110,11 @@ describe.skipIf(!reachable)('absences API', () => {
     expect((await owner('POST', `/api/absences/steps/${steps[1].id}/retry`, {})).status).toBe(200);
     expect((await owner('POST', `/api/absences/steps/${steps[0].id}/retry`, {})).status).toBe(409);
     expect((await work()).map((s) => s.kind)).toEqual(['mail_client', 'planning']);
+    // a failed step fixed by hand can be closed as done (the robot stops worrying); a done one cannot
+    expect((await exec('POST', `/api/absences/steps/${steps[1].id}/result`, { status: 'failed', detail: 'again' })).status).toBe(200);
+    expect((await owner('POST', `/api/absences/steps/${steps[1].id}/resolve`, {})).status).toBe(200);
+    expect((await owner('POST', `/api/absences/steps/${steps[1].id}/resolve`, {})).status).toBe(409);
+    expect((await owner('GET', '/api/absences')).body.absences[0].steps[1]).toMatchObject({ status: 'done', detail: 'Done by hand' });
     // and an absence with work done cannot be cancelled
     expect((await owner('POST', `/api/absences/${created.body.id}/cancel`, {})).status).toBe(409);
   });

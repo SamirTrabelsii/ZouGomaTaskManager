@@ -202,7 +202,7 @@ function BookTab({ onBooked }: { onBooked: () => void }) {
 const STATUS_ICON: Record<AbsenceStepState['status'], string> = { pending: '⏳', running: '⚙️', done: '✅', failed: '⚠️', skipped: '—' };
 
 function AbsenceCard({ a }: { a: Absence }) {
-  const { cancel, remove, retry } = useAbsences.getState();
+  const { cancel, remove, retry, resolve } = useAbsences.getState();
   const [error, setError] = useState<string | null>(null);
   const run = async (fn: () => Promise<string | null>) => setError(await fn());
   const untouched = a.steps.every((s) => s.status === 'pending');
@@ -225,7 +225,10 @@ function AbsenceCard({ a }: { a: Absence }) {
               {s.detail && <div className="text-xs text-ink-500">{s.detail}</div>}
             </div>
             {(s.status === 'failed' || (s.status === 'skipped' && !a.cancelled)) && (
-              <button type="button" className="btn btn-ghost shrink-0 text-xs" onClick={() => run(() => retry(s.id))}>Retry</button>
+              <div className="flex shrink-0 flex-col items-end gap-0.5">
+                <button type="button" className="btn btn-ghost text-xs" onClick={() => run(() => retry(s.id))}>Retry</button>
+                <button type="button" className="btn btn-ghost text-xs" title="I did it myself: close this action" onClick={() => run(() => resolve(s.id))}>Done by hand</button>
+              </div>
             )}
           </li>
         ))}

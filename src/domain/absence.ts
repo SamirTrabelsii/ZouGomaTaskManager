@@ -98,7 +98,7 @@ export function absenceSummary(list: AbsenceList | null, today: string): { summa
   const mood = absenceBotMood(list, today);
   const failed = list.absences.flatMap((a) => a.steps).filter((s) => s.status === 'failed').length;
   if (mood === 'worried') return { summary: `${failed} action${failed === 1 ? '' : 's'} failed`, prompt: 'Open to retry' };
-  if (mood === 'waiting') return { summary: 'Waiting for n8n (is the PC on?)', prompt: null };
+  if (mood === 'waiting') return { summary: 'Waiting for the PC to pick it up (runs at 9h, 13h and 17h on weekdays)', prompt: null };
   if (mood === 'busy') return { summary: 'Sending your absence…', prompt: null };
   if (mood === 'away') return { summary: 'You are away today', prompt: null };
   const next = upcomingDays(list.absences, today)[0];

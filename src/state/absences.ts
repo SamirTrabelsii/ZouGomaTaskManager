@@ -18,6 +18,8 @@ interface AbsenceState {
   cancel(id: string): Promise<string | null>;
   remove(id: string): Promise<string | null>;
   retry(stepId: string): Promise<string | null>;
+  /** A failed step that was fixed by hand: mark it done. */
+  resolve(stepId: string): Promise<string | null>;
   reset(): void;
 }
 
@@ -45,6 +47,7 @@ export const useAbsences = create<AbsenceState>((set, get) => {
     cancel: (id) => act(() => cloud.cancelAbsence(id)),
     remove: (id) => act(() => cloud.deleteAbsence(id)),
     retry: (stepId) => act(() => cloud.retryAbsenceStep(stepId)),
+    resolve: (stepId) => act(() => cloud.resolveAbsenceStep(stepId)),
     reset() { set({ list: null, settings: null, stale: false }); },
   };
 });
