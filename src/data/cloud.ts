@@ -90,6 +90,7 @@ export const cloud = {
   bookAbsence: (days: AbsenceDay[], steps: AbsenceStep[], type: AbsenceType) => api<{ id: string; label: string }>('/absences', { method: 'POST', body: { days, steps, type } }),
   cancelAbsence: (id: string) => api<{ ok: true }>(`/absences/${encodeURIComponent(id)}/cancel`, { method: 'POST', body: {} }),
   deleteAbsence: (id: string) => api<{ ok: true }>(`/absences/${encodeURIComponent(id)}`, { method: 'DELETE', body: {} }),
+  resolveAbsenceStep: (id: string) => api<{ ok: true }>(`/absences/steps/${encodeURIComponent(id)}/resolve`, { method: 'POST', body: {} }),
   retryAbsenceStep: (id: string) => api<{ ok: true }>(`/absences/steps/${encodeURIComponent(id)}/retry`, { method: 'POST', body: {} }),
   deleteSimulatedAlerts: () => api<{ deleted: number }>('/agent/alerts/simulated', { method: 'DELETE', body: {} }),
   agentAlert: (id: string) => api<AgentAlertDetail>(`/agent/alerts/${encodeURIComponent(id)}`),

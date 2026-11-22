@@ -247,6 +247,19 @@ export function absenceRouter(pool: pg.Pool, requireAuth: RequestHandler, userId
     } catch (e) { next(e); }
   });
 
+  /** The user fixed a failed or skipped step by hand: close it as done (the room's robot stops worrying). */
+  router.post('/steps/:id/resolve', requireAuth, async (req, res, next) => {
+    try {
+      const id = idOf(req.params.id);
+      const r = id ? await pool.query(
+        `UPDATE absence_steps s SET status='done', detail='Done by hand', finished_at=now() FROM absences a
+         WHERE s.id=$1 AND a.id=s.absence_id AND a.user_id=$2 AND a.cancelled_at IS NULL AND s.status IN ('failed','skipped')`,
+        [id, userIdOf(req)]) : null;
+      if (!r?.rowCount) return res.status(409).json({ error: 'Only a failed or skipped action can be marked as done.' });
+      res.json({ ok: true });
+    } catch (e) { next(e); }
+  });
+
   /* ── executor (agent token) ── */
 
   /** Steps waiting for the kinds this executor knows (?kinds=mail_employer,mail_client). Reading changes nothing but "last seen". */
