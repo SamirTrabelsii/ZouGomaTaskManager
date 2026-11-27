@@ -20,7 +20,7 @@ export const EMPTY_SETTINGS: AbsenceSettings = { employer: { to: [], cc: [] }, c
 export const DAY_PARTS: readonly DayPart[] = ['full', 'am', 'pm'];
 
 /** What an absence sets off, in the order it is shown. Each step is run by whichever executor knows it (n8n, the local agent). */
-export const ABSENCE_STEPS = ['mail_employer', 'mail_client', 'planning', 'outlook_status', 'google_status', 'boond_absence', 'boond_cra'] as const;
+export const ABSENCE_STEPS = ['mail_employer', 'mail_client', 'planning', 'outlook_status', 'google_status', 'boond_absence', 'boond_cra', 'admin_sheet'] as const;
 export type AbsenceStep = (typeof ABSENCE_STEPS)[number];
 export const STEP_LABELS: Record<AbsenceStep, string> = {
   mail_employer: 'Mail to Olivesoft (Outlook)',
@@ -30,6 +30,7 @@ export const STEP_LABELS: Record<AbsenceStep, string> = {
   google_status: 'Out of office in Gmail and Google Chat',
   boond_absence: 'Absence request in Boond',
   boond_cra: 'Timesheet (CRA) in Boond',
+  admin_sheet: 'Olive-Soft timesheet (Excel)',
 };
 /** Absence types as Boond names them (the Boond step picks one; the mails do not mention it). */
 export const ABSENCE_TYPES = ['CP', 'Congés Sans Solde', 'Maladie', 'Exceptionnelle', 'Absence école'] as const;
